@@ -81,7 +81,6 @@ export const App = () => {
       const panel = PANELS[parseInt(input) - 1];
       if (panel) {
         panelStatesRef.current[panel.id].visible = !panelStatesRef.current[panel.id].visible;
-        // Ensure at least one panel visible
         const visibleCount = PANELS.filter(p => panelStatesRef.current[p.id].visible).length;
         if (visibleCount === 0) {
           panelStatesRef.current[panel.id].visible = true;
@@ -111,7 +110,7 @@ export const App = () => {
   });
 
   const minWidth = 60;
-  const minHeight = 20;
+  const minHeight = 15;
   if (terminalSize.columns < minWidth || terminalSize.rows < minHeight) {
     return (
       <InkBox flexDirection="column" padding={2}>
@@ -124,6 +123,16 @@ export const App = () => {
   const visiblePanels = PANELS.filter(p => panelStatesRef.current[p.id].visible);
   const focusedState = panelStatesRef.current[focusedPanelRef.current];
 
+  // Calculate grid layout based on terminal size
+  const panelAreaWidth = terminalSize.columns - 2; // account for borders
+  const panelAreaHeight = terminalSize.rows - 8; // header(3) + footer(3) + tabBar(1) + margins
+  
+  // Calculate optimal panel dimensions for bento grid
+  const visibleCount = visiblePanels.length;
+  const maxCols = Math.min(visibleCount, Math.max(1, Math.floor(panelAreaWidth / 30)));
+  const panelWidth = Math.floor(panelAreaWidth / maxCols) - 2;
+  const panelHeight = Math.max(8, Math.floor(panelAreaHeight / Math.ceil(visibleCount / maxCols)) - 2);
+
   return (
     <InkBox flexDirection="column" height="100%" width="100%">
       {/* Header */}
@@ -135,27 +144,46 @@ export const App = () => {
         </Box>
       </Box>
 
-      {/* Main content */}
+      {/* Tab Bar - horizontal 1-6 tabs */}
+      <Box flexDirection="row" marginBottom={1} paddingX={1}>
+        {PANELS.map(panel => {
+          const isVisible = panelStatesRef.current[panel.id].visible;
+          const isFocused = focusedPanelRef.current === panel.id;
+          return (
+            <Box key={panel.id} flexDirection="row" marginRight={1} paddingX={1} 
+                 borderStyle={isFocused ? "round" : "single"} 
+                 borderColor={isFocused ? "accent" : (isVisible ? "border" : "dim")}
+                 backgroundColor={isFocused ? "selectionBg" : (isVisible ? "transparent" : "dim")}>
+              <Text color={isFocused ? "selectionFg" : (isVisible ? "foreground" : "dim")}>
+                [{panel.number}] {panel.title}
+              </Text>
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* Main content - Bento Grid */}
       <Box flexDirection="row" flexGrow={1}>
-        {/* Left panels */}
-        <Box width={Math.floor(terminalSize.columns * 0.4)} borderStyle="round" borderColor="border" marginRight={1}>
+        {/* Grid of panels */}
+        <Box width={Math.max(30, Math.floor(terminalSize.columns * 0.6))} flexDirection="column" flexGrow={1} flexWrap="wrap" marginRight={1}>
           {visiblePanels.map((panel, _idx) => (
-            <Panel
-              key={panel.id}
-              title={panel.title}
-              number={panel.number}
-              isFocused={focusedPanelRef.current === panel.id}
-              isVisible={true}
-              items={panelStatesRef.current[panel.id].items}
-              selectedIndex={panelStatesRef.current[panel.id].selectedIndex}
-              onSelect={(index) => { panelStatesRef.current[panel.id].selectedIndex = index; }}
-              _onToggle={() => { panelStatesRef.current[panel.id].visible = !panelStatesRef.current[panel.id].visible; }}
-            />
+            <Box key={panel.id} width={panelWidth} height={panelHeight} marginRight={1} marginBottom={1}>
+              <Panel
+                title={panel.title}
+                number={panel.number}
+                isFocused={focusedPanelRef.current === panel.id}
+                isVisible={true}
+                items={panelStatesRef.current[panel.id].items}
+                selectedIndex={panelStatesRef.current[panel.id].selectedIndex}
+                onSelect={(index) => { panelStatesRef.current[panel.id].selectedIndex = index; }}
+                _onToggle={() => { panelStatesRef.current[panel.id].visible = !panelStatesRef.current[panel.id].visible; }}
+              />
+            </Box>
           ))}
         </Box>
 
         {/* Detail pane */}
-        <Box flexGrow={1} borderStyle="round" borderColor="border" paddingX={1} paddingY={1}>
+        <Box flexGrow={1} borderStyle="round" borderColor="border" paddingX={1} paddingY={1} width={Math.max(25, terminalSize.columns - Math.floor(terminalSize.columns * 0.6))}>
           <Box flexDirection="row" marginBottom={1} borderStyle="single" borderColor="border" paddingX={1}>
             <Text color="accent">Detail</Text>
             <Box marginLeft={2}>
