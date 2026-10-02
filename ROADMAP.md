@@ -76,10 +76,10 @@ Phase overview
 
 **Goal:** the lazydocker-like frame with numbered, toggleable panels.
 
-- [ ] **P2-T1** `theme/theme.ts`: `Theme` type + default palette (semantic colors: ok, warn, error, dim, accent, border, selectionBg, selectionFg).
+- [x] **P2-T1** `theme/theme.ts`: `Theme` type + default palette (semantic colors: ok, warn, error, dim, accent, border, selectionBg, selectionFg).
 - [ ] **P2-T2** Layout: left column of panels, right detail pane, footer key hints, status bar. Handles terminal resize and a minimum size message ("terminal too small").
-- [ ] **P2-T3** Panel visibility: `1`–`6` toggle (FR-3). Each panel title shows its number, e.g. `[2] Containers`. At least one visible panel enforced. Hidden panels do not fetch or poll (assert in a test via a mock engine call counter).
-- [ ] **P2-T4** Focus: `Tab`/`Shift+Tab` cycles visible panels; focused panel has a highlighted border.
+- [x] **P2-T3** Panel visibility: `1`–`6` toggle (FR-3). Each panel title shows its number, e.g. `[2] Containers`. At least one visible panel enforced. Hidden panels do not fetch or poll (assert in a test via a mock engine call counter).
+- [x] **P2-T4** Focus: `Tab`/`Shift+Tab` cycles visible panels; focused panel has a highlighted border.
 - [ ] **P2-T5** `useContainers` hook + Containers panel: list with state color (running green, exited red/dim, paused yellow), healthy/unhealthy suffix, selection by ID, `↑↓`/`j k`, `/` filter.
 - [ ] **P2-T6** Refresh strategy (FR-2): event stream if verified, else polling at a configurable interval; no flicker; selection stable.
 - [ ] **P2-T7** Detail pane with `TabBar`; Config tab renders formatted inspect JSON: key/value with colors, collapsible sections, scrollable.

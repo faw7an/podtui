@@ -142,3 +142,90 @@ below, then building phases 3+ on top.
 Open UNKNOWNS carried forward: #10–#15 (TTY resize flicker, alt-screen restore
 on quit/Ctrl+C, zero-size mid-resize, NO_COLOR behavior, zero-width-panel
 fallback semantics, `useWindowSize` zero-reporting).
+
+---
+
+## Part 4 progress (updated 2026-10-03)
+
+Items completed on `audit/2026-10-02`, in the approved order. Each was
+verified by a test that fails without the change.
+
+| ID | Item | Status | Proving test |
+|---|---|---|---|
+| R-00 | Check flake eliminated | done | 30 consecutive `bun run check` green; 15/15 loaded runs (was 30/30 failing) |
+| R-04 | Prune previews never destroy | done | `test/prune-safety.test.ts` (7) |
+| R-05 | Abortable log streams, read as bytes | done | `test/log-stream.test.ts` (4) |
+| R-12 | Selection by item id | done | `test/selection.test.ts` (9) |
+| R-13 | Hidden panels do not fetch | done | `test/refresh.test.ts` (7) |
+| R-06 | Behavioural engine tests + guard fix | done | `test/engine.test.ts` (23) |
+| R-07 | request/stream timeout, abort, errors | done | `test/client-requests.test.ts` (16) |
+| R-16 | Detail TabBar + Config inspect | done | `test/detail.test.ts` (14) |
+| R-17 | `?` help overlay | done | `test/help.test.ts` (8) |
+
+Suite: **356 pass / 0 fail** with `PODTUI_INTEGRATION=1`; build compiles.
+
+### Bugs found and fixed during Part 4
+
+- `pruneContainers/Images/Volumes/Networks(sock, true)` really pruned
+  (server ignores the body). Previews are now list/inspect-only.
+- `containerLogs` had no `signal`; aborting timed out after 30s. Now abortable,
+  and log payloads are read as bytes instead of via a newline-splitting text
+  round-trip.
+- Index-based selection jumped to a different item when a refresh removed a row
+  above the cursor.
+- Hidden panels were still fetched on every tick.
+- `isSandboxSocket` used `includes()`, so `/etc/tmp/podtui-dev/...` passed the
+  destructive-test guard.
+- Every `AbortError` was reported as "Request timeout".
+- Streams reported a dead socket as an opaque `unknown` TypeError.
+- `StreamOptions.timeout` was declared and never read.
+- Two guessed API fields (`NetworkListItem.containers`,
+  `NetworkSettings.Networks`) — both caught by `tsc`; neither shipped.
+
+### ROADMAP status after Part 4
+
+Ticked (automated criteria verified): **P2-T1**, **P2-T3**, **P2-T4**.
+
+Still unticked, with the exact gap:
+
+| Task | Remaining gap |
+|---|---|
+| P2-T2 | No dedicated status bar (errors render in the footer). Everything else verified by the LAYOUT_SPEC §9 matrix |
+| P2-T5 | No `/` filter, no healthy/unhealthy suffix, no `useContainers` hook (data lives in `App` + `view/refresh.ts`) |
+| P2-T6 | Poll interval still hardcoded (`POLL_MS`); no event stream (FR-2 stream-first) |
+| P2-T7 | TabBar + Config rendering work, but no key binding for collapsing sections and no per-field colouring; manual item 5 will partially fail |
+| P2-T8 | Footer shows a fixed hint list, not *context-sensitive* hints |
+
+Phase 1 boxes stay unticked: the audit verified the work exists, but several
+task criteria are still unmet (P1-T2 timeout/abort now covered but the
+`{} as T` empty-body case remains; P1-T3 never records `network-inspect.json`;
+P1-T6 stream style is still unrecorded; P1-T7/P1-T8 mapper unit tests and a real
+abort assertion are still missing).
+
+## Resume point
+
+**Where to continue:** the hygiene batch, then the roadmap from Phase 3.
+
+Order:
+
+1. **R-11** delete dead `src/ui/panels/Panel.tsx` + `src/ui/components/Box.tsx`
+   and migrate or delete the stale `test/ui-layout.test.tsx` (S).
+2. **R-10** `parseJson` empty-body handling in `src/api/client.ts` (S).
+3. **R-14** configurable poll interval + record the stream-vs-poll decision
+   (S) — unblocks ticking P2-T6.
+4. **R-01** pin the 5 unpinned devDependencies (S).
+5. **R-09** fix `scripts/record-fixtures.sh` so `network-inspect.json` is
+   recorded; drop or justify the dead `container-stats.json` (S).
+6. **R-03** non-zero exit when raw mode is unavailable (S).
+7. **R-18** verify the Ctrl+C restore path (S).
+8. **R-02** complete the P0-T8 environment report (terminal name, truecolor
+   gradient, SGR mouse log) (S).
+9. **R-08** record the stream-style decision (S).
+10. Remaining manual-gated Phase 2 gaps: P2-T2 status bar, P2-T5 filter +
+    healthy/unhealthy, P2-T7 collapse/colour keys, P2-T8 context-sensitive
+    footer.
+11. Then resume the roadmap at **Phase 3 — detail tabs** (P3-T1..T10), which the
+    audit confirmed is entirely unstarted.
+
+Do not start Phase 3 work before the maintainer has run the manual checklist and
+confirmed the stop-point items below.
