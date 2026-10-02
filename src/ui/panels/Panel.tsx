@@ -35,16 +35,12 @@ const renderRow = (item: { id: string; label: string; status: string }, index: n
   const fgColor = selected ? "selectionFg" : "foreground";
   const prefix = selected ? "> " : "  ";
   
-  const label = item.label.length > nameW - 3 
-    ? item.label.slice(0, nameW - 3) + "…" 
-    : item.label.padEnd(nameW - 3);
-  
   return (
-    <Box key={item.id} flexDirection="row" backgroundColor={bgColor} paddingX={1}>
-      <Box width={nameW}>
-        <Text color={fgColor}>{prefix}{label}</Text>
+    <Box key={item.id} flexDirection="row" backgroundColor={bgColor} paddingX={1} paddingY={0}>
+      <Box width={nameW} flexShrink={0}>
+        <Text color={fgColor} wrap="truncate-end">{prefix}{item.label}</Text>
       </Box>
-      <Box width={statusW} flexDirection="row" alignItems="flex-end">
+      <Box width={statusW} flexDirection="row" alignItems="flex-end" flexShrink={0}>
         <Text color={fgColor}>{item.status}</Text>
       </Box>
     </Box>
