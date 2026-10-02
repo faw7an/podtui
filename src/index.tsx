@@ -18,8 +18,8 @@ const Content = () => {
   const { exit } = useApp();
   const [counter, setCounter] = useState(0);
 
-  useInput((_, key) => {
-    if (key.q) {
+  useInput((input, key) => {
+    if (input === "q" || key.escape) {
       exit(0);
     }
   });
