@@ -16,9 +16,8 @@ export type Action =
   | { type: "activate"; id: PanelId }
   /** Handled by the App's dialog/menu owner, highest Escape priority. */
   | { type: "closeDialog" }
-  /** Move the selection inside a panel; clamped by the caller to item count. */
-  | { type: "select"; id: PanelId; index: number }
-  | { type: "moveSelection"; delta: 1 | -1 };
+  /** Select an item by its stable ID (never by row index). */
+  | { type: "select"; id: PanelId; itemId: string };
 
 export interface LayoutState {
   visible: Set<PanelId>;
@@ -33,8 +32,12 @@ export interface LayoutState {
    */
   returnFocus: PaneId;
   tab: number;
-  /** Per-panel selection, remembered across hide/show (LAYOUT_SPEC §4). */
-  selected: Record<PanelId, number>;
+  /**
+   * Per-panel selection, stored as the selected item's ID so a refresh cannot
+   * move the cursor (PROJECT_GUIDE §3 data flow 4). The row index is resolved
+   * at render time by `selectedIndex`.
+   */
+  selected: Record<PanelId, string>;
 }
 
 /** At least one list panel must stay visible (LAYOUT_SPEC §4). */
@@ -44,8 +47,8 @@ export function initialState(
   visible?: readonly PanelId[],
   focus: PaneId = "containers",
 ): LayoutState {
-  const selected = {} as Record<PanelId, number>;
-  for (const id of PANEL_IDS) selected[id] = 0;
+  const selected = {} as Record<PanelId, string>;
+  for (const id of PANEL_IDS) selected[id] = "";
   return {
     visible: new Set(visible ?? PANEL_IDS),
     focus,
@@ -164,16 +167,8 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
       return state;
 
     case "select": {
-      const index = Math.max(0, Math.floor(action.index));
-      if (state.selected[action.id] === index) return state;
-      return { ...state, selected: { ...state.selected, [action.id]: index } };
-    }
-
-    case "moveSelection": {
-      const id = state.focus;
-      if (!isPanelId(id)) return state;
-      const next = Math.max(0, state.selected[id] + action.delta);
-      return { ...state, selected: { ...state.selected, [id]: next } };
+      if (state.selected[action.id] === action.itemId) return state;
+      return { ...state, selected: { ...state.selected, [action.id]: action.itemId } };
     }
   }
 }
@@ -204,4 +199,15 @@ export function resolveEscape(
   if (state.detailFullscreen) return { type: "escape" };
   if (ctx.filterActive && ctx.clearFilter) return ctx.clearFilter;
   return null;
+}
+
+/**
+ * Resolve a stored item ID to a row index against the CURRENT item ids.
+ * Falls back to the first row when the selection is empty or has vanished, so
+ * the panel always has a valid row to highlight.
+ */
+export function selectedIndex(selectedId: string, ids: readonly string[]): number {
+  if (ids.length === 0) return 0;
+  const idx = ids.indexOf(selectedId);
+  return idx >= 0 ? idx : 0;
 }

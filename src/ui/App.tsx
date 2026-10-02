@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useReducer, useState } from "re
 import { useInput } from "ink";
 import { Screen } from "./components/Screen.tsx";
 import { createPodmanEngine } from "../engine/podman.ts";
-import { initialState, reducer, resolveEscape } from "./layout/layoutReducer.ts";
+import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/layoutReducer.ts";
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
 import { defaultTheme } from "../theme/theme.ts";
 import { EMPTY_DATA, buildFrameModel, type ResourceData } from "./view/build.ts";
@@ -11,6 +11,25 @@ import { PANEL_COLUMNS } from "./view/model.ts";
 const SOCKET_PATH = process.env["PODTUI_SOCKET"] ?? "/tmp/podtui-dev/podman.sock";
 
 const POLL_MS = 5000;
+
+/**
+ * Next/previous item id in `ids`, clamped at both ends. With nothing selected
+ * yet, the first keypress lands on the first row rather than skipping it.
+ */
+function selectionStep(
+  panel: PanelId,
+  ids: readonly string[],
+  currentId: string,
+  delta: 1 | -1,
+): { type: "select"; id: PanelId; itemId: string } {
+  if (ids.length === 0) return { type: "select", id: panel, itemId: "" };
+  // Nothing selected yet: the first keypress selects the first row.
+  const next =
+    currentId === ""
+      ? 0
+      : Math.min(ids.length - 1, Math.max(0, selectedIndex(currentId, ids) + delta));
+  return { type: "select", id: panel, itemId: ids[next] ?? "" };
+}
 
 export { PANEL_COLUMNS };
 export { shortenImageName } from "../util/format.ts";
@@ -61,7 +80,6 @@ export const App = () => {
 
   const focusId: PanelId = isPanelId(state.focus) ? state.focus : "containers";
   const focusModel = model.panels.find((p) => p.id === focusId);
-  const focusCount = focusModel?.items.length ?? 0;
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
@@ -99,20 +117,16 @@ export const App = () => {
       return;
     }
 
-    // Selection navigation, clamped to the focused panel's item count.
+    // Selection navigation. The reducer stores an item ID, so the neighbour is
+    // resolved here where the current item list is known.
+    const ids = focusModel?.items.map((i) => i.id) ?? [];
     if (key.upArrow || input === "k") {
-      dispatch({ type: "moveSelection", delta: -1 });
+      dispatch(selectionStep(focusId, ids, state.selected[focusId] ?? "", -1));
       return;
     }
     if (key.downArrow || input === "j") {
-      dispatch({ type: "moveSelection", delta: 1 });
+      dispatch(selectionStep(focusId, ids, state.selected[focusId] ?? "", 1));
       return;
-    }
-
-    // Keep the selection inside the list when the data set shrinks.
-    const current = state.selected[focusId] ?? 0;
-    if (focusCount > 0 && current > focusCount - 1) {
-      dispatch({ type: "select", id: focusId, index: focusCount - 1 });
     }
   });
 

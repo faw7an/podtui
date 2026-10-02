@@ -7,6 +7,7 @@ import type {
 } from "../../api/types.ts";
 import { formatAge, formatBytes, parsePodmanTime, shortenImageName, statusText, statusGlyph } from "../../util/format.ts";
 import { PANEL_IDS, type PaneId, type PanelId } from "../layout/types.ts";
+import { selectedIndex } from "../layout/layoutReducer.ts";
 import { PANEL_COLUMNS, panelMeta, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
 
 export interface ResourceData {
@@ -117,7 +118,7 @@ function quadletRows(items: { id: string; name: string; status: string }[]): Row
 
 export function buildPanelModels(
   data: ResourceData,
-  selected: Record<PanelId, number>,
+  selected: Record<PanelId, string>,
   now: number,
 ): PanelModel[] {
   const rows: Record<PanelId, RowModel[]> = {
@@ -134,7 +135,8 @@ export function buildPanelModels(
     ...panelMeta(id),
     columns: PANEL_COLUMNS[id],
     items: rows[id],
-    selected: selected[id] ?? 0,
+    // Resolve the stored item ID to the row index for this render.
+    selected: selectedIndex(selected[id] ?? "", rows[id].map((r) => r.id)),
     // Quadlets has no data source until Phase 6. Say so explicitly instead of
     // showing an empty box that looks like a bug; no fake data is invented.
     ...(id === "quadlets" && rows.quadlets.length === 0
@@ -145,7 +147,7 @@ export function buildPanelModels(
 
 export interface BuildFrameArgs {
   data: ResourceData;
-  selected: Record<PanelId, number>;
+  selected: Record<PanelId, string>;
   focus: PaneId;
   now: number;
   clock: string;

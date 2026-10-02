@@ -622,10 +622,10 @@ describe("focus is size-independent", () => {
 
   test("selection is remembered per panel across hide/show", () => {
     let s = initialState();
-    s = { ...s, selected: { ...s.selected, containers: 4 } };
+    s = reducer(s, { type: "select", id: "containers", itemId: "web-pod-backend" });
     s = reducer(s, { type: "toggle", id: "containers" });
     s = reducer(s, { type: "toggle", id: "containers" });
-    expect(s.selected.containers).toBe(4);
+    expect(s.selected.containers).toBe("web-pod-backend");
   });
 
   test("visibleOrder follows the canonical order", () => {
