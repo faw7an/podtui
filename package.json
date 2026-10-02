@@ -1,0 +1,15 @@
+{
+  "name": "podtui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.tsx",
+    "check": "bunx tsc --noEmit && bun run lint && bun test",
+    "test": "bun test",
+    "build": "bun build --compile src/index.tsx --outfile dist/podtui",
+    "lint": "bunx eslint . --ext .ts,.tsx"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
