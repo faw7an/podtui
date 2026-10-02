@@ -10,3 +10,7 @@ Format: `YYYY-MM-DD | Phase/Task | Decision or verified fact | Evidence (command
 | 2026-10-02 | Planning | Podman first, Docker adapter post-v1 via `ContainerEngine` interface | Maintainer decision |
 | 2026-10-02 | Planning | v1 features: bulk actions, containers/logs/env/config/stats tabs, Omarchy theme, pods and quadlets | Maintainer decision |
 | 2026-10-02 | P0-T2 | Installed ink@7.1.1, react@19.3.0, typescript@7.0.2, @types/react@19.3.0, ink-testing-library@4.0.0 | bun pm ls; Ink peerDependencies: react>=19.2.0, @types/react>=19.2.0, react-devtools-core>=6.1.2 (optional) |
+| 2026-10-02 | P0-T7 | Bun's `fetch(..., { unix: socket })` works for Podman socket; API base path is `/v5.0.0/libpod/` | curl/bun fetch tests against sandbox socket; endpoints: _ping, /version, containers/json, pods/json, images/json, volumes/json, networks/json, containers/{id}/logs, containers/stats, events, containers/{id}/top, containers/{id}/json |
+| 2026-10-02 | P0-T7 | Log streams are multiplexed for both TTY and non-TTY containers (8-byte header: stream type, 3 zeros, 4-byte BE length) | Verified with `chatty` (non-TTY) and `tty-box` (TTY) containers; both return framed data |
+| 2026-10-02 | P0-T7 | Stats endpoint returns CPU%, MemUsage, MemLimit, Network, BlockIO, PIDs; CPU% is pre-calculated | `GET /v5.0.0/libpod/containers/stats?containers=web&stream=false` |
+| 2026-10-02 | P0-T8 | Podman version: 6.1.1 (API 6.1.1); Bun version: 1.4.2; Terminal: (tested in real TTY); truecolor + SGR mouse: not yet tested | `podman version`, `bun --version` |

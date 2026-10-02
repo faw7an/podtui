@@ -40,21 +40,24 @@ up() {
   mkdir -p "$SANDBOX_ROOT" "$SANDBOX_RUNROOT"
 
   echo "Starting Podman system service..."
-  podman \
+  setsid podman \
     --root "$SANDBOX_ROOT" \
     --runroot "$SANDBOX_RUNROOT" \
-    system service --time=0 "unix://$SOCKET_PATH" &
+    system service --time=0 "unix://$SOCKET_PATH" >/tmp/podtui-dev/podman.log 2>&1 &
 
   PID=$!
   echo "$PID" > "$PID_FILE"
 
   # Wait for socket to be ready
-  for i in {1..30}; do
+  for i in {1..50}; do
     if podman --url "unix://$SOCKET_PATH" version &>/dev/null; then
       break
     fi
     sleep 0.2
   done
+
+  # Give it a moment to fully stabilize
+  sleep 1
 
   if ! podman --url "unix://$SOCKET_PATH" version &>/dev/null; then
     echo "ERROR: Podman service failed to start" >&2
@@ -111,8 +114,10 @@ seed() {
   echo "Seeding test resources..."
 
   # Clean existing test resources
+  # Remove pods first (this removes their containers too)
+  podman --url "unix://$SOCKET_PATH" pod ps --filter "label=$LABEL" -q | xargs -r podman --url "unix://$SOCKET_PATH" pod rm -f
+  # Remove any remaining containers
   podman --url "unix://$SOCKET_PATH" ps -a --filter "label=$LABEL" -q | xargs -r podman --url "unix://$SOCKET_PATH" rm -f
-  podman --url "unix://$SOCKET_PATH" pod ps -a --filter "label=$LABEL" -q | xargs -r podman --url "unix://$SOCKET_PATH" pod rm -f
   podman --url "unix://$SOCKET_PATH" volume ls --filter "label=$LABEL" -q | xargs -r podman --url "unix://$SOCKET_PATH" volume rm -f
   podman --url "unix://$SOCKET_PATH" network ls --filter "label=$LABEL" -q | xargs -r podman --url "unix://$SOCKET_PATH" network rm -f
 
@@ -178,7 +183,7 @@ seed() {
   echo ""
   echo "Test resources:"
   podman --url "unix://$SOCKET_PATH" ps -a --filter "label=$LABEL" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
-  podman --url "unix://$SOCKET_PATH" pod ps -a --filter "label=$LABEL"
+  podman --url "unix://$SOCKET_PATH" pod ps --filter "label=$LABEL"
   podman --url "unix://$SOCKET_PATH" volume ls --filter "label=$LABEL"
   podman --url "unix://$SOCKET_PATH" network ls --filter "label=$LABEL"
 }
