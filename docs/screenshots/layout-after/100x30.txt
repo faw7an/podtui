@@ -1,4 +1,4 @@
-▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets            11:55:24 PM
+▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets            12:06:12 AM
 ╭─[1] Pods 1                    ╮╭─[2] Containers 6              ╮╭─[3] Images 2                   ╮
 │  NAME            STATUS    CNT││  NAME       STATUS    IMAGE   ││  NAME              SIZE    AGE │
 │▸ web-pod         ● running 3  ││▸ web        ● running nginx:a…││▸ nginx:alpine      64.3MB  9d  │

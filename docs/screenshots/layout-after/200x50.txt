@@ -1,4 +1,4 @@
-▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets                                                                                                                11:55:22 PM
+▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets                                                                                                                12:06:10 AM
 ╭─[1] Pods 1                                          ╮╭─[2] Containers 6                                    ╮╭─web · running                                                                          ╮
 │  NAME                                  STATUS    CNT││  NAME                      STATUS    IMAGE      AGE ││Logs Stats Env Config Top                                                               │
 │▸ web-pod                               ● running 3  ││▸ web                       ● running nginx:alp… 5h  ││name       web                                                                          │

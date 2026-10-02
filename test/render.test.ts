@@ -197,18 +197,48 @@ describe("renderPanel (LAYOUT_SPEC §6)", () => {
     expect(blurred[0]).not.toContain("\u001B[1m");
   });
 
-  test("focused selection uses reverse video; unfocused does not", () => {
-    const focused = renderPanel(rect(8, 60, "containers", true), panel("containers", items(3), 1), focusedColor);
+  test("the focused selection is one unbroken highlight span", () => {
+    const lines = renderPanel(rect(8, 60, "containers", true), panel("containers", items(3), 1), focusedColor);
+    const row = lines.find((l) => stripAnsi(l).includes("▸ container-number-1")) ?? "";
+    expect(row).not.toBe("");
+
+    // Explicit background + foreground, not `inverse()`: relying on inverse
+    // made the row render black-on-black and hard to read.
+    expect(row).toContain("\u001B[48;2;");
+    expect(row).toContain("\u001B[38;2;");
+    expect(row).not.toContain("\u001B[7m");
+
+    // Exactly ONE highlight span, and it covers the whole inner row. A nested
+    // per-cell colour would emit its own RESET and tear the highlight into
+    // separate patches, leaving part of the row unhighlighted.
+    const start = row.indexOf("\u001B[48;2;");
+    const end = row.indexOf("\u001B[0m", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    // No RESET inside the span, and the span is the full inner width.
+    expect(row.slice(start, end)).not.toContain("\u001B[0m");
+    expect(visibleWidth(stripAnsi(row.slice(start, end + 4)))).toBe(60 - 2);
+    expect(row.split("\u001B[48;2;")).toHaveLength(2);
+
+    // The status cell is not coloured separately on the selected row, so it
+    // stays legible on the selection background.
+    expect(row).not.toContain("\u001B[38;2;0;255;0m"); // statusOk green
+    expect(stripAnsi(row)).toContain("▸ container-number-1");
+    expect(stripAnsi(row)).toContain("● running");
+  });
+
+  test("unfocused selection is marked but has no background", () => {
     const plain = renderPanel(rect(8, 60, "containers", false), panel("containers", items(3), 1), { ...COLORS, focused: false });
-    const focusedText = focused.map(stripAnsi).join("\n");
-    const plainText = plain.map(stripAnsi).join("\n");
-    // The marker is present in both, so meaning survives without colour.
-    expect(focusedText).toContain("▸ container-number-1");
-    expect(plainText).toContain("▸ container-number-1");
-    // Only the focused panel inverts.
-    expect(focused.join("\n")).toContain("\u001B[7m");
-    const selectedLine = plain.find((l) => stripAnsi(l).includes("▸ container-number-1")) ?? "";
-    expect(selectedLine).not.toContain("\u001B[7m");
+    const row = plain.find((l) => stripAnsi(l).includes("▸ container-number-1")) ?? "";
+    expect(row).toContain("▸");
+    expect(row).not.toContain("\u001B[48;2;");
+    expect(row).not.toContain("\u001B[7m");
+  });
+
+  test("non-selected rows keep their status colour", () => {
+    const lines = renderPanel(rect(8, 60, "containers", true), panel("containers", items(3), 1), focusedColor);
+    const other = lines.find((l) => stripAnsi(l).includes("container-number-0")) ?? "";
+    expect(other).toContain("\u001B[38;2;0;255;0m"); // statusOk green
   });
 
   test("an unfocused panel keeps its remembered selection after focus moves", () => {

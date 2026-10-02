@@ -1,4 +1,4 @@
-import { dim, fg, inverse, paint, RESET } from "./palette.ts";
+import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 import { fit, displayWidth } from "../../util/fit.ts";
 import type { Layout } from "../layout/types.ts";
 import { PANEL_IDS, type PanelId } from "../layout/types.ts";
@@ -61,8 +61,10 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
     // Every tab gets the same one-cell padding so the spacing is uniform
     // whether or not a tab is focused (focus is marked, not re-spaced).
     const body = ` ${text} `;
+    // Explicit background/foreground rather than `inverse()`: the highlight is
+    // then the same, predictable colours as the selected row in a list.
     const painted = isFocused
-      ? paint(body, [on ? inverse() : "", on ? fg(theme.accent) : ""])
+      ? paint(body, [on ? bg(theme.accent) : "", on ? fg(theme.selectionFg) : "", on ? bold() : ""])
       : isVisible
         ? body
         : paint(body, [on ? dim() : ""]);

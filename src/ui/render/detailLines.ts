@@ -3,7 +3,7 @@ import { innerWidth } from "../layout/panelView.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit, padRight } from "../../util/fit.ts";
 import type { DetailModel } from "../view/model.ts";
-import { dim, fg, inverse, paint, RESET } from "./palette.ts";
+import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 import { windowRows } from "./panelLines.ts";
 
 const TL = "╭";
@@ -51,7 +51,9 @@ export function renderDetail(
   const innerRows = Math.max(0, rect.h - 2);
   const tabText = detail.tabs
     .map((t, i) =>
-      i === detail.activeTab ? paint(t, [on ? fg(theme.accent) : "", on ? inverse() : ""]) : paint(t, [on ? dim() : ""]),
+      i === detail.activeTab
+        ? paint(t, [on ? bg(theme.accent) : "", on ? fg(theme.selectionFg) : "", on ? bold() : ""])
+        : paint(t, [on ? dim() : ""]),
     )
     .join(" ");
   const tabStrip = fit(tabText, iw);

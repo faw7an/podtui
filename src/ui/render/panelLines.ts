@@ -5,7 +5,7 @@ import type { PanelLayout } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit, padRight } from "../../util/fit.ts";
 import { COLUMN_HEADERS, type PanelModel, type RowModel } from "../view/model.ts";
-import { bold, dim, fg, inverse, paint, RESET } from "./palette.ts";
+import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 
 /** Box-drawing characters, emitted directly for exact control. */
 const TL = "╭";
@@ -117,11 +117,16 @@ export function renderPanel(
    * Place each column's cell at the offset `computeColumns` assigned. Gaps
    * between columns are left blank — the widths already include them, so
    * subtracting a gap per cell would shave a character off every column.
+   *
+   * `plain` suppresses every per-cell colour so the caller can wrap the whole
+   * line in one SGR span (used for the selected row, where a nested RESET would
+   * break the highlight).
    */
   const composeCells = (
     record: Record<string, string>,
     tone?: RowModel["tone"],
     dimAll = false,
+    plain = false,
   ): string => {
     if (!layoutCols) return padRight("", contentW);
     let out = "";
@@ -138,7 +143,8 @@ export function renderPanel(
       if (room <= 0) break;
       const text = fit(record[col.id] ?? "", room);
       const color = toneColor(tone, theme);
-      if (dimAll) out += paint(text, [on ? dim() : ""]);
+      if (plain) out += text;
+      else if (dimAll) out += paint(text, [on ? dim() : ""]);
       else if (col.id === "state" && on && color) out += paint(text, [fg(color)]);
       else out += text;
       cursor += room;
@@ -182,19 +188,23 @@ export function renderPanel(
           (empty && label !== undefined ? paint(fit(label, contentW), [on ? dim() : ""]) : padRight("", contentW));
       } else {
         const isSelected = shown.offset + slot === panel.selected;
-        const body = composeCells(item.cells, item.tone);
         if (isSelected && focused) {
-          // Reverse video across the whole padded row: marker, text and the
-          // trailing blanks all invert together.
-          inner = paint(
-            padRight(FOCUS_MARKER + body, iw),
-            [on ? inverse() : "", on ? fg(theme.selectionBg) : "", on ? fg(theme.selectionFg) : ""],
-          );
-        } else if (isSelected) {
-          // Remembered selection stays visible without reverse video.
-          inner = `${paint(FOCUS_MARKER, [on ? dim() : ""])}${body}`;
+          // One single SGR span across the whole padded row. The cells are
+          // composed WITHOUT per-cell colour on purpose: a nested colour would
+          // emit its own RESET and tear the highlight into patches. The
+          // selection background/foreground come from the theme and are
+          // explicit rather than relying on `inverse()`, so the row stays
+          // readable whatever the terminal's default background happens to be.
+          const plain = composeCells(item.cells, undefined, false, true);
+          inner = paint(padRight(FOCUS_MARKER + plain, iw), [
+            on ? bg(theme.selectionBg) : "",
+            on ? fg(theme.selectionFg) : "",
+            on ? bold() : "",
+          ]);
         } else {
-          inner = " ".repeat(markerW) + body;
+          const body = composeCells(item.cells, item.tone);
+          // Remembered selection stays visible without a background.
+          inner = isSelected ? `${paint(FOCUS_MARKER, [on ? dim() : ""])}${body}` : " ".repeat(markerW) + body;
         }
       }
     }
