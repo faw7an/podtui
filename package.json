@@ -10,6 +10,17 @@
     "build": "bun build --compile src/index.tsx --outfile dist/podtui",
     "lint": "bunx eslint . --ext .ts,.tsx"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "ink": "7.1.1",
+    "react": "19.3.0",
+    "typescript": "7.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@typescript-eslint/eslint-plugin": "8.71.0",
+    "@typescript-eslint/parser": "8.71.0",
+    "eslint": "10.11.0",
+    "ink-testing-library": "4.0.0",
+    "react-devtools-core": "6.1.2"
+  }
 }
