@@ -73,14 +73,37 @@ Let `n` = number of visible list panels, `body = {w: cols, h: rows − 2}`.
 
 Make the thresholds named constants in one file so they can be tuned; the numbers above are starting points, not facts.
 
+> **Resolved 2026-10-02 — the table above is normative and implemented.** An
+> earlier implementation used `L ≥ 120`, `M ≥ 100`, `S ≥ 40`, which put 80×24 in
+> mode S. That drift was reverted; the constants now live in
+> `src/ui/layout/constants.ts` and are asserted by `test/layout.test.ts`. Do not
+> change them without changing this table.
+
 ### Vertical fitting (the "cut off" fix)
 Within a column of panels:
-1. Each visible panel needs `MIN_PANEL_H = 6` (2 border + 1 column-header + ≥ 3 data rows — tune).
+1. Each visible panel needs `MIN_PANEL_H = 4` — 2 rows of border plus at least 1 data row. (The starting value of 6 assumed a column header; see the short-panel rule in §6, which now removes the header instead of shrinking the box.)
 2. Distribute available height by **weights** (focused = 1.5, others = 1.0), integer rounding, remainder given to the focused panel. Sum of heights must equal the available height exactly.
-3. If `n × MIN_PANEL_H > available height`, apply **accordion**: non-focused panels collapse to a **1-row title strip** (`▸ 3 Images (2)`, no border) and the focused panel gets the rest. If still not enough, show only the focused panel (mode S behavior).
+3. If `n × MIN_PANEL_H > available height`, apply **accordion**: non-focused panels collapse to a **1-row title strip** (`▸ 3 Images (2)`, no border) and the focused panel gets the rest. If still not enough, omit the lowest-priority panels entirely, then show only the focused panel (mode S behavior).
 4. Never produce a rect with `h ≤ 0` or outside the body.
 
+**Growth is content-driven.** Each panel declares a desired height of
+`PANEL_CHROME_H + itemCount`. Panels grow toward that cap by weight; once every
+panel has reached its cap, the remaining surplus goes to the focused panel, so a
+column always tiles exactly and a long list never hides rows behind a short one.
+A panel is never grown past its cap unless it is the focused one.
+
+**The focused panel is never collapsed.** Its minimum is `MIN_PANEL_H`; accordion
+only ever collapses non-focused panels. If the focused panel still cannot reach
+`MIN_PANEL_H`, lower-priority panels are dropped instead of collapsing focus.
+
 Horizontal fitting in the grid (XL): if a grid column would be narrower than `MIN_PANEL_W = 30`, fall back to mode L.
+
+### Focus never changes due to size
+Resize, breakpoint changes and any recomputation must leave the focus and the
+per-panel selection untouched. Focus moves **only** for explicit user actions:
+hiding the focused panel, focusing another visible panel, opening or closing
+detail, `Tab`/arrow navigation. Focusing a panel that would be collapsed expands
+it and collapses another panel instead.
 
 ## 6. Panel anatomy
 
@@ -95,13 +118,29 @@ Horizontal fitting in the grid (XL): if a grid column would be narrower than `MI
 ```
 
 - Inner size = `w − 2`, `h − 2`. Header row consumes 1 of the inner rows.
+- **Short-panel rule (normative).** The layout decides this, never the component; `panelMetrics(h)` in `src/ui/layout/panelView.ts` is the single source of truth:
+
+  | panel height | bordered | column header | data rows |
+  |---|---|---|---|
+  | `h ≥ 6` | yes | yes | `h − 3` |
+  | `h = 4–5` | yes | **no** (dropped to gain a row) | `h − 2` |
+  | `h < 4` | **no** — collapsed 1-row title strip | no | `0` |
+
+  A bordered box needs 2 rows for its own border and Ink does not clip, so a
+  2- or 3-row bordered box would have its border overdraw its content. `collapsed`
+  therefore means *borderless strip* and never *short box*.
 - **Column layout is a pure function** `computeColumns(innerWidth, spec) → widths[]`:
   - spec per column: `{key, min, max?, flex?, priority}`; `NAME` is the flexible column.
   - If widths do not fit, **drop lowest-priority columns first** (e.g. AGE, then PORTS), never shrink below `min`.
   - Gap between columns = 1–2 spaces. Total exactly = `innerWidth`.
 - Every cell goes through `fit()`. Status text always accompanies color (`● running`, `✖ exited(1)`), never color alone.
-- Scroll: keep selection visible (`scrollTop` adjusted on selection change/resize). Show `↓ N more` / `↑ N more` in the border when needed.
+- Scroll: keep selection visible (`scrollTop` adjusted on selection change/resize). Show `↓ N more` / `↑ N more` in the border when needed, so the hint costs no data row.
 - Focused panel: accent border color; others: dim border. Border style from theme.
+- **Markers must carry meaning without color** (`NO_COLOR`, 16-color terminals):
+  - focused panel's selected row → reverse video **and** a `▸ ` prefix;
+  - unfocused panels keep their remembered selection with a dim `▸ ` prefix and **no** reverse video;
+  - a collapsed title strip is always `▸ N Label (count)`, bold accent when focused.
+  The `▸` prefix is part of the contract and is asserted by tests with color stripped.
 
 ## 7. Detail pane
 
@@ -109,6 +148,21 @@ Horizontal fitting in the grid (XL): if a grid column would be narrower than `MI
 - Content is windowed exactly like lists (scrollable, scroll hint). Long lines **truncate with `…`** by default; `w` toggles wrapping (wrapping must be done by our own pure function, not by the renderer).
 - Title shows the selected item (`web · running`). Placeholder when nothing selected.
 - Layout must give the detail pane a minimum of `MIN_DETAIL_W = 40` in modes XL/L; otherwise switch to a smaller mode.
+
+**Detail is available at every size; it is never removed.**
+- **XL / L**: detail sits to the right of the list area, `MIN_DETAIL_W = 40`.
+- **M**: list band on top (~50% of the body), detail below at full width.
+- **S**: only the focused list panel is drawn. `Enter` opens detail **full-screen** (it takes the whole body), `Esc` returns to the list and restores the previous list focus. Number keys keep working on the list view — they focus a panel, or toggle it when it is already focused.
+
+### Escape priority
+`Esc` is resolved in this order, and only the first match fires:
+
+1. an open dialog or menu (nothing else happens),
+2. leaving detail full-screen or zoom,
+3. clearing an active filter/search,
+4. nothing.
+
+`resolveEscape(state, ctx)` in `src/ui/layout/layoutReducer.ts` implements this as a pure function so the ordering is testable without rendering a dialog.
 
 ## 8. Types and file layout
 
