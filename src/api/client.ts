@@ -18,6 +18,7 @@ export interface RequestOptions {
   timeout?: number;
   signal?: AbortSignal;
   headers?: Record<string, string>;
+  query?: Record<string, string>;
 }
 
 interface FetchOptions extends RequestInit {
@@ -64,7 +65,7 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { method = "GET", body, timeout = 10000, signal, headers = {} } = options;
+  const { method = "GET", body, timeout = 10000, signal, headers = {}, query = {} } = options;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -72,6 +73,9 @@ export async function request<T>(
   if (signal) {
     signal.addEventListener("abort", () => controller.abort());
   }
+
+  const queryString = new URLSearchParams(query).toString();
+  const fullPath = queryString ? `${path}?${queryString}` : path;
 
   const fetchOptions: FetchOptions = {
     method,
@@ -88,7 +92,7 @@ export async function request<T>(
   }
 
   try {
-    const response = await fetch(buildUrl(socketPath, path), fetchOptions);
+    const response = await fetch(buildUrl(socketPath, fullPath), fetchOptions);
     clearTimeout(timeoutId);
 
     if (!response.ok) {
