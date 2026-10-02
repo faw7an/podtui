@@ -376,7 +376,12 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     isSandboxSocket(socketPath: string) {
-      return socketPath.includes("/tmp/podtui-dev/") || socketPath.includes("/tmp/podtui-test/");
+      // Prefix match, not substring: `includes("/tmp/podtui-dev/")` also matched
+      // "/etc/tmp/podtui-dev/podman.sock", so a crafted path could satisfy the
+      // destructive-test guard. Found by test/engine.test.ts.
+      return (
+        socketPath.startsWith("/tmp/podtui-dev/") || socketPath.startsWith("/tmp/podtui-test/")
+      );
     },
   };
 }
