@@ -2,6 +2,7 @@ import {
   get,
   post,
   del,
+  streamChunks,
   streamJson,
   streamLines,
   EngineError,
@@ -196,16 +197,17 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async *containerLogs(socketPath: string, id: string, options = {}) {
-      const { follow = true, tail = 100, timestamps = true } = options;
+      const { follow = true, tail = 100, timestamps = true, signal } = options;
       const query = `stdout=true&stderr=true&follow=${follow}&tail=${tail}&timestamps=${timestamps}`;
-      
+
       const decoder = new MultiplexedLogDecoder();
-      
-      for await (const line of streamLines(socketPath, `/containers/${id}/logs?${query}`)) {
-        const chunk = new TextEncoder().encode(line + "\n");
+
+      // Read BYTES, not lines: the multiplexed log format is a binary frame
+      // stream, and routing it through a newline-splitting text decoder would
+      // corrupt any payload that is not line-oriented.
+      for await (const chunk of streamChunks(socketPath, `/containers/${id}/logs?${query}`, { signal })) {
         decoder.append(chunk);
-        const frames = decoder.decode();
-        for (const frame of frames) {
+        for (const frame of decoder.decode()) {
           yield frame;
         }
       }

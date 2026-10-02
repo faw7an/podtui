@@ -133,65 +133,95 @@ export interface StreamOptions {
   signal?: AbortSignal;
 }
 
-export async function* streamLines(
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
+/**
+ * Stream the raw response body as byte chunks.
+ *
+ * This is what binary/multiplexed payloads (container logs) must be read
+ * through: `streamLines` decodes UTF-8 and splits on newlines, which would
+ * corrupt any payload that is not line-oriented text.
+ *
+ * Abort handling: an external `signal` is bridged onto the internal controller,
+ * and the reader is cancelled in `finally`, so breaking out of a `for await`
+ * releases the socket immediately instead of leaving `reader.read()` pending.
+ */
+export async function* streamChunks(
   socketPath: string,
   path: string,
   options: StreamOptions = {}
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<Uint8Array, void, unknown> {
   const { signal } = options;
 
   const controller = new AbortController();
+  const onAbort = (): void => controller.abort();
   if (signal) {
-    signal.addEventListener("abort", () => controller.abort());
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", onAbort);
   }
 
-  const fetchOptions: FetchOptions = {
-    method: "GET",
-    signal: controller.signal,
-    unix: socketPath,
-  };
-
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
-    const response = await fetch(buildUrl(socketPath, path), fetchOptions);
+    const response = await fetch(buildUrl(socketPath, path), {
+      method: "GET",
+      signal: controller.signal,
+      unix: socketPath,
+    });
 
     if (!response.ok) {
       const text = await response.text();
       throw mapHttpError(response.status, text);
     }
 
-    const reader = response.body?.getReader();
+    reader = response.body?.getReader();
     if (!reader) return;
 
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.trim()) {
-          yield line;
-        }
-      }
-    }
-
-    if (buffer.trim()) {
-      yield buffer;
+      if (value && value.length > 0) yield value;
     }
   } catch (error) {
-    if (error instanceof EngineError) {
-      throw error;
-    }
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return;
-    }
+    if (error instanceof EngineError) throw error;
+    // An abort is a normal way for a stream to end, not an error.
+    if (isAbortError(error)) return;
     throw new EngineError("unknown", String(error));
+  } finally {
+    // Release the connection on early exit (break/abort) as well as on EOF.
+    try {
+      await reader?.cancel();
+    } catch {
+      // The stream may already be closed; nothing to release.
+    }
+    signal?.removeEventListener("abort", onAbort);
   }
+}
+
+/** Newline-delimited text view of `streamChunks` (used for JSON streams). */
+export async function* streamLines(
+  socketPath: string,
+  path: string,
+  options: StreamOptions = {}
+): AsyncGenerator<string, void, unknown> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  for await (const chunk of streamChunks(socketPath, path, options)) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line.trim()) yield line;
+    }
+  }
+
+  const tail = buffer + decoder.decode();
+  if (tail.trim()) yield tail;
 }
 
 export async function* streamJson<T>(
