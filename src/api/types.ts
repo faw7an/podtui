@@ -408,21 +408,18 @@ export interface IpamOptions {
 }
 
 export interface NetworkInspect {
-  Name: string;
-  Id: string;
-  Created: string;
-  Scope: string;
-  Driver: string;
-  EnableIPv6: boolean;
-  IPAM: Ipam;
-  Internal: boolean;
-  Attachable: boolean;
-  Ingress: boolean;
-  ConfigFrom: { Network: string };
-  ConfigOnly: boolean;
-  Containers: Record<string, EndpointSettings>;
-  Options: Record<string, string>;
-  Labels: Record<string, string>;
+  name: string;
+  id: string;
+  created: string;
+  driver: string;
+  network_interface: string;
+  subnets: Subnet[];
+  ipv6_enabled: boolean;
+  internal: boolean;
+  dns_enabled: boolean;
+  labels: Record<string, string>;
+  ipam_options: IpamOptions;
+  containers: Record<string, EndpointSettings>;
 }
 
 export interface Ipam {

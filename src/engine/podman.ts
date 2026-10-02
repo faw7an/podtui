@@ -4,6 +4,7 @@ import {
   del,
   streamJson,
   streamLines,
+  EngineError,
 } from "../api/client.ts";
 import {
   MultiplexedLogDecoder,
@@ -37,25 +38,37 @@ function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
     memUsage: s.MemUsage,
     memLimit: s.MemLimit,
     memPercent: s.MemPerc * 100,
-    netRx: Object.values(s.Network).reduce((sum, n) => sum + n.RxBytes, 0),
-    netTx: Object.values(s.Network).reduce((sum, n) => sum + n.TxBytes, 0),
-    blockRead: s.BlockInput,
-    blockWrite: s.BlockOutput,
-    pids: s.PIDs,
+    netRx: s.Network ? Object.values(s.Network).reduce((sum, n) => sum + (n.RxBytes || 0), 0) : 0,
+    netTx: s.Network ? Object.values(s.Network).reduce((sum, n) => sum + (n.TxBytes || 0), 0) : 0,
+    blockRead: s.BlockInput || 0,
+    blockWrite: s.BlockOutput || 0,
+    pids: s.PIDs || 0,
   }));
 }
 
-function mapPrunePreview(raw: Record<string, unknown>, resource: string): PrunePreview {
-  const key = resource.charAt(0).toLowerCase() + resource.slice(1);
-  const items = (raw?.[`${resource}s`] as Record<string, unknown>[]) || [];
+function mapPrunePreview(raw: unknown, resource: string): PrunePreview {
+  const key = resource.charAt(0).toLowerCase() + resource.slice(1) + "s";
+  // API returns either { Containers: [...] } or [] directly
+  let items: Record<string, unknown>[] = [];
+  if (Array.isArray(raw)) {
+    items = raw as Record<string, unknown>[];
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>)[`${resource}s`])) {
+    items = (raw as Record<string, unknown>)[`${resource}s`] as Record<string, unknown>[];
+  }
   return {
-    [key]: items.map((r) => String(r["Name"] || r["Id"] || "")),
+    [key]: { count: items.length, names: items.map((r) => String(r["Name"] || r["Id"] || "")) },
   } as PrunePreview;
 }
 
-function mapPruneResult(raw: Record<string, unknown>, resource: string): PruneResult {
-  const key = resource.charAt(0).toLowerCase() + resource.slice(1);
-  const items = (raw?.[`${resource}s`] as Record<string, unknown>[]) || [];
+function mapPruneResult(raw: unknown, resource: string): PruneResult {
+  const key = resource.charAt(0).toLowerCase() + resource.slice(1) + "s";
+  // API returns either { Containers: [...] } or [] directly
+  let items: Record<string, unknown>[] = [];
+  if (Array.isArray(raw)) {
+    items = raw as Record<string, unknown>[];
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>)[`${resource}s`])) {
+    items = (raw as Record<string, unknown>)[`${resource}s`] as Record<string, unknown>[];
+  }
   return {
     [key]: {
       count: items.length,
@@ -100,31 +113,36 @@ export function createPodmanEngine(): ContainerEngine {
       return get<ContainerTop>(socketPath, `/containers/${id}/top`);
     },
 
-    async containerStats(socketPath: string, ids: string[], stream = false) {
+    async containerStats(socketPath: string, ids: string[], stream = false): Promise<ContainerStats[] | AsyncGenerator<ContainerStatsUI>> {
       if (ids.length === 0) {
         if (stream) {
           const never = false;
-          return (async function* (): AsyncGenerator<ContainerStatsUI> {
-            if (never) yield undefined as never;
-          })();
+          return Promise.resolve((async function* () { if (never) yield undefined as never; })());
         }
-        return [];
+        return Promise.resolve([]);
       }
       const containerParam = ids.length === 1 ? ids[0]! : ids.join(",");
       const queryString = `containers=${encodeURIComponent(containerParam)}`;
       if (stream) {
-        const gen = streamJson<ContainerStats>(socketPath, `/containers/stats?${queryString}&stream=true`, {});
-        return (async function* () {
-          for await (const item of gen) {
-            const mapped = mapContainerStats([item])[0];
-            if (mapped) yield mapped;
+        return Promise.resolve((async function* (): AsyncGenerator<ContainerStatsUI> {
+          for await (const line of streamLines(socketPath, `/containers/stats?${queryString}&stream=true`, {})) {
+            try {
+              const response = JSON.parse(line);
+              if (response.Stats && Array.isArray(response.Stats)) {
+                for (const stat of response.Stats) {
+                  const mapped = mapContainerStats([stat])[0];
+                  if (mapped) yield mapped;
+                }
+              }
+            } catch {
+              // Skip invalid JSON lines
+            }
           }
-        })();
+        })());
       }
-      const raw = await get<{ Stats: ContainerStats[] }>(socketPath, "/containers/stats", {
+      return get<{ Stats: ContainerStats[] }>(socketPath, "/containers/stats", {
         query: { containers: containerParam, stream: "false" },
-      });
-      return raw.Stats;
+      }).then(raw => raw.Stats);
     },
 
     async *containerLogs(socketPath: string, id: string, options = {}) {
@@ -148,8 +166,8 @@ export function createPodmanEngine(): ContainerEngine {
       return { success: true };
     },
 
-    async stopContainer(socketPath: string, id: string, timeout = 10) {
-      await post(socketPath, `/containers/${id}/stop`, {}, { query: { t: timeout.toString() } });
+    async stopContainer(socketPath: string, id: string, timeout = 30) {
+      await post(socketPath, `/containers/${id}/stop`, {}, { query: { t: timeout.toString() }, timeout: timeout * 1000 + 5000 });
       return { success: true };
     },
 
@@ -169,11 +187,10 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneContainers(socketPath: string, dryRun = false) {
+      const raw = await post<unknown>(socketPath, "/containers/prune", dryRun ? { dryRun: true } : {});
       if (dryRun) {
-        const raw = await get<Record<string, unknown>>(socketPath, "/containers/prune");
         return mapPrunePreview(raw, "Container");
       }
-      const raw = await post<Record<string, unknown>>(socketPath, "/containers/prune", {});
       return mapPruneResult(raw, "Container");
     },
 
@@ -230,11 +247,10 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneImages(socketPath: string, dryRun = false) {
+      const raw = await post<unknown>(socketPath, "/images/prune", dryRun ? { dryRun: true } : {});
       if (dryRun) {
-        const raw = await get<Record<string, unknown>>(socketPath, "/images/prune");
         return mapPrunePreview(raw, "Image");
       }
-      const raw = await post<Record<string, unknown>>(socketPath, "/images/prune", {});
       return mapPruneResult(raw, "Image");
     },
 
@@ -253,11 +269,10 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneVolumes(socketPath: string, dryRun = false) {
+      const raw = await post<unknown>(socketPath, "/volumes/prune", dryRun ? { dryRun: true } : {});
       if (dryRun) {
-        const raw = await get<Record<string, unknown>>(socketPath, "/volumes/prune");
         return mapPrunePreview(raw, "Volume");
       }
-      const raw = await post<Record<string, unknown>>(socketPath, "/volumes/prune", {});
       return mapPruneResult(raw, "Volume");
     },
 
@@ -276,12 +291,21 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneNetworks(socketPath: string, dryRun = false) {
-      if (dryRun) {
-        const raw = await get<Record<string, unknown>>(socketPath, "/networks/prune");
-        return mapPrunePreview(raw, "Network");
+      try {
+        const raw = await post<unknown>(socketPath, "/networks/prune", dryRun ? { dryRun: true } : {});
+        if (dryRun) {
+          return mapPrunePreview(raw, "Network");
+        }
+        return mapPruneResult(raw, "Network");
+      } catch (e: unknown) {
+        // Network prune may not be available in all Podman versions
+        if (e instanceof EngineError && e.statusCode === 404) {
+          return dryRun 
+            ? { networks: { count: 0, names: [] } } 
+            : { networks: { count: 0, names: [], reclaimedBytes: 0 } };
+        }
+        throw e;
       }
-      const raw = await post<Record<string, unknown>>(socketPath, "/networks/prune", {});
-      return mapPruneResult(raw, "Network");
     },
 
     // Events
