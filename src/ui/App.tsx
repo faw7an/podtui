@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useInput } from "ink";
 import { Screen } from "./components/Screen.tsx";
 import { createPodmanEngine } from "../engine/podman.ts";
@@ -6,6 +6,7 @@ import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/la
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
 import { defaultTheme } from "../theme/theme.ts";
 import { EMPTY_DATA, buildFrameModel, type ResourceData } from "./view/build.ts";
+import { createVisibleFetcher } from "./view/refresh.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
 
 const SOCKET_PATH = process.env["PODTUI_SOCKET"] ?? "/tmp/podtui-dev/podman.sock";
@@ -40,30 +41,35 @@ export const App = () => {
   const [data, setData] = useState<ResourceData>(EMPTY_DATA);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [error, setError] = useState<string | undefined>(undefined);
+  // Kept in a ref so the poll interval always reads the latest resource data
+  // without being torn down and re-created on every refresh.
+  const dataRef = useRef<ResourceData>(EMPTY_DATA);
 
-  const fetchAll = useCallback(async () => {
-    const engine = createPodmanEngine();
+  const fetchVisible = useMemo(
+    () => createVisibleFetcher(createPodmanEngine(), SOCKET_PATH),
+    [],
+  );
+
+  // Only panels that are visible are fetched (FR-3); hidden panels keep their
+  // last known data and stop polling.
+  const refresh = useCallback(async () => {
+    const visible = state.visible;
     try {
-      const [containers, pods, images, volumes, networks] = await Promise.all([
-        engine.listContainers(SOCKET_PATH, true),
-        engine.listPods(SOCKET_PATH),
-        engine.listImages(SOCKET_PATH, true),
-        engine.listVolumes(SOCKET_PATH),
-        engine.listNetworks(SOCKET_PATH),
-      ]);
-      setData({ containers, pods, images, volumes, networks, quadlets: [] });
-      setError(undefined);
+      const { data, error } = await fetchVisible(visible, dataRef.current);
+      dataRef.current = data;
+      setData(data);
+      setError(error);
       setLastRefresh(Date.now());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch data");
     }
-  }, []);
+  }, [fetchVisible, state.visible]);
 
   useEffect(() => {
-    void fetchAll();
-    const id = setInterval(() => void fetchAll(), POLL_MS);
+    void refresh();
+    const id = setInterval(() => void refresh(), POLL_MS);
     return () => clearInterval(id);
-  }, [fetchAll]);
+  }, [refresh]);
 
   const model = useMemo(
     () =>
