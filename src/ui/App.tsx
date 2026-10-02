@@ -282,6 +282,7 @@ export const App = () => {
                   updateDetail();
                 }}
                 _onToggle={() => { panelStatesRef.current[panel.id].visible = !panelStatesRef.current[panel.id].visible; }}
+                panelWidth={panelWidth}
               />
             </Box>
           ))}

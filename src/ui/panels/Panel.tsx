@@ -10,7 +10,46 @@ interface PanelProps {
   selectedIndex: number;
   onSelect: (index: number) => void;
   _onToggle: () => void;
+  panelWidth: number;
 }
+
+const renderHeader = (panelWidth: number) => {
+  const nameW = Math.max(10, Math.floor(panelWidth * 0.6));
+  const statusW = Math.max(8, panelWidth - nameW - 2);
+  return (
+    <Box flexDirection="row" marginBottom={1} paddingX={1} paddingY={0}>
+      <Box width={nameW}>
+        <Text color="green" bold>NAME</Text>
+      </Box>
+      <Box width={statusW} flexDirection="row" alignItems="flex-end">
+        <Text color="green" bold>STATUS</Text>
+      </Box>
+    </Box>
+  );
+};
+
+const renderRow = (item: { id: string; label: string; status: string }, index: number, selected: boolean, panelWidth: number) => {
+  const nameW = Math.max(10, Math.floor(panelWidth * 0.6));
+  const statusW = Math.max(8, panelWidth - nameW - 2);
+  const bgColor = selected ? "selectionBg" : undefined;
+  const fgColor = selected ? "selectionFg" : "foreground";
+  const prefix = selected ? "> " : "  ";
+  
+  const label = item.label.length > nameW - 3 
+    ? item.label.slice(0, nameW - 3) + "…" 
+    : item.label.padEnd(nameW - 3);
+  
+  return (
+    <Box key={item.id} flexDirection="row" backgroundColor={bgColor} paddingX={1}>
+      <Box width={nameW}>
+        <Text color={fgColor}>{prefix}{label}</Text>
+      </Box>
+      <Box width={statusW} flexDirection="row" alignItems="flex-end">
+        <Text color={fgColor}>{item.status}</Text>
+      </Box>
+    </Box>
+  );
+};
 
 export const Panel = ({
   title,
@@ -21,11 +60,9 @@ export const Panel = ({
   selectedIndex,
   onSelect,
   _onToggle,
+  panelWidth,
 }: PanelProps) => {
   if (!isVisible) return null;
-
-  const borderColor = isFocused ? "accent" : "border";
-  const titleColor = isFocused ? "panelTitleFocused" : "panelTitle";
 
   useInput((input, key) => {
     if (key.upArrow || input === "k") {
@@ -38,28 +75,31 @@ export const Panel = ({
   return (
     <Box
       borderStyle="round"
-      borderColor={borderColor}
+      borderColor={isFocused ? "green" : "dim"}
       width="100%"
       height="100%"
       paddingX={1}
       paddingY={1}
     >
-      <Box flexDirection="row" marginBottom={1}>
-        <Text color={titleColor}>[{number}] {title}</Text>
+      <Box flexDirection="row" marginBottom={1} paddingX={1}>
+        <Text color={isFocused ? "green" : "dim"} bold>[{number}] {title}</Text>
+        <Box flexGrow={1} />
+        <Text color="dim">{items.length} items</Text>
       </Box>
-      {items.map((item, index) => (
-        <Box
-          key={item.id}
-          flexDirection="row"
-          backgroundColor={index === selectedIndex ? "selectionBg" : undefined}
-        >
-          <Text color={index === selectedIndex ? "selectionFg" : "foreground"}>
-            {index === selectedIndex ? "> " : "  "}
-            {item.label}
-            <Text color="dim"> [{item.status}]</Text>
-          </Text>
-        </Box>
-      ))}
+      <Box width="100%">
+        {items.length > 0 ? (
+          <>
+            {renderHeader(panelWidth)}
+            {items.map((item, index) => 
+              renderRow(item, index, index === selectedIndex, panelWidth)
+            )}
+          </>
+        ) : (
+          <Box paddingY={1}>
+            <Text color="dim">No items</Text>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };
