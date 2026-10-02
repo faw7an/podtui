@@ -449,21 +449,33 @@ describe("renderFrame: LAYOUT_SPEC §9 invariants", () => {
     }
   }
 
-  test("property sweep across the whole size matrix", () => {
-    for (let cols = 40; cols <= 200; cols += 1) {
-      for (let rows = 10; rows <= 60; rows += 1) {
-        const layout = computeLayout({
-          cols,
-          rows,
-          visible: ALL,
-          focused: "containers",
-        });
-        const lines = renderFrame(layout, model(6, 20), PLAIN);
-        expect(lines).toHaveLength(rows);
-        for (const line of lines) expect(visibleWidth(line)).toBe(cols);
+  // The full matrix (cols 40..200 x rows 10..60 = 8,211 frames) takes ~5s, which
+  // is exactly bun's default per-test timeout — under any load it times out
+  // without anything being wrong. So the matrix is split into four chunk tests
+  // with identical assertions; same coverage, each ~1.2s. (Found by the R-00
+  // flake hunt: 30/30 failures under 3x contention, all this test at ~6.2s.)
+  for (const [lo, hi] of [
+    [40, 80],
+    [81, 120],
+    [121, 160],
+    [161, 200],
+  ] as const) {
+    test(`property sweep cols ${lo}..${hi} x rows 10..60`, () => {
+      for (let cols = lo; cols <= hi; cols += 1) {
+        for (let rows = 10; rows <= 60; rows += 1) {
+          const layout = computeLayout({
+            cols,
+            rows,
+            visible: ALL,
+            focused: "containers",
+          });
+          const lines = renderFrame(layout, model(6, 20), PLAIN);
+          expect(lines).toHaveLength(rows);
+          for (const line of lines) expect(visibleWidth(line)).toBe(cols);
+        }
       }
-    }
-  });
+    });
+  }
 
   test("every visible panel appears in the output", () => {
     const layout = computeLayout({

@@ -67,6 +67,20 @@ class FakeStdout extends EventEmitter {
 const ESC = String.fromCharCode(27);
 const ANSI_RE = new RegExp(`${ESC}\\[[0-9;?]*[a-zA-Z]`, "g");
 const HIDE_CURSOR = `${ESC}[?25l`;
+/**
+ * Wait for an explicit render condition instead of sleeping a fixed time.
+ * Same assertions downstream, but the wait adapts to machine load instead of
+ * assuming Ink renders within N ms (the assumption that flaked under R-00).
+ */
+async function waitFor(cond: () => boolean, what: string, timeoutMs = 10000): Promise<void> {
+  const start = Date.now();
+  for (;;) {
+    if (cond()) return;
+    if (Date.now() - start > timeoutMs) throw new Error(`waitFor timed out after ${timeoutMs}ms: ${what}`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
 
 const items = (n: number): RowModel[] =>
   Array.from({ length: n }, (_, i) => ({
@@ -119,7 +133,7 @@ async function renderAt(cols: number, rows: number, rows2 = 12) {
     React.createElement(Frame, { layout, model: model(rows2), theme: defaultTheme, color: false }),
     { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
   );
-  await new Promise((r) => setTimeout(r, 120));
+  await waitFor(() => stdout.peek().includes("podtui"), "initial frame with header");
   return { stdout, instance, layout };
 }
 
@@ -185,7 +199,7 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
       }),
       { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
     );
-    await new Promise((r) => setTimeout(r, 150));
+    await waitFor(() => stdout.frame().includes("[1] Pods"), "initial XL frame");
     const wide = stdout.frame().split("\n");
     expect(wide.length).toBeLessThanOrEqual(50);
     for (const line of wide) expect(displayWidth(line)).toBeLessThanOrEqual(200);
@@ -196,7 +210,12 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
     // Shrink to mode S via a real resize event. Ink writes the settled frame
     // last (and only sends the hide-cursor sequence once), so read the tail.
     stdout.setSize(60, 20);
-    await new Promise((r) => setTimeout(r, 250));
+    // The settled 60-wide frame is present once the tail holds [2] Containers
+    // with no over-wide line left in it.
+    await waitFor(() => {
+      const tail = stdout.peek().split("\n").filter((l) => l.length > 0).slice(-20);
+      return tail.join("\n").includes("[2] Containers") && tail.every((l) => displayWidth(l) <= 60);
+    }, "settled 60x20 frame after resize");
     const narrow = stdout.peek().split("\n").filter((l) => l.length > 0).slice(-20);
     expect(narrow.length).toBeLessThanOrEqual(20);
     for (const line of narrow) expect(displayWidth(line)).toBeLessThanOrEqual(60);
@@ -208,7 +227,7 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
     // Grow back to XL; the grid must return.
     stdout.take();
     stdout.setSize(200, 50);
-    await new Promise((r) => setTimeout(r, 250));
+    await waitFor(() => stdout.peek().includes("[1] Pods"), "XL grid back after resize");
     const back = stdout.peek().split("\n").filter((l) => l.length > 0).slice(-50);
     expect(back.length).toBeLessThanOrEqual(50);
     for (const line of back) expect(displayWidth(line)).toBeLessThanOrEqual(200);
@@ -230,7 +249,7 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
       React.createElement(Frame, { layout, model: model(), theme: defaultTheme, color: false }),
       { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
     );
-    await new Promise((r) => setTimeout(r, 120));
+    await waitFor(() => stdout.frame().includes("[2] Containers"), "zoomed frame");
     const frame = stdout.frame();
     expect(frame).toContain("[2] Containers");
     expect(frame).not.toContain("[1] Pods");
@@ -244,7 +263,7 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
       React.createElement(Frame, { layout, model: model(), theme: defaultTheme, color: false }),
       { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
     );
-    await new Promise((r) => setTimeout(r, 120));
+    await waitFor(() => stdout.frame().includes("Terminal too small"), "too-small message");
     const lines = stdout.frame().split("\n").filter((l) => l.length > 0);
     expect(lines.length).toBeLessThanOrEqual(8);
     expect(stdout.frame()).toContain("Terminal too small");

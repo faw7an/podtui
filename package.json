@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.tsx",
-    "check": "bunx tsc --noEmit && bun run lint && bun test",
-    "test": "bun test",
+    "check": "scripts/check.sh",
+    "test": "scripts/check.sh test",
     "build": "bun build --compile src/index.tsx --outfile dist/podtui",
     "lint": "bunx eslint . --ext .ts,.tsx"
   },
