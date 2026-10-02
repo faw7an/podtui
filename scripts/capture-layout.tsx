@@ -24,7 +24,6 @@ mkdirSync(outDir, { recursive: true });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// eslint-disable-next-line no-control-regex
 const ANSI_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[a-zA-Z]`, "g");
 
 for (const [cols, rows] of SIZES) {
