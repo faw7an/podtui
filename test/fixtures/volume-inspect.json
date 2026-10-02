@@ -1,0 +1,15 @@
+{
+  "Name": "test-volume",
+  "Driver": "local",
+  "Mountpoint": "/tmp/podtui-dev/root/volumes/test-volume/_data",
+  "CreatedAt": "2026-10-02T16:07:08.828490752+03:00",
+  "Labels": {
+    "podtui.test": "1"
+  },
+  "Scope": "local",
+  "Options": {},
+  "MountCount": 0,
+  "NeedsCopyUp": true,
+  "NeedsChown": true,
+  "LockNumber": 14
+}

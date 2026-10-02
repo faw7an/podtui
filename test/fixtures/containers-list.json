@@ -1,0 +1,267 @@
+[
+  {
+    "AutoRemove": false,
+    "Command": [
+      "nginx",
+      "-g",
+      "daemon off;"
+    ],
+    "Created": "2026-10-02T16:07:05.622996086+03:00",
+    "CreatedAt": "",
+    "CIDFile": "",
+    "Exited": false,
+    "ExitedAt": -62135596800,
+    "ExitCode": 0,
+    "ExposedPorts": {
+      "80": [
+        "tcp"
+      ]
+    },
+    "Id": "44749aa2dcbd90dbeb7cb2cfb56a2ceb536593f8711b75d817528b47d6b6e3b2",
+    "Image": "docker.io/library/nginx:alpine",
+    "ImageID": "3dd08163706a20b20622f310ec10258cc96e9007ab357f7201955bc880ac17f4",
+    "IsInfra": false,
+    "Labels": {
+      "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>",
+      "podtui.test": "1"
+    },
+    "Mounts": [],
+    "Names": [
+      "web"
+    ],
+    "Namespaces": {},
+    "Networks": [],
+    "Pid": 385928,
+    "Pod": "",
+    "PodName": "",
+    "Ports": null,
+    "Restarts": 0,
+    "Size": null,
+    "StartedAt": 1790946425,
+    "State": "running",
+    "Status": ""
+  },
+  {
+    "AutoRemove": false,
+    "Command": [
+      "sh",
+      "-c",
+      "while true; do echo \"$(date) - log line from chatty\"; sleep 1; done"
+    ],
+    "Created": "2026-10-02T16:07:07.899636638+03:00",
+    "CreatedAt": "",
+    "CIDFile": "",
+    "Exited": false,
+    "ExitedAt": -62135596800,
+    "ExitCode": 0,
+    "ExposedPorts": null,
+    "Id": "9ca3ff39c27a4fee6dee39f09aa6565355c223bf37b9e37322775a5fc4b7600d",
+    "Image": "docker.io/library/alpine:latest",
+    "ImageID": "320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "IsInfra": false,
+    "Labels": {
+      "podtui.test": "1"
+    },
+    "Mounts": [],
+    "Names": [
+      "chatty"
+    ],
+    "Namespaces": {},
+    "Networks": [],
+    "Pid": 386021,
+    "Pod": "",
+    "PodName": "",
+    "Ports": null,
+    "Restarts": 0,
+    "Size": null,
+    "StartedAt": 1790946427,
+    "State": "running",
+    "Status": ""
+  },
+  {
+    "AutoRemove": false,
+    "Command": [
+      "sh",
+      "-c",
+      "echo \"ERROR something broke\"; echo \"WARN low disk\"; sleep 1; exit 1"
+    ],
+    "Created": "2026-10-02T16:07:08.052514659+03:00",
+    "CreatedAt": "",
+    "CIDFile": "",
+    "Exited": true,
+    "ExitedAt": 1790946429,
+    "ExitCode": 1,
+    "ExposedPorts": null,
+    "Id": "ea4f4325fcf91ffd86aeefae6ebe3acb23dcbf05593912a6cf5ac6c9290c3ab1",
+    "Image": "docker.io/library/alpine:latest",
+    "ImageID": "320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "IsInfra": false,
+    "Labels": {
+      "podtui.test": "1"
+    },
+    "Mounts": [],
+    "Names": [
+      "failing"
+    ],
+    "Namespaces": {},
+    "Networks": [],
+    "Pid": 0,
+    "Pod": "",
+    "PodName": "",
+    "Ports": null,
+    "Restarts": 0,
+    "Size": null,
+    "StartedAt": 1790946428,
+    "State": "exited",
+    "Status": ""
+  },
+  {
+    "AutoRemove": false,
+    "Command": [
+      "sh",
+      "-c",
+      "while true; do echo \"$(date) - tty output\"; sleep 2; done"
+    ],
+    "Created": "2026-10-02T16:07:08.205056749+03:00",
+    "CreatedAt": "",
+    "CIDFile": "",
+    "Exited": false,
+    "ExitedAt": -62135596800,
+    "ExitCode": 0,
+    "ExposedPorts": null,
+    "Id": "1e2875ac01fa90a645de9d12b1f36bb5b8d824b395b64715881362c00f360b63",
+    "Image": "docker.io/library/alpine:latest",
+    "ImageID": "320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "IsInfra": false,
+    "Labels": {
+      "podtui.test": "1"
+    },
+    "Mounts": [],
+    "Names": [
+      "tty-box"
+    ],
+    "Namespaces": {},
+    "Networks": [],
+    "Pid": 386137,
+    "Pod": "",
+    "PodName": "",
+    "Ports": null,
+    "Restarts": 0,
+    "Size": null,
+    "StartedAt": 1790946428,
+    "State": "running",
+    "Status": ""
+  },
+  {
+    "AutoRemove": false,
+    "Command": null,
+    "Created": "2026-10-02T16:07:08.369143228+03:00",
+    "CreatedAt": "",
+    "CIDFile": "",
+    "Exited": false,
+    "ExitedAt": -62135596800,
+    "ExitCode": 0,
+    "ExposedPorts": null,
+    "Id": "a969c7aebf1d59e0da661161bde094e0ccea0908552fca5bdec30e3017643ff9",
+    "Image": "",
+    "ImageID": "",
+    "IsInfra": true,
+    "Labels": {
+      "podtui.test": "1"
+    },
+    "Mounts": [],
+    "Names": [
+      "f77579bd1aad-infra"
+    ],
+    "Namespaces": {},
+    "Networks": [],
+    "Pid": 386204,
+    "Pod": "f77579bd1aad998407a7c7db3a2ab6730e14fc50086b74f38b4ac3bb5ce520b8",
+    "PodName": "web-pod",
+    "Ports": null,
+    "Restarts": 0,
+    "Size": null,
+    "StartedAt": 1790946428,
+    "State": "running",
+    "Status": ""
+  },
+  {
+    "AutoRemove": false,
+    "Command": [
+      "nginx",
+      "-g",
+      "daemon off;"
+    ],
+    "Created": "2026-10-02T16:07:08.431926394+03:00",
+    "CreatedAt": "",
+    "CIDFile": "",
+    "Exited": false,
+    "ExitedAt": -62135596800,
+    "ExitCode": 0,
+    "ExposedPorts": {
+      "80": [
+        "tcp"
+      ]
+    },
+    "Id": "cad2da6a3439eb698ae85c77390386d5cfb344be56f5c979355589fda9508b9a",
+    "Image": "docker.io/library/nginx:alpine",
+    "ImageID": "3dd08163706a20b20622f310ec10258cc96e9007ab357f7201955bc880ac17f4",
+    "IsInfra": false,
+    "Labels": {
+      "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>",
+      "podtui.test": "1"
+    },
+    "Mounts": [],
+    "Names": [
+      "web-pod-frontend"
+    ],
+    "Namespaces": {},
+    "Networks": [],
+    "Pid": 386235,
+    "Pod": "f77579bd1aad998407a7c7db3a2ab6730e14fc50086b74f38b4ac3bb5ce520b8",
+    "PodName": "web-pod",
+    "Ports": null,
+    "Restarts": 0,
+    "Size": null,
+    "StartedAt": 1790946428,
+    "State": "running",
+    "Status": ""
+  },
+  {
+    "AutoRemove": false,
+    "Command": [
+      "sh",
+      "-c",
+      "while true; do sleep 3600; done"
+    ],
+    "Created": "2026-10-02T16:07:08.682471249+03:00",
+    "CreatedAt": "",
+    "CIDFile": "",
+    "Exited": false,
+    "ExitedAt": -62135596800,
+    "ExitCode": 0,
+    "ExposedPorts": null,
+    "Id": "df16fa1681b9d69755df0710e70c078dd29c95fc183a937e496840ea98587e13",
+    "Image": "docker.io/library/alpine:latest",
+    "ImageID": "320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "IsInfra": false,
+    "Labels": {
+      "podtui.test": "1"
+    },
+    "Mounts": [],
+    "Names": [
+      "web-pod-backend"
+    ],
+    "Namespaces": {},
+    "Networks": [],
+    "Pid": 386310,
+    "Pod": "f77579bd1aad998407a7c7db3a2ab6730e14fc50086b74f38b4ac3bb5ce520b8",
+    "PodName": "web-pod",
+    "Ports": null,
+    "Restarts": 0,
+    "Size": null,
+    "StartedAt": 1790946428,
+    "State": "running",
+    "Status": ""
+  }
+]

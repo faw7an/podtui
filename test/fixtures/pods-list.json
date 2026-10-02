@@ -1,0 +1,35 @@
+[
+  {
+    "Cgroup": "user.slice",
+    "Containers": [
+      {
+        "Id": "a969c7aebf1d59e0da661161bde094e0ccea0908552fca5bdec30e3017643ff9",
+        "Names": "f77579bd1aad-infra",
+        "Status": "running",
+        "RestartCount": 0
+      },
+      {
+        "Id": "cad2da6a3439eb698ae85c77390386d5cfb344be56f5c979355589fda9508b9a",
+        "Names": "web-pod-frontend",
+        "Status": "running",
+        "RestartCount": 0
+      },
+      {
+        "Id": "df16fa1681b9d69755df0710e70c078dd29c95fc183a937e496840ea98587e13",
+        "Names": "web-pod-backend",
+        "Status": "running",
+        "RestartCount": 0
+      }
+    ],
+    "Created": "2026-10-02T16:07:08.364032099+03:00",
+    "Id": "f77579bd1aad998407a7c7db3a2ab6730e14fc50086b74f38b4ac3bb5ce520b8",
+    "InfraId": "a969c7aebf1d59e0da661161bde094e0ccea0908552fca5bdec30e3017643ff9",
+    "Name": "web-pod",
+    "Namespace": "",
+    "Networks": [],
+    "Status": "Running",
+    "Labels": {
+      "podtui.test": "1"
+    }
+  }
+]

@@ -1,0 +1,45 @@
+{
+  "Platform": {
+    "Name": "linux/amd64/omarchy-4.0.4"
+  },
+  "Components": [
+    {
+      "Name": "Podman Engine",
+      "Version": "6.1.1",
+      "Details": {
+        "APIVersion": "6.1.1",
+        "Arch": "amd64",
+        "BuildTime": "2026-09-02T19:28:21+03:00",
+        "Experimental": "false",
+        "GitCommit": "8303f2e25b675ea7f82099d615c60969aec15870",
+        "GoVersion": "go1.27.0-X:nodwarf5",
+        "KernelVersion": "7.2.5-3-omarchy",
+        "MinAPIVersion": "4.0.0",
+        "Os": "linux"
+      }
+    },
+    {
+      "Name": "Conmon",
+      "Version": "conmon version 2.2.1, commit: c8cc2c4db27531bd4e084ce7857f73cd21ee639d",
+      "Details": {
+        "Package": "conmon-1:2.2.1-1"
+      }
+    },
+    {
+      "Name": "OCI Runtime (runc)",
+      "Version": "runc version 1.5.1\nspec: 1.3.0\ngo: go1.26.5-X:nodwarf5\nlibseccomp: 2.6.0\nlibpathrs: 0.2.6",
+      "Details": {
+        "Package": "runc-1.5.1-1"
+      }
+    }
+  ],
+  "Version": "6.1.1",
+  "ApiVersion": "1.44",
+  "MinAPIVersion": "1.24",
+  "GitCommit": "8303f2e25b675ea7f82099d615c60969aec15870",
+  "GoVersion": "go1.27.0-X:nodwarf5",
+  "Os": "linux",
+  "Arch": "amd64",
+  "KernelVersion": "7.2.5-3-omarchy",
+  "BuildTime": "2026-09-02T19:28:21+03:00"
+}

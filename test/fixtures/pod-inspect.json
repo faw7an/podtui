@@ -1,0 +1,70 @@
+{
+  "Id": "f77579bd1aad998407a7c7db3a2ab6730e14fc50086b74f38b4ac3bb5ce520b8",
+  "Name": "web-pod",
+  "Created": "2026-10-02T16:07:08.364032099+03:00",
+  "CreateCommand": [
+    "podman",
+    "--url",
+    "unix:///tmp/podtui-dev/podman.sock",
+    "pod",
+    "create",
+    "--name",
+    "web-pod",
+    "--label",
+    "podtui.test=1"
+  ],
+  "ExitPolicy": "continue",
+  "State": "Running",
+  "Hostname": "",
+  "Labels": {
+    "podtui.test": "1"
+  },
+  "CreateCgroup": true,
+  "CgroupParent": "user.slice",
+  "CgroupPath": "user.slice/user-1000.slice/user@1000.service/user.slice/user-libpod_pod_f77579bd1aad998407a7c7db3a2ab6730e14fc50086b74f38b4ac3bb5ce520b8.slice",
+  "CreateInfra": true,
+  "InfraContainerID": "a969c7aebf1d59e0da661161bde094e0ccea0908552fca5bdec30e3017643ff9",
+  "InfraConfig": {
+    "PortBindings": {},
+    "HostNetwork": false,
+    "StaticIP": "",
+    "StaticMAC": "",
+    "NoManageResolvConf": false,
+    "DNSServer": null,
+    "DNSSearch": null,
+    "DNSOption": null,
+    "NoManageHostname": false,
+    "NoManageHosts": false,
+    "HostAdd": null,
+    "HostsFile": "",
+    "Networks": null,
+    "NetworkOptions": null,
+    "pid_ns": "private",
+    "userns": "host",
+    "uts_ns": "private"
+  },
+  "SharedNamespaces": [
+    "ipc",
+    "net",
+    "uts"
+  ],
+  "NumContainers": 3,
+  "Containers": [
+    {
+      "Id": "a969c7aebf1d59e0da661161bde094e0ccea0908552fca5bdec30e3017643ff9",
+      "Name": "f77579bd1aad-infra",
+      "State": "running"
+    },
+    {
+      "Id": "cad2da6a3439eb698ae85c77390386d5cfb344be56f5c979355589fda9508b9a",
+      "Name": "web-pod-frontend",
+      "State": "running"
+    },
+    {
+      "Id": "df16fa1681b9d69755df0710e70c078dd29c95fc183a937e496840ea98587e13",
+      "Name": "web-pod-backend",
+      "State": "running"
+    }
+  ],
+  "LockNumber": 9
+}

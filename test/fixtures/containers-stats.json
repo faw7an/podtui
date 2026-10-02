@@ -1,0 +1,179 @@
+{
+  "Error": null,
+  "Stats": [
+    {
+      "AvgCPU": 0.0019695068164554278,
+      "ContainerID": "44749aa2dcbd90dbeb7cb2cfb56a2ceb536593f8711b75d817528b47d6b6e3b2",
+      "Name": "web",
+      "CPU": 0.0019695068164554278,
+      "CPUNano": 72539000,
+      "CPUSystemNano": 31216000,
+      "SystemNano": 1790950108827499290,
+      "MemUsage": 7630848,
+      "MemLimit": 16100315136,
+      "MemPerc": 0.047395643722137885,
+      "Network": {
+        "wlp1s0": {
+          "RxBytes": 258,
+          "RxDropped": 0,
+          "RxErrors": 0,
+          "RxPackets": 4,
+          "TxBytes": 1102,
+          "TxDropped": 0,
+          "TxErrors": 0,
+          "TxPackets": 15
+        }
+      },
+      "BlockInput": 0,
+      "BlockOutput": 0,
+      "PIDs": 9,
+      "UpTime": 72539000,
+      "Duration": 72539000
+    },
+    {
+      "AvgCPU": 0.460606690368943,
+      "ContainerID": "9ca3ff39c27a4fee6dee39f09aa6565355c223bf37b9e37322775a5fc4b7600d",
+      "Name": "chatty",
+      "CPU": 0.460606690368943,
+      "CPUNano": 16954162000,
+      "CPUSystemNano": 13232095000,
+      "SystemNano": 1790950108829463596,
+      "MemUsage": 995328,
+      "MemLimit": 16100315136,
+      "MemPerc": 0.006182040485496246,
+      "Network": {
+        "wlp1s0": {
+          "RxBytes": 258,
+          "RxDropped": 0,
+          "RxErrors": 0,
+          "RxPackets": 4,
+          "TxBytes": 1172,
+          "TxDropped": 0,
+          "TxErrors": 0,
+          "TxPackets": 16
+        }
+      },
+      "BlockInput": 0,
+      "BlockOutput": 0,
+      "PIDs": 2,
+      "UpTime": 16954162000,
+      "Duration": 16954162000
+    },
+    {
+      "AvgCPU": 0.22873300504432167,
+      "ContainerID": "1e2875ac01fa90a645de9d12b1f36bb5b8d824b395b64715881362c00f360b63",
+      "Name": "tty-box",
+      "CPU": 0.22873300504432167,
+      "CPUNano": 8418566000,
+      "CPUSystemNano": 6556671000,
+      "SystemNano": 1790950108831150299,
+      "MemUsage": 749568,
+      "MemLimit": 16100315136,
+      "MemPerc": 0.004655610735991,
+      "Network": {
+        "wlp1s0": {
+          "RxBytes": 258,
+          "RxDropped": 0,
+          "RxErrors": 0,
+          "RxPackets": 4,
+          "TxBytes": 1102,
+          "TxDropped": 0,
+          "TxErrors": 0,
+          "TxPackets": 15
+        }
+      },
+      "BlockInput": 0,
+      "BlockOutput": 0,
+      "PIDs": 2,
+      "UpTime": 8418566000,
+      "Duration": 8418566000
+    },
+    {
+      "AvgCPU": 0.001124446192300875,
+      "ContainerID": "a969c7aebf1d59e0da661161bde094e0ccea0908552fca5bdec30e3017643ff9",
+      "Name": "f77579bd1aad-infra",
+      "CPU": 0.001124446192300875,
+      "CPUNano": 41383000,
+      "CPUSystemNano": 10014000,
+      "SystemNano": 1790950108833043909,
+      "MemUsage": 290816,
+      "MemLimit": 16100315136,
+      "MemPerc": 0.0018062752035812076,
+      "Network": {
+        "wlp1s0": {
+          "RxBytes": 258,
+          "RxDropped": 0,
+          "RxErrors": 0,
+          "RxPackets": 4,
+          "TxBytes": 1102,
+          "TxDropped": 0,
+          "TxErrors": 0,
+          "TxPackets": 15
+        }
+      },
+      "BlockInput": 0,
+      "BlockOutput": 0,
+      "PIDs": 1,
+      "UpTime": 41383000,
+      "Duration": 41383000
+    },
+    {
+      "AvgCPU": 0.001975075260079738,
+      "ContainerID": "cad2da6a3439eb698ae85c77390386d5cfb344be56f5c979355589fda9508b9a",
+      "Name": "web-pod-frontend",
+      "CPU": 0.001975075260079738,
+      "CPUNano": 72687000,
+      "CPUSystemNano": 24472000,
+      "SystemNano": 1790950108835850392,
+      "MemUsage": 7671808,
+      "MemLimit": 16100315136,
+      "MemPerc": 0.04765004868038876,
+      "Network": {
+        "wlp1s0": {
+          "RxBytes": 258,
+          "RxDropped": 0,
+          "RxErrors": 0,
+          "RxPackets": 4,
+          "TxBytes": 1102,
+          "TxDropped": 0,
+          "TxErrors": 0,
+          "TxPackets": 15
+        }
+      },
+      "BlockInput": 0,
+      "BlockOutput": 0,
+      "PIDs": 9,
+      "UpTime": 72687000,
+      "Duration": 72687000
+    },
+    {
+      "AvgCPU": 0.001163785988107214,
+      "ContainerID": "df16fa1681b9d69755df0710e70c078dd29c95fc183a937e496840ea98587e13",
+      "Name": "web-pod-backend",
+      "CPU": 0.001163785988107214,
+      "CPUNano": 42828000,
+      "CPUSystemNano": 9729000,
+      "SystemNano": 1790950108839003738,
+      "MemUsage": 413696,
+      "MemLimit": 16100315136,
+      "MemPerc": 0.0025694900783338305,
+      "Network": {
+        "wlp1s0": {
+          "RxBytes": 258,
+          "RxDropped": 0,
+          "RxErrors": 0,
+          "RxPackets": 4,
+          "TxBytes": 1102,
+          "TxDropped": 0,
+          "TxErrors": 0,
+          "TxPackets": 15
+        }
+      },
+      "BlockInput": 0,
+      "BlockOutput": 0,
+      "PIDs": 2,
+      "UpTime": 42828000,
+      "Duration": 42828000
+    }
+  ]
+}

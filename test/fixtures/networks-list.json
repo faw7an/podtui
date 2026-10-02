@@ -1,0 +1,43 @@
+[
+  {
+    "name": "test-network",
+    "id": "af261ef19c53619b9603069f428182c1b163cc74c1d69e75390bce22672b3809",
+    "driver": "bridge",
+    "network_interface": "podman1",
+    "created": "2026-10-02T13:07:08.87905882Z",
+    "subnets": [
+      {
+        "subnet": "10.89.0.0/24",
+        "gateway": "10.89.0.1"
+      }
+    ],
+    "ipv6_enabled": false,
+    "internal": false,
+    "dns_enabled": true,
+    "labels": {
+      "podtui.test": "1"
+    },
+    "ipam_options": {
+      "driver": "host-local"
+    }
+  },
+  {
+    "name": "podman",
+    "id": "2f259bab93aaaaa2542ba43ef33eb990d0999ee1b9924b557b7be53c0b7a1bb9",
+    "driver": "bridge",
+    "network_interface": "podman0",
+    "created": "2026-10-02T16:07:09.070924236+03:00",
+    "subnets": [
+      {
+        "subnet": "10.88.0.0/16",
+        "gateway": "10.88.0.1"
+      }
+    ],
+    "ipv6_enabled": false,
+    "internal": false,
+    "dns_enabled": false,
+    "ipam_options": {
+      "driver": "host-local"
+    }
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "Id": "3dd08163706a20b20622f310ec10258cc96e9007ab357f7201955bc880ac17f4",
+    "ParentId": "",
+    "RepoTags": [
+      "docker.io/library/nginx:alpine"
+    ],
+    "RepoDigests": [
+      "docker.io/library/nginx@sha256:0530961ff0592b58c10f767535cc0abdfccf9e389ff7cc90f87320c1bc7e8506",
+      "docker.io/library/nginx@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2"
+    ],
+    "Created": 1790115017,
+    "Size": 64322556,
+    "SharedSize": 0,
+    "VirtualSize": 64322556,
+    "Labels": {
+      "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>"
+    },
+    "Containers": 2,
+    "Arch": "amd64",
+    "Digest": "sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2",
+    "History": [
+      "docker.io/library/nginx:alpine"
+    ],
+    "IsManifestList": false,
+    "Names": [
+      "docker.io/library/nginx:alpine"
+    ],
+    "Os": "linux"
+  },
+  {
+    "Id": "320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "ParentId": "",
+    "RepoTags": [
+      "docker.io/library/alpine:latest"
+    ],
+    "RepoDigests": [
+      "docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+      "docker.io/library/alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395"
+    ],
+    "Created": 1789677440,
+    "Size": 8715873,
+    "SharedSize": 0,
+    "VirtualSize": 8715873,
+    "Labels": null,
+    "Containers": 4,
+    "Arch": "amd64",
+    "Digest": "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+    "History": [
+      "docker.io/library/alpine:latest"
+    ],
+    "IsManifestList": false,
+    "Names": [
+      "docker.io/library/alpine:latest"
+    ],
+    "Os": "linux"
+  }
+]
