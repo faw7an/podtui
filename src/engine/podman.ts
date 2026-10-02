@@ -46,20 +46,6 @@ function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
   }));
 }
 
-function mapPrunePreview(raw: unknown, resource: string): PrunePreview {
-  const key = resource.charAt(0).toLowerCase() + resource.slice(1) + "s";
-  // API returns either { Containers: [...] } or [] directly
-  let items: Record<string, unknown>[] = [];
-  if (Array.isArray(raw)) {
-    items = raw as Record<string, unknown>[];
-  } else if (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>)[`${resource}s`])) {
-    items = (raw as Record<string, unknown>)[`${resource}s`] as Record<string, unknown>[];
-  }
-  return {
-    [key]: { count: items.length, names: items.map((r) => String(r["Name"] || r["Id"] || "")) },
-  } as PrunePreview;
-}
-
 function mapPruneResult(raw: unknown, resource: string): PruneResult {
   const key = resource.charAt(0).toLowerCase() + resource.slice(1) + "s";
   // API returns either { Containers: [...] } or [] directly
@@ -76,6 +62,70 @@ function mapPruneResult(raw: unknown, resource: string): PruneResult {
       reclaimedBytes: items.reduce((sum, r) => sum + Number(r["Size"] || 0), 0),
     },
   } as PruneResult;
+}
+
+/**
+ * Prune PREVIEWS are computed from list endpoints only.
+ *
+ * The libpod prune endpoints take no parameters: a `{dryRun:true}` body is
+ * silently ignored and the prune really runs (proved live — a "dry run"
+ * deleted a seeded container). So a preview must never POST. Instead we ask
+ * the list endpoints what the matching CLI prune would remove, using the
+ * semantics documented in `podman <resource> prune --help`:
+ *
+ *   container  "Removes all non running containers"      -> State != running
+ *   image      "dangling or unused", default = dangling  -> no RepoTags
+ *   volume     default removes only ANONYMOUS unused     -> MountCount 0 and
+ *              an auto-generated (64 hex char) name. See docs/UNKNOWNS.md:
+ *              "prune unused named volumes" is NOT reachable via this
+ *              endpoint and must be built from confirmed per-volume deletes.
+ *   network    "unused networks"                         -> inspect `containers` empty
+ *
+ * Every predicate below reads a field verified present in test/fixtures.
+ */
+const ANONYMOUS_VOLUME_NAME = /^[0-9a-f]{64}$/;
+
+function previewContainers(raw: ContainerListItem[]): PrunePreview {
+  const prunable = raw.filter((c) => (c.State ?? "").toLowerCase() !== "running");
+  return {
+    containers: {
+      count: prunable.length,
+      names: prunable.map((c) => c.Names?.[0]?.replace(/^\//, "") || c.Id.slice(0, 12)),
+    },
+  };
+}
+
+function previewImages(raw: ImageListItem[]): PrunePreview {
+  const dangling = raw.filter((i) => (i.RepoTags ?? []).length === 0);
+  return {
+    images: {
+      count: dangling.length,
+      names: dangling.map((i) => i.RepoTags?.[0] ?? i.Id.slice(0, 19)),
+    },
+  };
+}
+
+function previewVolumes(raw: VolumeListItem[]): PrunePreview {
+  const unused = raw.filter(
+    (v) => (v.MountCount ?? 0) === 0 && ANONYMOUS_VOLUME_NAME.test(v.Name),
+  );
+  return { volumes: { count: unused.length, names: unused.map((v) => v.Name) } };
+}
+
+async function previewNetworks(socketPath: string): Promise<PrunePreview> {
+  // The LIST response has no attachment information (verified: the live
+  // /networks/json keys are created, dns_enabled, driver, id, internal,
+  // ipam_options, ipv6_enabled, name, network_interface, subnets — no
+  // `containers`), and /networks/{name}/containers is a 404 on 6.1.1. The
+  // per-network INSPECT response does carry `containers`, so that is what we
+  // read. Network counts are small, so the N+1 calls are acceptable.
+  const list = await get<NetworkListItem[]>(socketPath, "/networks/json");
+  const unused: string[] = [];
+  for (const n of list) {
+    const detail = await get<NetworkInspect>(socketPath, `/networks/${n.name}/json`);
+    if (Object.keys(detail.containers ?? {}).length === 0) unused.push(n.name);
+  }
+  return { networks: { count: unused.length, names: unused } };
 }
 
 export function createPodmanEngine(): ContainerEngine {
@@ -187,11 +237,12 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneContainers(socketPath: string, dryRun = false) {
-      const raw = await post<unknown>(socketPath, "/containers/prune", dryRun ? { dryRun: true } : {});
       if (dryRun) {
-        return mapPrunePreview(raw, "Container");
+        return previewContainers(await get<ContainerListItem[]>(socketPath, "/containers/json", {
+          query: { all: "true" },
+        }));
       }
-      return mapPruneResult(raw, "Container");
+      return mapPruneResult(await post<unknown>(socketPath, "/containers/prune", {}), "Container");
     },
 
     // Pods
@@ -247,11 +298,12 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneImages(socketPath: string, dryRun = false) {
-      const raw = await post<unknown>(socketPath, "/images/prune", dryRun ? { dryRun: true } : {});
       if (dryRun) {
-        return mapPrunePreview(raw, "Image");
+        return previewImages(await get<ImageListItem[]>(socketPath, "/images/json", {
+          query: { all: "true" },
+        }));
       }
-      return mapPruneResult(raw, "Image");
+      return mapPruneResult(await post<unknown>(socketPath, "/images/prune", {}), "Image");
     },
 
     // Volumes
@@ -269,11 +321,10 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneVolumes(socketPath: string, dryRun = false) {
-      const raw = await post<unknown>(socketPath, "/volumes/prune", dryRun ? { dryRun: true } : {});
       if (dryRun) {
-        return mapPrunePreview(raw, "Volume");
+        return previewVolumes(await get<VolumeListItem[]>(socketPath, "/volumes/json"));
       }
-      return mapPruneResult(raw, "Volume");
+      return mapPruneResult(await post<unknown>(socketPath, "/volumes/prune", {}), "Volume");
     },
 
     // Networks
@@ -292,11 +343,10 @@ export function createPodmanEngine(): ContainerEngine {
 
     async pruneNetworks(socketPath: string, dryRun = false) {
       try {
-        const raw = await post<unknown>(socketPath, "/networks/prune", dryRun ? { dryRun: true } : {});
         if (dryRun) {
-          return mapPrunePreview(raw, "Network");
+          return await previewNetworks(socketPath);
         }
-        return mapPruneResult(raw, "Network");
+        return mapPruneResult(await post<unknown>(socketPath, "/networks/prune", {}), "Network");
       } catch (e: unknown) {
         // Network prune may not be available in all Podman versions
         if (e instanceof EngineError && e.statusCode === 404) {
