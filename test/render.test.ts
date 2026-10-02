@@ -249,9 +249,41 @@ describe("renderPanel (LAYOUT_SPEC §6)", () => {
     expect(narrow).not.toContain("AGE");
   });
 
-  test("an empty panel says so rather than rendering nothing", () => {
+  test("an empty panel names its count in the title", () => {
     const lines = renderPanel(rect(8, 30), panel("quadlets", []), PLAIN);
-    expect(stripAnsi(lines.join("\n"))).toContain("0");
+    expect(stripAnsi(lines[0] ?? "")).toContain("[6] Quadlets 0");
+    expect(stripAnsi(lines.join("\n"))).toContain("(empty)");
+  });
+
+  test("a panel with no data source shows its placeholder, not a bare box", () => {
+    // Quadlets is Phase 6; it must read as a deliberate placeholder.
+    const p = { ...panel("quadlets", []), emptyLabel: "not implemented yet (phase 6)" };
+    const text = stripAnsi(renderPanel(rect(8, 40), p, PLAIN).join("\n"));
+    expect(text).toContain("not implemented yet (phase 6)");
+    expect(text).not.toContain("(empty)");
+  });
+
+  test("the placeholder is truncated, never wrapped, in a narrow panel", () => {
+    const p = { ...panel("quadlets", []), emptyLabel: "not implemented yet (phase 6)" };
+    for (const w of [12, 16, 20, 26, 40]) {
+      const lines = renderPanel(rect(6, w), p, PLAIN);
+      expect(lines).toHaveLength(6);
+      for (const l of lines) expect(visibleWidth(l)).toBe(w);
+      // Narrow panels truncate the label rather than wrapping it onto a
+      // second row, which is the bug this whole layer exists to prevent.
+      const text = stripAnsi(lines.join("\n"));
+      expect(text).toContain("not");
+      if (w >= 26) expect(text).toContain("not implemented");
+      // Exactly one row carries the label; a wrapped label would need two.
+      expect(lines.filter((l) => stripAnsi(l).includes("not"))).toHaveLength(1);
+    }
+  });
+
+  test("quadlets keeps its placeholder only while it has no rows", () => {
+    const withRows = { ...panel("quadlets", items(2)), emptyLabel: "not implemented yet (phase 6)" };
+    const text = stripAnsi(renderPanel(rect(8, 40), withRows, PLAIN).join("\n"));
+    expect(text).not.toContain("not implemented");
+    expect(text).toContain("container-number-0");
   });
 
   test("every column header is defined for every column id in use", () => {
@@ -375,7 +407,6 @@ describe("renderFrame: LAYOUT_SPEC §9 invariants", () => {
           rows,
           visible: ALL,
           focused: "containers",
-          demands: new Map(PANEL_IDS.map((id, i) => [id, i + 1])),
         });
         const lines = renderFrame(layout, model(6, 12), { theme: defaultTheme, color });
         expect(lines).toHaveLength(rows);
@@ -396,7 +427,6 @@ describe("renderFrame: LAYOUT_SPEC §9 invariants", () => {
           rows,
           visible: ALL,
           focused: "containers",
-          demands: new Map(PANEL_IDS.map((id, i) => [id, i + 1])),
         });
         const lines = renderFrame(layout, model(6, 20), PLAIN);
         expect(lines).toHaveLength(rows);
@@ -411,7 +441,6 @@ describe("renderFrame: LAYOUT_SPEC §9 invariants", () => {
       rows: 50,
       visible: ALL,
       focused: "containers",
-      demands: new Map(PANEL_IDS.map((id) => [id, 3])),
     });
     const text = stripAnsi(renderFrame(layout, model(6, 3), PLAIN).join("\n"));
     for (const id of PANEL_IDS) {
@@ -460,7 +489,6 @@ describe("renderFrame: LAYOUT_SPEC §9 invariants", () => {
       rows: 50,
       visible: new Set<PanelId>(["containers", "images"]),
       focused: "containers",
-      demands: new Map<PanelId, number>([["containers", 6], ["images", 2]]),
     });
     const text = stripAnsi(renderFrame(layout, model(6, 6), PLAIN).join("\n"));
     expect(text).toContain("[2] Containers");
@@ -475,7 +503,6 @@ describe("renderFrame: LAYOUT_SPEC §9 invariants", () => {
       rows: 35,
       visible: ALL,
       focused: "containers",
-      demands: new Map(PANEL_IDS.map((id, i) => [id, i + 1])),
     });
     const lines = renderFrame(layout, model(6, 8), PLAIN);
     expect(lines.join("\n")).not.toContain("\u001B");

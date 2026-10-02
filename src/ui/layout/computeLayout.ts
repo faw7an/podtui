@@ -18,7 +18,7 @@ import {
   NORMAL_HEIGHT_WEIGHT,
 } from "./constants";
 import { BREAKPOINTS } from "./constants";
-import { desiredPanelHeight, panelMetrics } from "./panelView";
+import { panelMetrics } from "./panelView";
 import {
   PANEL_IDS,
   isPanelId,
@@ -49,13 +49,19 @@ function makePanel(id: PanelId, rect: Rect, focused: boolean): PanelLayout {
 }
 
 /**
- * Height allocation for one column of panels (LAYOUT_SPEC §5 + §6).
+ * Height allocation for one column of panels (LAYOUT_SPEC §5).
+ *
+ * Heights are distributed purely **by weight** (focused 1.5, others 1.0). They
+ * deliberately do NOT depend on item counts: a panel that grows when containers
+ * appear and shrinks when they stop would make the whole frame jump on every
+ * refresh, which is far worse than a few blank rows. The focused panel still
+ * gets its larger share, and lists that do not fit are windowed with a scroll
+ * hint (LAYOUT_SPEC §6).
  *
  * Rules, in order:
- *  1. If `n * MIN_PANEL_H` fits, every panel is a bordered box: start at
- *     `MIN_PANEL_H`, then grow toward each panel's desired height by weight
- *     (focused 1.5, others 1.0). Surplus beyond every desired height goes to
- *     the focused panel so the column always tiles exactly.
+ *  1. If `n * MIN_PANEL_H` fits, split `available` by weight, round each to
+ *     the nearest row, and settle the integer remainder: positive drift goes to
+ *     the focused panel, negative drift is taken from the tallest panel.
  *  2. Otherwise accordion: non-focused panels collapse to 1-row strips and the
  *     focused panel takes the rest. The focused panel is NEVER collapsed.
  *  3. If the focused panel still cannot reach `MIN_PANEL_H`, lower-priority
@@ -66,48 +72,84 @@ function makePanel(id: PanelId, rect: Rect, focused: boolean): PanelLayout {
  */
 export function allocatePanelHeights(
   ids: readonly PanelId[],
-  demands: ReadonlyMap<PanelId, number>,
   available: number,
   focused: PanelId | null,
 ): Map<PanelId, number> {
   const out = new Map<PanelId, number>();
   if (ids.length === 0 || available <= 0) return out;
 
-  // The focused panel is protected. With focus on detail, protect the first
-  // panel so the column always has one expanded box.
-  const protectedId: PanelId = focused && ids.includes(focused) ? focused : (ids[0] as PanelId);
+  // The focused panel is the only one with a larger share. A column that does
+  // not contain the focus splits its height evenly, so unfocused panels always
+  // look alike. (Accordion still needs someone to expand, so it falls back to
+  // the first panel of the column.)
+  const hasFocus = focused !== null && ids.includes(focused);
+  const protectedId: PanelId = hasFocus ? (focused as PanelId) : (ids[0] as PanelId);
   const pIdx = ids.indexOf(protectedId);
-  const caps = ids.map((id) => desiredPanelHeight(demands.get(id) ?? 0));
-  const weights = ids.map((id) => (id === protectedId ? FOCUS_HEIGHT_WEIGHT : NORMAL_HEIGHT_WEIGHT));
+  const weights = ids.map((id) => (hasFocus && id === focused ? FOCUS_HEIGHT_WEIGHT : NORMAL_HEIGHT_WEIGHT));
 
   // --- Rule 1: every panel can be a bordered box ---
   if (ids.length * MIN_PANEL_H <= available) {
-    const heights = ids.map(() => MIN_PANEL_H);
-    let remaining = available - ids.length * MIN_PANEL_H;
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const raw = ids.map((_, i) => (available * (weights[i] ?? 1)) / totalWeight);
+    const heights = raw.map((v) => Math.floor(v));
 
-    while (remaining > 0) {
-      let totalWeight = 0;
-      let best = -1;
-      let bestScore = -1;
+    // Largest-remainder apportionment for the integer rows left over by
+    // flooring: hand them to the panels whose share was rounded down hardest,
+    // ties going to the focused panel. Dumping the whole remainder on the
+    // focused panel instead would push it well past its 1.5x weight whenever
+    // the rounding favours a sibling.
+    let drift = available - heights.reduce((a, b) => a + b, 0);
+    if (drift > 0) {
+      const order = raw
+        .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+        .sort((a, b) => b.frac - a.frac || (a.i === pIdx ? -1 : b.i === pIdx ? 1 : 0));
+      for (const { i } of order) {
+        if (drift <= 0) break;
+        heights[i] = (heights[i] ?? 0) + 1;
+        drift -= 1;
+      }
+    }
+    while (drift < 0) {
+      let tallest = -1;
+      let best = 0;
       for (let i = 0; i < ids.length; i++) {
-        const room = (caps[i] ?? MIN_PANEL_H) - (heights[i] ?? 0);
-        if (room <= 0) continue;
-        totalWeight += weights[i] ?? 1;
-        const score = room * (weights[i] ?? 1);
-        if (score > bestScore) {
-          bestScore = score;
-          best = i;
+        const h = heights[i] ?? 0;
+        if (h <= MIN_PANEL_H) continue;
+        if (h > best) {
+          best = h;
+          tallest = i;
         }
       }
-      if (best === -1) break;
-      const room = (caps[best] ?? MIN_PANEL_H) - (heights[best] ?? 0);
-      const share = Math.max(1, Math.round((remaining * (weights[best] ?? 1)) / totalWeight));
-      const grant = Math.min(room, remaining, share);
-      heights[best] = (heights[best] ?? 0) + grant;
-      remaining -= grant;
+      if (tallest === -1) break;
+      heights[tallest] = best - 1;
+      drift += 1;
     }
-    // Leftover surplus: the focused panel keeps growing past its desired height.
-    if (remaining > 0) heights[pIdx] = (heights[pIdx] ?? 0) + remaining;
+
+    // Rounding can leave a panel under the minimum (many small panels). Raise
+    // the offenders and take the rows back from the tallest, always cutting the
+    // currently tallest panel so the column stays even.
+    let over = heights.reduce((a, b) => a + b, 0) - available;
+    for (let i = 0; i < ids.length && over < 0; i++) {
+      if ((heights[i] ?? 0) >= MIN_PANEL_H) continue;
+      const need = MIN_PANEL_H - (heights[i] ?? 0);
+      heights[i] = MIN_PANEL_H;
+      over += need;
+    }
+    while (over > 0) {
+      let tallest = -1;
+      let best = 0;
+      for (let i = 0; i < ids.length; i++) {
+        const h = heights[i] ?? 0;
+        if (h <= 0) continue;
+        if (h > best || (h === best && i === pIdx)) {
+          best = h;
+          tallest = i;
+        }
+      }
+      if (tallest === -1) break;
+      heights[tallest] = best - 1;
+      over -= 1;
+    }
 
     ids.forEach((id, i) => out.set(id, heights[i] ?? 0));
     return out;
@@ -138,7 +180,6 @@ export function allocatePanelHeights(
  */
 function placePanels(
   ids: readonly PanelId[],
-  demands: ReadonlyMap<PanelId, number>,
   area: Rect,
   focused: PanelId | null,
   columns: number,
@@ -148,20 +189,19 @@ function placePanels(
   const colCount = Math.max(1, Math.min(columns, ids.length));
   const colWidth = Math.floor(area.w / colCount);
 
-  // Bucket by desired height, tallest first, into the emptiest column.
+  // Deal panels round-robin into the emptiest column, preserving canonical
+  // order, so the columns are balanced and stable across refreshes.
   const buckets: PanelId[][] = Array.from({ length: colCount }, () => []);
   const load = new Array<number>(colCount).fill(0);
-  const order = ids
-    .map((id, i) => ({ id, want: desiredPanelHeight(demands.get(id) ?? 0), i }))
-    .sort((a, b) => b.want - a.want || a.i - b.i);
-  for (const item of order) {
+  ids.forEach((id, i) => {
     let target = 0;
     for (let c = 1; c < colCount; c++) {
       if ((load[c] ?? 0) < (load[target] ?? 0)) target = c;
     }
-    buckets[target]?.push(item.id);
-    load[target] = (load[target] ?? 0) + item.want;
-  }
+    buckets[target]?.push(id);
+    load[target] = (load[target] ?? 0) + 1;
+    void i;
+  });
 
   const out: PanelLayout[] = [];
   buckets.forEach((bucket, c) => {
@@ -170,7 +210,7 @@ function placePanels(
     const colW = c === colCount - 1 ? area.w - c * colWidth : colWidth;
     // Canonical order within the column.
     const colIds = ids.filter((id) => bucket.includes(id));
-    const heights = allocatePanelHeights(colIds, demands, area.h, focused);
+    const heights = allocatePanelHeights(colIds, area.h, focused);
     let y = area.y;
     for (const id of colIds) {
       const h = heights.get(id) ?? 0;
@@ -222,7 +262,6 @@ export function computeLayout(input: LayoutInput): Layout {
   const header: Rect = { x: 0, y: 0, w: cols, h: HEADER_H };
   const footer: Rect = { x: 0, y: rows - FOOTER_H, w: cols, h: FOOTER_H };
 
-  const demands = input.demands ?? new Map<PanelId, number>();
   const panelIds = PANEL_IDS.filter((id) => input.visible.has(id));
   const focusedPanel =
     isPanelId(input.focused) && panelIds.includes(input.focused) ? input.focused : null;
@@ -264,7 +303,7 @@ export function computeLayout(input: LayoutInput): Layout {
       h: Math.max(0, contentH - bandH),
     };
     const columns = Math.max(1, Math.floor(content.w / MIN_PANEL_W));
-    const panels = placePanels(panelIds, demands, band, focusedPanel, columns);
+    const panels = placePanels(panelIds, band, focusedPanel, columns);
     return {
       ...base,
       list: band,
@@ -282,7 +321,7 @@ export function computeLayout(input: LayoutInput): Layout {
       return {
         ...base,
         list,
-        panels: placePanels(panelIds, demands, list, focusedPanel, GRID_COLUMNS_XL),
+        panels: placePanels(panelIds, list, focusedPanel, GRID_COLUMNS_XL),
         detail: detailArea,
       };
     }
@@ -300,7 +339,7 @@ export function computeLayout(input: LayoutInput): Layout {
   return {
     ...base,
     list,
-    panels: placePanels(panelIds, demands, list, focusedPanel, 1),
+    panels: placePanels(panelIds, list, focusedPanel, 1),
     detail: detailArea,
   };
 }

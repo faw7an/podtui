@@ -1,4 +1,4 @@
-import { COLLAPSED_PANEL_H, MIN_PANEL_H, MIN_PANEL_H_WITH_HEADER, PANEL_CHROME_H } from "./constants";
+import { COLLAPSED_PANEL_H, MIN_PANEL_H, MIN_PANEL_H_WITH_HEADER } from "./constants";
 
 /**
  * How a panel of a given height must be drawn (LAYOUT_SPEC §6).
@@ -54,15 +54,6 @@ export function panelMetrics(height: number): PanelMetrics {
 /** Inner (usable) width of a bordered panel of the given outer width. */
 export function innerWidth(outerWidth: number): number {
   return Math.max(0, Math.floor(outerWidth) - 2);
-}
-
-/**
- * How many rows a panel would *like* to be, given its item count.
- * `PANEL_CHROME_H` (border + column header) plus the items, but never fewer
- * than a bordered box with one data row.
- */
-export function desiredPanelHeight(itemCount: number): number {
-  return Math.max(MIN_PANEL_H, PANEL_CHROME_H + Math.max(0, itemCount));
 }
 
 /** Title strip for a collapsed panel, e.g. `▸ 3 Images (2)`. */

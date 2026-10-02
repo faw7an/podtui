@@ -135,12 +135,12 @@ export function buildPanelModels(
     columns: PANEL_COLUMNS[id],
     items: rows[id],
     selected: selected[id] ?? 0,
+    // Quadlets has no data source until Phase 6. Say so explicitly instead of
+    // showing an empty box that looks like a bug; no fake data is invented.
+    ...(id === "quadlets" && rows.quadlets.length === 0
+      ? { emptyLabel: "not implemented yet (phase 6)" }
+      : {}),
   }));
-}
-
-/** How many rows each panel would like (drives expand-to-fit heights). */
-export function buildDemands(models: PanelModel[]): Map<PanelId, number> {
-  return new Map(models.map((m) => [m.id, m.items.length]));
 }
 
 export interface BuildFrameArgs {

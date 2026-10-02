@@ -59,11 +59,6 @@ export interface LayoutInput {
   detailFullscreen?: boolean;
   /** Column definitions from the active tab's view model. */
   columns?: readonly ColumnDef[];
-  /**
-   * How many content rows each panel would like to display, excluding its
-   * chrome. Drives "expand to fit" height allocation.
-   */
-  demands?: ReadonlyMap<PanelId, number>;
 }
 
 export interface Layout {

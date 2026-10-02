@@ -1,12 +1,12 @@
 ▲ podtui   1 Pods  2 Cont  3 Imgs  4 Vols  5 Nets  6 Quads 
 ╭─[2] Containers 6                                         ╮
 │  NAME                          STATUS    IMAGE       AGE │
-│▸ web                           ● running nginx:alpi… 4h  │
-│  chatty                        ● running alpine:lat… 4h  │
-│  tty-box                       ● running alpine:lat… 4h  │
-│  bd6cc3f9035d-infra            ● running             4h  │
-│  web-pod-frontend              ● running nginx:alpi… 4h  │
-│  web-pod-backend               ● running alpine:lat… 4h  │
+│▸ web                           ● running nginx:alpi… 5h  │
+│  chatty                        ● running alpine:lat… 5h  │
+│  tty-box                       ● running alpine:lat… 5h  │
+│  bd6cc3f9035d-infra            ● running             5h  │
+│  web-pod-frontend              ● running nginx:alpi… 5h  │
+│  web-pod-backend               ● running alpine:lat… 5h  │
 │                                                          │
 │                                                          │
 │                                                          │

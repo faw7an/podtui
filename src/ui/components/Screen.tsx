@@ -2,7 +2,6 @@ import React, { useMemo } from "react";
 import { Frame } from "./Frame.tsx";
 import { computeLayout } from "../layout/computeLayout.ts";
 import { useTerminalSize, type TerminalSize } from "../hooks/useTerminalSize.ts";
-import { buildDemands } from "../view/build.ts";
 import type { PanelId, PaneId } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
@@ -53,9 +52,8 @@ export function Screen({
         focused: model.focus,
         zoom,
         detailFullscreen,
-        demands: buildDemands(model.panels),
       }),
-    [columns, rows, visible, model.focus, model.panels, zoom, detailFullscreen],
+    [columns, rows, visible, model.focus, zoom, detailFullscreen],
   );
 
   return <Frame layout={layout} model={model} theme={theme} color={color} />;

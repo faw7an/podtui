@@ -7,7 +7,7 @@ import {
   listWidthL,
   listWidthXL,
 } from "../src/ui/layout/computeLayout";
-import { collapsedTitle, desiredPanelHeight, innerWidth, panelMetrics } from "../src/ui/layout/panelView";
+import { collapsedTitle, innerWidth, panelMetrics } from "../src/ui/layout/panelView";
 import {
   FIXED_CHROME_H,
   FOCUS_MARKER,
@@ -41,20 +41,6 @@ function contains(outer: Rect, inner: Rect): boolean {
 
 const ALL = new Set<PanelId>(PANEL_IDS);
 const ALL_IDS = [...PANEL_IDS];
-
-/** The real sandbox shape: 6 containers, 2 images, 1 pod, 1 volume, ... */
-const SANDBOX: Map<PanelId, number> = new Map<PanelId, number>([
-  ["pods", 1],
-  ["containers", 6],
-  ["images", 2],
-  ["volumes", 1],
-  ["networks", 2],
-  ["quadlets", 0],
-]);
-
-function uniformDemands(n: number): Map<PanelId, number> {
-  return new Map(PANEL_IDS.map((id, i) => [id, (i % n) + 1]));
-}
 
 // ---------------------------------------------------------------- breakpoints
 
@@ -164,13 +150,13 @@ describe("panelMetrics: short-panel rule (LAYOUT_SPEC §6)", () => {
   test("computeLayout never emits a bordered panel below MIN_PANEL_H", () => {
     for (let cols = MIN_COLS; cols <= 300; cols += 1) {
       for (let rows = MIN_ROWS; rows <= 80; rows += 1) {
-        for (const n of [1, 2, 6]) {
+        for (const visibleCount of [1, 2, 6]) {
+          const visible = new Set<PanelId>(ALL_IDS.slice(0, visibleCount));
           const layout = computeLayout({
             cols,
             rows,
-            visible: ALL,
+            visible,
             focused: "containers",
-            demands: uniformDemands(n),
           });
           for (const p of layout.panels) {
             if (p.collapsed) {
@@ -184,12 +170,6 @@ describe("panelMetrics: short-panel rule (LAYOUT_SPEC §6)", () => {
         }
       }
     }
-  });
-
-  test("desiredPanelHeight never asks for less than a bordered box", () => {
-    expect(desiredPanelHeight(0)).toBe(MIN_PANEL_H);
-    expect(desiredPanelHeight(1)).toBe(4);
-    expect(desiredPanelHeight(6)).toBe(9);
   });
 
   test("innerWidth accounts for both borders", () => {
@@ -210,7 +190,7 @@ describe("allocatePanelHeights", () => {
     for (let n = 1; n <= 8; n++) {
       for (let available = 1; available <= 160; available++) {
         const ids = ALL_IDS.slice(0, n) as PanelId[];
-        const heights = allocatePanelHeights(ids, uniformDemands(3), available, "containers");
+        const heights = allocatePanelHeights(ids, available, "containers");
         const sum = [...heights.values()].reduce((a, b) => a + b, 0);
         expect(sum).toBe(available);
       }
@@ -222,7 +202,7 @@ describe("allocatePanelHeights", () => {
       for (let n = 1; n <= 8; n++) {
         const ids = ALL_IDS.slice(0, n) as PanelId[];
         for (const focus of ids) {
-          const heights = allocatePanelHeights(ids, uniformDemands(2), available, focus);
+          const heights = allocatePanelHeights(ids, available, focus);
           const h = heights.get(focus);
           expect(h).toBeDefined();
           if (available >= MIN_PANEL_H) {
@@ -235,7 +215,7 @@ describe("allocatePanelHeights", () => {
 
   test("accordion kicks in below n * MIN_PANEL_H and gives strips to the rest", () => {
     // 6 panels, 20 rows: 6 * 4 = 24 > 20.
-    const heights = allocatePanelHeights(ALL_IDS, uniformDemands(2), 20, "containers");
+    const heights = allocatePanelHeights(ALL_IDS, 20, "containers");
     expect(heights.get("containers")).toBe(15); // 20 - 5 strips
     for (const id of ALL_IDS.filter((i) => i !== "containers")) {
       expect(heights.get(id)).toBe(1);
@@ -244,39 +224,58 @@ describe("allocatePanelHeights", () => {
 
   test("panels are omitted when even strips cannot fit the focused panel", () => {
     // 6 panels, 7 rows: focused needs 4, so only 3 strips fit.
-    const heights = allocatePanelHeights(ALL_IDS, uniformDemands(2), 7, "containers");
+    const heights = allocatePanelHeights(ALL_IDS, 7, "containers");
     expect(heights.get("containers")).toBe(4);
     expect(heights.size).toBe(4); // focused + 3 strips
     expect([...heights.values()].reduce((a, b) => a + b, 0)).toBe(7);
   });
 
   test("the lowest-priority panel is the one dropped", () => {
-    const heights = allocatePanelHeights(ALL_IDS, uniformDemands(2), 7, "containers");
+    const heights = allocatePanelHeights(ALL_IDS, 7, "containers");
     expect(heights.has("quadlets")).toBe(false);
     expect(heights.has("pods")).toBe(true);
   });
 
   test("with no focus, the first panel is the protected one", () => {
-    const heights = allocatePanelHeights(ALL_IDS, uniformDemands(2), 20, null);
+    const heights = allocatePanelHeights(ALL_IDS, 20, null);
     expect(heights.get("pods")).toBe(15);
   });
 
-  test("panels expand toward their item count; leftover surplus goes to focus", () => {
-    const heights = allocatePanelHeights(ALL_IDS, SANDBOX, 100, "containers");
-    // Containers has 6 items -> desired 9, so it is at least that tall...
-    expect(heights.get("containers") ?? 0).toBeGreaterThanOrEqual(9);
-    // ...and is the tallest panel, absorbing the surplus the small lists do
-    // not need (LAYOUT_SPEC §5 step 2: remainder to the focused panel).
+  test("the focused panel is strictly the tallest and the sum is exact", () => {
+    const heights = allocatePanelHeights(ALL_IDS, 100, "containers");
     for (const id of ALL_IDS.filter((i) => i !== "containers")) {
       expect(heights.get("containers") ?? 0).toBeGreaterThan(heights.get(id) ?? 0);
     }
     expect([...heights.values()].reduce((a, b) => a + b, 0)).toBe(100);
   });
 
-  test("no panel exceeds its desired height unless it is the focused one", () => {
-    const heights = allocatePanelHeights(ALL_IDS, SANDBOX, 100, "containers");
-    for (const id of ALL_IDS.filter((i) => i !== "containers")) {
-      expect(heights.get(id)).toBe(desiredPanelHeight(SANDBOX.get(id) ?? 0));
+  test("heights depend only on weights, never on item counts", () => {
+    // Allocation takes no demands argument: the frame must not jump when
+    // containers appear or disappear.
+    expect(allocatePanelHeights.length).toBe(3);
+    const heights = allocatePanelHeights(ALL_IDS, 33, "containers");
+    // 6 panels, weights 1.5 / 1.0 x5 -> totalW 6.5; shares are 7.615 / 5.077,
+    // so the single leftover row goes to the focused panel.
+    expect(heights.get("containers")).toBe(8);
+    expect(heights.get("pods")).toBe(5);
+    expect([...heights.values()].reduce((a, b) => a + b, 0)).toBe(33);
+  });
+
+  test("the focused share is at most 1.5x an unfocused sibling (+1 row)", () => {
+    // Only the normal weight distribution is bounded this way. In accordion the
+    // focused panel deliberately takes everything the strips do not use.
+    for (let available = MIN_PANEL_H; available <= 200; available++) {
+      for (let n = 1; n <= 6; n++) {
+        if (n * MIN_PANEL_H > available) continue;
+        const ids = ALL_IDS.slice(0, n) as PanelId[];
+        const heights = allocatePanelHeights(ids, available, "containers");
+        const focus = heights.get("containers");
+        if (focus === undefined) continue;
+        for (const [id, h] of heights) {
+          if (id === "containers" || h === 0) continue;
+          expect(focus).toBeLessThanOrEqual(Math.ceil(h * 1.5) + 1);
+        }
+      }
     }
   });
 });
@@ -308,8 +307,8 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
       ];
       for (const visible of visibleSets) {
         for (const focus of focusables) {
-          for (const demands of [SANDBOX, uniformDemands(4), new Map<PanelId, number>()]) {
-            const layout = computeLayout({ cols, rows, visible, focused: focus, demands });
+          {
+            const layout = computeLayout({ cols, rows, visible, focused: focus });
             const rects = [...layout.panels, ...(layout.detail ? [layout.detail] : [])];
             for (const r of rects) {
               expect(r.w).toBeGreaterThan(0);
@@ -354,7 +353,6 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
           rows,
           visible: ALL,
           focused: "containers",
-          demands: uniformDemands(5),
         });
         if (bp === "TOO_SMALL") {
           expect(layout.message).toBeDefined();
@@ -393,7 +391,6 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
         rows,
         visible: ALL,
         focused: "containers",
-        demands: SANDBOX,
       });
       if (!layout.list) continue;
       const byX = new Map<number, Rect[]>();
@@ -416,13 +413,55 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
     }
   });
 
+  for (const [cols, rows] of [
+    [200, 50],
+    [120, 35],
+  ] as const) {
+    test(`${cols}x${rows}: heights come from weights, not item counts`, () => {
+      const layout = computeLayout({ cols, rows, visible: ALL, focused: "containers" });
+      expect(layout.panels.length).toBe(6);
+      const focus = layout.panels.find((p) => p.focused);
+      expect(focus).toBeDefined();
+
+      // The same inputs must give the same rectangles: nothing about the
+      // layout depends on how many items a panel holds.
+      const again = computeLayout({ cols, rows, visible: ALL, focused: "containers" });
+      expect(again.panels.map((p) => ({ id: p.id, h: p.h, x: p.x, y: p.y }))).toEqual(
+        layout.panels.map((p) => ({ id: p.id, h: p.h, x: p.x, y: p.y })),
+      );
+
+      // No panel exceeds 1.5x an unfocused sibling, +/- 1 row for rounding.
+      for (const p of layout.panels) {
+        if (p.focused || p.h === 0) continue;
+        expect(focus?.h ?? 0).toBeLessThanOrEqual(Math.ceil(p.h * 1.5) + 1);
+      }
+
+      // Within a single column, the unfocused panels all share weight 1.0 and
+      // are therefore equal to each other.
+      const unfocusedByColumn = new Map<number, number[]>();
+      for (const p of layout.panels) {
+        if (p.focused) continue;
+        const list = unfocusedByColumn.get(p.x) ?? [];
+        list.push(p.h);
+        unfocusedByColumn.set(p.x, list);
+      }
+      for (const heights of unfocusedByColumn.values()) {
+        for (const h of heights) expect(h).toBe(heights[0] ?? h);
+      }
+
+      // And the columns still tile exactly.
+      const sums = new Map<number, number>();
+      for (const p of layout.panels) sums.set(p.x, (sums.get(p.x) ?? 0) + p.h);
+      for (const sum of sums.values()) expect(sum).toBe(layout.list?.h ?? 0);
+    });
+  }
+
   test("XL lays panels out in 2 grid columns", () => {
     const layout = computeLayout({
       cols: 200,
       rows: 50,
       visible: ALL,
       focused: "containers",
-      demands: SANDBOX,
     });
     expect(layout.breakpoint).toBe("XL");
     const xs = new Set(layout.panels.map((p) => p.x));
@@ -436,7 +475,6 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
       rows: 30,
       visible: ALL,
       focused: "containers",
-      demands: SANDBOX,
     });
     expect(layout.breakpoint).toBe("M");
     expect(layout.detail).toBeDefined();
@@ -452,7 +490,6 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
       rows: 20,
       visible: ALL,
       focused: "images",
-      demands: SANDBOX,
     });
     expect(layout.breakpoint).toBe("S");
     expect(layout.panels).toHaveLength(1);
@@ -472,7 +509,7 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
 
   test("detail is present in XL and L", () => {
     for (const [cols, rows] of [[200, 50], [150, 40], [120, 35], [110, 24]] as const) {
-      const layout = computeLayout({ cols, rows, visible: ALL, focused: "containers", demands: SANDBOX });
+      const layout = computeLayout({ cols, rows, visible: ALL, focused: "containers"});
       expect(layout.detail).toBeDefined();
       expect(layout.detail?.w).toBeGreaterThanOrEqual(MIN_DETAIL_W);
     }
@@ -491,14 +528,12 @@ describe("computeLayout invariants (LAYOUT_SPEC §9)", () => {
       rows: 35,
       visible: ALL,
       focused: "containers",
-      demands: SANDBOX,
     });
     const after = computeLayout({
       cols: 120,
       rows: 35,
       visible: new Set<PanelId>(ALL_IDS.filter((id) => id !== "images")),
       focused: "containers",
-      demands: SANDBOX,
     });
     expect(after.panels.map((p) => p.id)).not.toContain("images");
     expect(after.panels.length).toBe(before.panels.length - 1);
@@ -516,7 +551,7 @@ describe("focus is size-independent", () => {
     const s: LayoutState = initialState();
     const focusBefore = s.focus;
     for (const [cols, rows] of [[200, 50], [120, 35], [100, 30], [60, 20], [40, 10]] as const) {
-      computeLayout({ cols, rows, visible: s.visible, focused: s.focus, demands: SANDBOX });
+      computeLayout({ cols, rows, visible: s.visible, focused: s.focus});
     }
     expect(s.focus).toBe(focusBefore);
   });
@@ -551,7 +586,6 @@ describe("focus is size-independent", () => {
           rows,
           visible: ALL,
           focused: focus,
-          demands: uniformDemands(2),
         });
         const panel = layout.panels.find((p) => p.id === focus);
         if (panel) expect(panel.collapsed).toBe(false);
@@ -565,7 +599,6 @@ describe("focus is size-independent", () => {
       rows: 35,
       visible: ALL,
       focused: "images",
-      demands: SANDBOX,
     });
     expect(layout.panels.filter((p) => p.focused).map((p) => p.id)).toEqual(["images"]);
   });
@@ -573,10 +606,9 @@ describe("focus is size-independent", () => {
   test("among equally-sized panels the focused one is never the smallest", () => {
     // Content drives growth, so a panel with many items may legitimately be
     // taller than the focused panel. The focus weight only decides ties.
-    const equal = new Map<PanelId, number>(ALL_IDS.map((id) => [id, 3]));
     for (let rows = MIN_ROWS; rows <= 60; rows++) {
       for (const focus of ALL_IDS) {
-        const heights = allocatePanelHeights(ALL_IDS, equal, rows, focus);
+        const heights = allocatePanelHeights(ALL_IDS, rows, focus);
         const fh = heights.get(focus);
         if (fh === undefined) continue;
         for (const [id, h] of heights) {
@@ -660,7 +692,6 @@ describe("mode S Enter/Esc flow", () => {
       visible: s.visible,
       focused: s.focus,
       zoom: s.zoom,
-      demands: SANDBOX,
     });
     expect(zoomed.panels).toHaveLength(1);
     expect(zoomed.panels[0]).toMatchObject({ x: 0, y: 1, w: 120, h: 33 });

@@ -1,16 +1,16 @@
-▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets            11:44:15 PM
-╭─[2] Containers 6              ╮╭─[3] Images 2                  ╮╭─[1] Pods 1                     ╮
-│  NAME       STATUS    IMAGE   ││  NAME             SIZE    AGE ││  NAME             STATUS    CNT│
-│▸ web        ● running nginx:a…││▸ nginx:alpine     64.3MB  9d  ││▸ web-pod          ● running 3  │
-│  chatty     ● running alpine:…││  alpine:latest    8.7MB   15d ││                                │
-│  tty-box    ● running alpine:…││                               ││                                │
-│  bd6cc3f90… ● running         ││                               │└────────────────────────────────┘
-│  web-pod-f… ● running nginx:a…││                               │╭─[4] Volumes 1                  ╮
-│  web-pod-b… ● running alpine:…││                               ││▸ test-volu… · unused /tmp/podt…│
+▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets            11:55:24 PM
+╭─[1] Pods 1                    ╮╭─[2] Containers 6              ╮╭─[3] Images 2                   ╮
+│  NAME            STATUS    CNT││  NAME       STATUS    IMAGE   ││  NAME              SIZE    AGE │
+│▸ web-pod         ● running 3  ││▸ web        ● running nginx:a…││▸ nginx:alpine      64.3MB  9d  │
+│                               ││  chatty     ● running alpine:…││  alpine:latest     8.7MB   15d │
+│                               ││  tty-box    ● running alpine:…││                                │
+│                               ││  bd6cc3f90… ● running         ││                                │
+└───────────────────────────────┘│  web-pod-f… ● running nginx:a…│└────────────────────────────────┘
+╭─[4] Volumes 1                 ╮└────────────────────── ↓1 more ┘╭─[6] Quadlets 0                 ╮
+│  NAME                 STATUS  │╭─[5] Networks 1                ╮│  NAME                 STATUS   │
+│▸ test-volume          · unused││  NAME                 STATUS  ││  not implemented yet (phase 6) │
+│                               ││▸ podman               bridge  ││                                │
 │                               ││                               ││                                │
-│                               │└───────────────────────────────┘└────────────────────────────────┘
-│                               │╭─[5] Networks 1                ╮╭─[6] Quadlets 0                 ╮
-│                               ││▸ podman               bridge  ││  (empty)                       │
 │                               ││                               ││                                │
 └───────────────────────────────┘└───────────────────────────────┘└────────────────────────────────┘
 ╭─web · running                                                                                    ╮
@@ -18,7 +18,7 @@
 │name       web                                                                                    │
 │state      ● running                                                                              │
 │image      nginx:alpine                                                                           │
-│age        4h                                                                                     │
+│age        5h                                                                                     │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │

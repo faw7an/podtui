@@ -1,12 +1,41 @@
-▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets                                                                                                                11:44:13 PM
-╭─[2] Containers 6                                    ╮╭─[1] Pods 1                                          ╮╭─web · running                                                                          ╮
-│  NAME                      STATUS    IMAGE      AGE ││  NAME                                  STATUS    CNT││Logs Stats Env Config Top                                                               │
-│▸ web                       ● running nginx:alp… 4h  ││▸ web-pod                               ● running 3  ││name       web                                                                          │
-│  chatty                    ● running alpine:la… 4h  ││                                                     ││state      ● running                                                                    │
-│  tty-box                   ● running alpine:la… 4h  ││                                                     ││image      nginx:alpine                                                                 │
-│  bd6cc3f9035d-infra        ● running            4h  ││                                                     ││age        4h                                                                           │
-│  web-pod-frontend          ● running nginx:alp… 4h  ││                                                     ││                                                                                        │
-│  web-pod-backend           ● running alpine:la… 4h  ││                                                     ││                                                                                        │
+▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets                                                                                                                11:55:22 PM
+╭─[1] Pods 1                                          ╮╭─[2] Containers 6                                    ╮╭─web · running                                                                          ╮
+│  NAME                                  STATUS    CNT││  NAME                      STATUS    IMAGE      AGE ││Logs Stats Env Config Top                                                               │
+│▸ web-pod                               ● running 3  ││▸ web                       ● running nginx:alp… 5h  ││name       web                                                                          │
+│                                                     ││  chatty                    ● running alpine:la… 5h  ││state      ● running                                                                    │
+│                                                     ││  tty-box                   ● running alpine:la… 5h  ││image      nginx:alpine                                                                 │
+│                                                     ││  bd6cc3f9035d-infra        ● running            5h  ││age        5h                                                                           │
+│                                                     ││  web-pod-frontend          ● running nginx:alp… 5h  ││                                                                                        │
+│                                                     ││  web-pod-backend           ● running alpine:la… 5h  ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+└─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
+╭─[3] Images 2                                        ╮│                                                     ││                                                                                        │
+│  NAME                                   SIZE    AGE ││                                                     ││                                                                                        │
+│▸ nginx:alpine                           64.3MB  9d  ││                                                     ││                                                                                        │
+│  alpine:latest                          8.7MB   15d │└─────────────────────────────────────────────────────┘│                                                                                        │
+│                                                     │╭─[4] Volumes 1                                       ╮│                                                                                        │
+│                                                     ││  NAME                         STATUS   MOUNTPOINT   ││                                                                                        │
+│                                                     ││▸ test-volume                  · unused /tmp/podtui-…││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+└─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
+╭─[5] Networks 1                                      ╮│                                                     ││                                                                                        │
+│  NAME                                       STATUS  │└─────────────────────────────────────────────────────┘│                                                                                        │
+│▸ podman                                     bridge  │╭─[6] Quadlets 0                                      ╮│                                                                                        │
+│                                                     ││  NAME                                      STATUS   ││                                                                                        │
+│                                                     ││  not implemented yet (phase 6)                      ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
@@ -16,35 +45,6 @@
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     │└─────────────────────────────────────────────────────┘│                                                                                        │
-└─────────────────────────────────────────────────────┘╭─[3] Images 2                                        ╮│                                                                                        │
-╭─[4] Volumes 1                                       ╮│▸ nginx:alpine                           64.3MB  9d  ││                                                                                        │
-│▸ test-volume                  · unused /tmp/podtui-…││  alpine:latest                          8.7MB   15d ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-└─────────────────────────────────────────────────────┘└─────────────────────────────────────────────────────┘│                                                                                        │
-╭─[6] Quadlets 0                                      ╮╭─[5] Networks 1                                      ╮│                                                                                        │
-│  (empty)                                            ││▸ podman                                     bridge  ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 └─────────────────────────────────────────────────────┘└─────────────────────────────────────────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘
 1-6 panel  Tab focus  ↑↓jk move  Enter inspect  z zoom  ? help  q quit

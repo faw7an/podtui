@@ -114,7 +114,6 @@ async function renderAt(cols: number, rows: number, rows2 = 12) {
     rows,
     visible: new Set<PanelId>(PANEL_IDS),
     focused: "containers",
-    demands: new Map(PANEL_IDS.map((id, i) => [id, i + 1])),
   });
   const instance = render(
     React.createElement(Frame, { layout, model: model(rows2), theme: defaultTheme, color: false }),

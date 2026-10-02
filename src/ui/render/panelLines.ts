@@ -174,9 +174,12 @@ export function renderPanel(
       const slot = i - (header ? 1 : 0);
       const item = slot < 0 ? undefined : shown.rows[slot];
       if (!item) {
-        // An empty panel says so, rather than looking like a rendering failure.
-        const empty = slot === 0 && panel.items.length === 0 && contentW >= 7;
-        inner = " ".repeat(markerW) + (empty ? paint(fit("(empty)", contentW), [on ? dim() : ""]) : padRight("", contentW));
+        // An empty panel says why, rather than looking like a rendering failure.
+        const label = panel.items.length === 0 ? (panel.emptyLabel ?? "(empty)") : undefined;
+        const empty = slot === 0 && label !== undefined && contentW >= 3;
+        inner =
+          " ".repeat(markerW) +
+          (empty && label !== undefined ? paint(fit(label, contentW), [on ? dim() : ""]) : padRight("", contentW));
       } else {
         const isSelected = shown.offset + slot === panel.selected;
         const body = composeCells(item.cells, item.tone);

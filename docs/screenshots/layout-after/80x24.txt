@@ -1,21 +1,21 @@
 ▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets
-╭─[2] Containers 6                     ╮╭─[1] Pods 1                           ╮
-│  NAME         STATUS    IMAGE    AGE ││  NAME                   STATUS    CNT│
-│▸ web          ● running nginx:a… 4h  ││▸ web-pod                ● running 3  │
-│  chatty       ● running alpine:… 4h  ││                                      │
-│  tty-box      ● running alpine:… 4h  ││                                      │
-│  bd6cc3f9035… ● running          4h  ││                                      │
-│  web-pod-fro… ● running nginx:a… 4h  ││                                      │
-│  web-pod-bac… ● running alpine:… 4h  ││                                      │
+╭─[1] Pods 1                           ╮╭─[2] Containers 6                     ╮
+│  NAME                   STATUS    CNT││  NAME         STATUS    IMAGE    AGE │
+│▸ web-pod                ● running 3  ││▸ web          ● running nginx:a… 5h  │
+│                                      ││  chatty       ● running alpine:… 5h  │
+│                                      ││  tty-box      ● running alpine:… 5h  │
+│                                      ││  bd6cc3f9035… ● running          5h  │
+│                                      ││  web-pod-fro… ● running nginx:a… 5h  │
+│                                      ││  web-pod-bac… ● running alpine:… 5h  │
 └──────────────────────────────────────┘└──────────────────────────────────────┘
-▸ 4 Volumes (1)                         ▸ 3 Images (2)
-▸ 6 Quadlets (0)                        ▸ 5 Networks (1)
+▸ 3 Images (2)                          ▸ 4 Volumes (1)
+▸ 5 Networks (1)                        ▸ 6 Quadlets (0)
 ╭─web · running                                                                ╮
 │Logs Stats Env Config Top                                                     │
 │name       web                                                                │
 │state      ● running                                                          │
 │image      nginx:alpine                                                       │
-│age        4h                                                                 │
+│age        5h                                                                 │
 │                                                                              │
 │                                                                              │
 │                                                                              │

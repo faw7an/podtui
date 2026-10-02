@@ -21,6 +21,11 @@ export interface PanelModel {
   items: RowModel[];
   /** Selected row index; remembered per panel across hide/show. */
   selected: number;
+  /**
+   * Text shown when the panel has no rows. Set for panels with no data source
+   * yet, so an unimplemented panel reads as a placeholder rather than a bug.
+   */
+  emptyLabel?: string;
 }
 
 export interface DetailModel {
