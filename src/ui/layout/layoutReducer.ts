@@ -16,6 +16,8 @@ export type Action =
   | { type: "activate"; id: PanelId }
   /** Handled by the App's dialog/menu owner, highest Escape priority. */
   | { type: "closeDialog" }
+  /** `?` toggles the help overlay. */
+  | { type: "toggleHelp" }
   /** Select an item by its stable ID (never by row index). */
   | { type: "select"; id: PanelId; itemId: string };
 
@@ -32,6 +34,8 @@ export interface LayoutState {
    */
   returnFocus: PaneId;
   tab: number;
+  /** `?` help overlay visibility. Escape closes it before anything else. */
+  help: boolean;
   /**
    * Per-panel selection, stored as the selected item's ID so a refresh cannot
    * move the cursor (PROJECT_GUIDE §3 data flow 4). The row index is resolved
@@ -56,6 +60,7 @@ export function initialState(
     detailFullscreen: false,
     returnFocus: focus,
     tab: 0,
+    help: false,
     selected,
   };
 }
@@ -161,6 +166,9 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
       return { ...state, tab: (state.tab + 1) % 6, zoom: null };
     case "prevTab":
       return { ...state, tab: (state.tab + 5) % 6, zoom: null };
+    case "toggleHelp":
+      return { ...state, help: !state.help };
+
     case "closeDialog":
       // Owned by the App (dialog/menu state lives there); the layout state is
       // unchanged by definition, since dialogs take priority over the frame.
@@ -184,6 +192,8 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
 export interface EscapeContext {
   /** A modal dialog or bulk-action menu is open. */
   dialogOpen?: boolean;
+  /** The `?` help overlay is open (highest priority after a dialog). */
+  helpOpen?: boolean;
   /** A filter or search input has an active query. */
   filterActive?: boolean;
   /** Clears the filter/search; supplied by the caller that owns it. */
@@ -195,6 +205,7 @@ export function resolveEscape(
   ctx: EscapeContext = {},
 ): Action | null {
   if (ctx.dialogOpen) return { type: "closeDialog" };
+  if (ctx.helpOpen) return { type: "toggleHelp" };
   if (state.zoom) return { type: "escape" };
   if (state.detailFullscreen) return { type: "escape" };
   if (ctx.filterActive && ctx.clearFilter) return ctx.clearFilter;

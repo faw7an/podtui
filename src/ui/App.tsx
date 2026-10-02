@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useInput } from "ink";
 import { Screen } from "./components/Screen.tsx";
+import { HelpOverlay } from "./components/HelpOverlay.tsx";
+import { useTerminalSize } from "./hooks/useTerminalSize.ts";
 import { createPodmanEngine } from "../engine/podman.ts";
 import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/layoutReducer.ts";
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
@@ -39,6 +41,7 @@ export { shortenImageName } from "../util/format.ts";
 export { formatBytes } from "../util/format.ts";
 
 export const App = () => {
+  const { columns: terminalCols, rows: terminalRows } = useTerminalSize();
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState());
   const [data, setData] = useState<ResourceData>(EMPTY_DATA);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
@@ -124,9 +127,14 @@ export const App = () => {
       process.exit(0);
     }
 
-    // --- Escape: dialog > zoom/fullscreen > filter > nothing ---
+    if (input === "?") {
+      dispatch({ type: "toggleHelp" });
+      return;
+    }
+
+    // --- Escape: dialog > help > zoom/fullscreen > filter > nothing ---
     if (key.escape) {
-      const action = resolveEscape(state, {});
+      const action = resolveEscape(state, { helpOpen: state.help });
       if (action) dispatch(action);
       return;
     }
@@ -173,6 +181,11 @@ export const App = () => {
       return;
     }
   });
+
+  // The help overlay replaces the frame while open.
+  if (state.help) {
+    return <HelpOverlay size={{ cols: terminalCols, rows: terminalRows }} />;
+  }
 
   return (
     <Screen
