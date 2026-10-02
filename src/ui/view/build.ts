@@ -9,6 +9,8 @@ import { formatAge, formatBytes, parsePodmanTime, shortenImageName, statusText, 
 import { PANEL_IDS, type PaneId, type PanelId } from "../layout/types.ts";
 import { selectedIndex } from "../layout/layoutReducer.ts";
 import { PANEL_COLUMNS, panelMeta, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
+import { buildDetail, type DetailTabId } from "./detail.ts";
+import type { ContainerInspect } from "../../api/types.ts";
 
 export interface ResourceData {
   containers: ContainerListItem[];
@@ -152,6 +154,12 @@ export interface BuildFrameArgs {
   now: number;
   clock: string;
   error?: string;
+  /** Which detail tab is active (P2-T7). */
+  activeTab?: DetailTabId;
+  /** Inspect payload for the selected container, when available. */
+  inspect?: ContainerInspect | null;
+  collapsedSections?: ReadonlySet<string>;
+  revealSecrets?: boolean;
 }
 
 export function buildFrameModel(args: BuildFrameArgs): FrameModel {
@@ -161,13 +169,25 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
   const focusId: PanelId = args.focus === "detail" ? "containers" : args.focus;
   const panel = panels.find((p) => p.id === focusId);
   const item = panel?.items[panel.selected];
-  const detailLines: string[] = [];
-  if (item) {
+
+  // With a real inspect payload the Config tab renders formatted sections;
+  // otherwise fall back to the list row's own cells so the pane is never blank.
+  const inspect = args.inspect ?? null;
+  const detail = item
+    ? buildDetail({
+        inspect,
+        activeTab: args.activeTab ?? "config",
+        hasSelection: true,
+        collapsed: args.collapsedSections,
+        revealSecrets: args.revealSecrets,
+      })
+    : buildDetail({ inspect: null, activeTab: args.activeTab ?? "config", hasSelection: false });
+
+  if (item && !inspect) {
     for (const [key, value] of Object.entries(item.cells)) {
-      detailLines.push(`${key.padEnd(11)}${value}`);
+      detail.lines.push(`${key.padEnd(11)}${value}`);
     }
-  } else {
-    detailLines.push("no selection");
+    detail.title = `${item.cells["name"] ?? ""} · ${(item.cells["state"] ?? "").slice(2)}`;
   }
 
   return {
@@ -175,11 +195,6 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
     focus: args.focus,
     clock: args.clock,
     error: args.error,
-    detail: {
-      title: item ? `${item.cells["name"] ?? ""} · ${(item.cells["state"] ?? "").slice(2)}` : "(no selection)",
-      tabs: ["Logs", "Stats", "Env", "Config", "Top"],
-      activeTab: 0,
-      lines: detailLines,
-    },
+    detail,
   };
 }

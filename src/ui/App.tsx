@@ -7,6 +7,8 @@ import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
 import { defaultTheme } from "../theme/theme.ts";
 import { EMPTY_DATA, buildFrameModel, type ResourceData } from "./view/build.ts";
 import { createVisibleFetcher } from "./view/refresh.ts";
+import { DETAIL_TABS, nextTabIndex, type DetailTabId } from "./view/detail.ts";
+import type { ContainerInspect } from "../api/types.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
 
 const SOCKET_PATH = process.env["PODTUI_SOCKET"] ?? "/tmp/podtui-dev/podman.sock";
@@ -41,6 +43,8 @@ export const App = () => {
   const [data, setData] = useState<ResourceData>(EMPTY_DATA);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [error, setError] = useState<string | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<DetailTabId>("config");
+  const [inspect, setInspect] = useState<ContainerInspect | null>(null);
   // Kept in a ref so the poll interval always reads the latest resource data
   // without being torn down and re-created on every refresh.
   const dataRef = useRef<ResourceData>(EMPTY_DATA);
@@ -80,12 +84,37 @@ export const App = () => {
         now: Date.now(),
         clock: new Date(lastRefresh).toLocaleTimeString(),
         error,
+        activeTab,
+        inspect,
       }),
-    [data, state.selected, state.focus, lastRefresh, error],
+    [data, state.selected, state.focus, lastRefresh, error, activeTab, inspect],
   );
 
   const focusId: PanelId = isPanelId(state.focus) ? state.focus : "containers";
   const focusModel = model.panels.find((p) => p.id === focusId);
+  const selectedItemId = focusModel?.items[focusModel.selected]?.id ?? "";
+
+  // Inspect data feeds the Config tab. Fetched only for containers (the one
+  // resource P2-T7 needs) and only when the selection actually changes.
+  useEffect(() => {
+    if (focusId !== "containers" || !selectedItemId) {
+      setInspect(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const engine = createPodmanEngine();
+        const data = await engine.inspectContainer(SOCKET_PATH, selectedItemId);
+        if (!cancelled) setInspect(data);
+      } catch {
+        if (!cancelled) setInspect(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId, selectedItemId]);
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
@@ -109,6 +138,15 @@ export const App = () => {
 
     if (input === "z") {
       dispatch({ type: "zoom" });
+      return;
+    }
+
+    // [ / ] move through the detail tabs (FR-4).
+    if (input === "[" || input === "]") {
+      setActiveTab((prev) => {
+        const idx = DETAIL_TABS.findIndex((t) => t.id === prev);
+        return DETAIL_TABS[nextTabIndex(idx, input === "]" ? 1 : -1)]?.id ?? "config";
+      });
       return;
     }
 
