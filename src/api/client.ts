@@ -68,10 +68,12 @@ export async function request<T>(
   const { method = "GET", body, timeout = 10000, signal, headers = {}, query = {} } = options;
 
   const controller = new AbortController();
+  const onExternalAbort = (): void => controller.abort();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   if (signal) {
-    signal.addEventListener("abort", () => controller.abort());
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", onExternalAbort);
   }
 
   const queryString = new URLSearchParams(query).toString();
@@ -103,13 +105,20 @@ export async function request<T>(
     return parseJson<T>(response);
   } catch (error) {
     clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", onExternalAbort);
     if (error instanceof EngineError) {
       throw error;
     }
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new EngineError("unreachable", "Request timeout");
+    if (isAbortError(error)) {
+      // A deliberate cancellation must not be reported as a slow daemon: the
+      // two are indistinguishable to the user otherwise.
+      throw new EngineError(
+        "unreachable",
+        signal?.aborted ? "Request aborted" : `Request timeout after ${timeout}ms`,
+      );
     }
-    if (error instanceof TypeError && error.message.includes("fetch")) {
+    if (error instanceof TypeError) {
+      // Bun reports a missing/unreachable unix socket as a TypeError from fetch.
       throw new EngineError("unreachable", "Failed to connect to Podman socket");
     }
     throw new EngineError("unknown", String(error));
@@ -129,7 +138,10 @@ export const put = <T>(socketPath: string, path: string, body: unknown, options?
   request<T>(socketPath, path, { ...options, method: "PUT", body });
 
 export interface StreamOptions {
-  timeout?: number;
+  /**
+   * Cancels the stream. Streams are long-lived by design, so there is no
+   * default timeout: a caller that wants one must abort it.
+   */
   signal?: AbortSignal;
 }
 
@@ -190,6 +202,11 @@ export async function* streamChunks(
     if (error instanceof EngineError) throw error;
     // An abort is a normal way for a stream to end, not an error.
     if (isAbortError(error)) return;
+    // Same mapping as request(): an unreachable socket is "unreachable", not an
+    // opaque "unknown" (FR-8 wants readable errors).
+    if (error instanceof TypeError) {
+      throw new EngineError("unreachable", "Failed to connect to Podman socket");
+    }
     throw new EngineError("unknown", String(error));
   } finally {
     // Release the connection on early exit (break/abort) as well as on EOF.
