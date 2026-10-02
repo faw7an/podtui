@@ -16,7 +16,10 @@ MISSING = not implemented (includes all of unstarted phases 3–8).
 
 ## Part 1 — Baseline (evidence)
 
-- `bun install`: no changes. `bun run check`: **exit 0, 270 pass / 0 fail**,
+- `bun install`: no changes. `bun run check`: **exit 0, 270 pass / 0 fail**
+  (one transient single-test failure was observed once across six full runs and
+  did not reproduce; suspected timing flake in the `setTimeout`-based Ink
+  tests — worth watching, not yet proven),
   1.65M expects, 13 files (integration skipped without `PODTUI_INTEGRATION=1`).
   `bun run build`: 562 modules, 83 MB binary.
 - Toolchain verified: Bun 1.4.2, Podman 6.1.1/API 6.1.1, ink 7.1.1 / react 19.3.0 /
