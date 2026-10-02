@@ -15,7 +15,10 @@ export type Action =
   /** Number keys 1-6: switch focus, or toggle when already focused. */
   | { type: "activate"; id: PanelId }
   /** Handled by the App's dialog/menu owner, highest Escape priority. */
-  | { type: "closeDialog" };
+  | { type: "closeDialog" }
+  /** Move the selection inside a panel; clamped by the caller to item count. */
+  | { type: "select"; id: PanelId; index: number }
+  | { type: "moveSelection"; delta: 1 | -1 };
 
 export interface LayoutState {
   visible: Set<PanelId>;
@@ -159,6 +162,19 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
       // Owned by the App (dialog/menu state lives there); the layout state is
       // unchanged by definition, since dialogs take priority over the frame.
       return state;
+
+    case "select": {
+      const index = Math.max(0, Math.floor(action.index));
+      if (state.selected[action.id] === index) return state;
+      return { ...state, selected: { ...state.selected, [action.id]: index } };
+    }
+
+    case "moveSelection": {
+      const id = state.focus;
+      if (!isPanelId(id)) return state;
+      const next = Math.max(0, state.selected[id] + action.delta);
+      return { ...state, selected: { ...state.selected, [id]: next } };
+    }
   }
 }
 

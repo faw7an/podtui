@@ -40,6 +40,11 @@ export interface ColumnDef {
   flex?: number;
   /** Lower numbers are dropped first when space is scarce. */
   priority?: number;
+  /**
+   * Blank cells reserved after this column (LAYOUT_SPEC §6: gap = 1-2 spaces).
+   * The gap is included in the column's width, so the row still sums exactly.
+   */
+  gap?: number;
 }
 
 export interface LayoutInput {

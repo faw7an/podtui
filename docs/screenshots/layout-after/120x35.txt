@@ -1,0 +1,35 @@
+▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets                                11:44:14 PM
+╭─[1] Pods 1                                         ╮╭─web · running                                                  ╮
+│▸ web-pod                              ● running 3  ││Logs Stats Env Config Top                                       │
+│                                                    ││name       web                                                  │
+└────────────────────────────────────────────────────┘│state      ● running                                            │
+╭─[2] Containers 6                                   ╮│image      nginx:alpine                                         │
+│  NAME                     STATUS    IMAGE      AGE ││age        4h                                                   │
+│▸ web                      ● running nginx:alp… 4h  ││                                                                │
+│  chatty                   ● running alpine:la… 4h  ││                                                                │
+│  tty-box                  ● running alpine:la… 4h  ││                                                                │
+│  bd6cc3f9035d-infra       ● running            4h  ││                                                                │
+│  web-pod-frontend         ● running nginx:alp… 4h  ││                                                                │
+│  web-pod-backend          ● running alpine:la… 4h  ││                                                                │
+│                                                    ││                                                                │
+│                                                    ││                                                                │
+│                                                    ││                                                                │
+└────────────────────────────────────────────────────┘│                                                                │
+╭─[3] Images 2                                       ╮│                                                                │
+│▸ nginx:alpine                          64.3MB  9d  ││                                                                │
+│  alpine:latest                         8.7MB   15d ││                                                                │
+│                                                    ││                                                                │
+└────────────────────────────────────────────────────┘│                                                                │
+╭─[4] Volumes 1                                      ╮│                                                                │
+│▸ test-volume                 · unused /tmp/podtui-…││                                                                │
+│                                                    ││                                                                │
+└────────────────────────────────────────────────────┘│                                                                │
+╭─[5] Networks 1                                     ╮│                                                                │
+│▸ podman                                    bridge  ││                                                                │
+│                                                    ││                                                                │
+└────────────────────────────────────────────────────┘│                                                                │
+╭─[6] Quadlets 0                                     ╮│                                                                │
+│  (empty)                                           ││                                                                │
+│                                                    ││                                                                │
+└────────────────────────────────────────────────────┘└────────────────────────────────────────────────────────────────┘
+1-6 panel  Tab focus  ↑↓jk move  Enter inspect  z zoom  ? help  q quit

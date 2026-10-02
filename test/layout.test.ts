@@ -768,8 +768,23 @@ describe("computeColumns", () => {
   });
 
   test("drops the lowest priority column first", () => {
-    expect(computeColumns(31, specs)?.dropped).toEqual(["age"]);
-    expect(computeColumns(21, specs)?.dropped).toEqual(["age", "image"]);
+    // Minimum widths plus 1-cell gaps: all four need 39, without age 33,
+    // without age+image 22.
+    expect(computeColumns(39, specs)?.dropped).toEqual([]);
+    expect(computeColumns(38, specs)?.dropped).toEqual(["age"]);
+    expect(computeColumns(32, specs)?.dropped).toEqual(["age", "image"]);
+    expect(computeColumns(21, specs)?.dropped).toEqual(["age", "image", "state"]);
+  });
+
+  test("reserves a gap cell after every column but the last", () => {
+    const result = computeColumns(80, specs);
+    expect(result).not.toBeNull();
+    const cols = result?.columns ?? [];
+    for (const [i, col] of cols.entries()) {
+      expect(col.gap).toBe(i === cols.length - 1 ? 0 : 1);
+      expect(col.w).toBe(col.cellW + col.gap);
+      expect(col.cellW).toBeGreaterThanOrEqual(specs.find((s) => s.id === col.id)?.minW ?? 0);
+    }
   });
 
   test("x offsets are contiguous and ordered", () => {
