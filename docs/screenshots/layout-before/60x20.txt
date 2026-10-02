@@ -1,0 +1,8 @@
+size: 60x20
+lines: 2 (rows=20)  ok
+max line width: 41 (cols=60)  ok
+vertical-letter pattern present: no
+
+----- frame -----
+                    ⚠ Terminal too small
+                   Need 80×20, have 60×20
