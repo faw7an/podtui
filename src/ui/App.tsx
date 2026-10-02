@@ -8,12 +8,12 @@ import type { ContainerListItem, PodListItem, ImageListItem, VolumeListItem, Net
 const SOCKET_PATH = "/tmp/podtui-dev/podman.sock";
 
 const PANELS = [
-  { id: "pods", title: "Pods", number: 1, color: "magenta" },
-  { id: "containers", title: "Containers", number: 2, color: "green" },
-  { id: "images", title: "Images", number: 3, color: "blue" },
-  { id: "volumes", title: "Volumes", number: 4, color: "yellow" },
-  { id: "networks", title: "Networks", number: 5, color: "cyan" },
-  { id: "quadlets", title: "Quadlets", number: 6, color: "magenta" },
+  { id: "pods", title: "Pods", number: 1, color: "magenta", short: "Pods" },
+  { id: "containers", title: "Containers", number: 2, color: "green", short: "Cont" },
+  { id: "images", title: "Images", number: 3, color: "blue", short: "Imgs" },
+  { id: "volumes", title: "Volumes", number: 4, color: "yellow", short: "Vols" },
+  { id: "networks", title: "Networks", number: 5, color: "cyan", short: "Nets" },
+  { id: "quadlets", title: "Quadlets", number: 6, color: "magenta", short: "Quads" },
 ] as const;
 
 type PanelId = typeof PANELS[number]["id"];
@@ -117,6 +117,20 @@ export const App = () => {
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
+  // Update detail helper
+  const updateDetail = () => {
+    const state = panelStatesRef.current[focusedPanelRef.current];
+    const item = state.items[state.selectedIndex];
+    if (item) {
+      setSelectedDetail({
+        id: item.id,
+        label: item.label,
+        type: focusedPanelRef.current,
+        data: { status: item.status },
+      });
+    }
+  };
+
   // Input handling
   useInput((input, key) => {
     if (input === "q" || key.escape) {
@@ -156,30 +170,43 @@ export const App = () => {
     }
   });
 
-  const updateDetail = () => {
-    const state = panelStatesRef.current[focusedPanelRef.current];
-    const item = state.items[state.selectedIndex];
-    if (item) {
-      setSelectedDetail({
-        id: item.id,
-        label: item.label,
-        type: focusedPanelRef.current,
-        data: { status: item.status },
-      });
-    }
-  };
-
   const visiblePanels = PANELS.filter(p => panelStatesRef.current[p.id].visible);
   const focusedState = panelStatesRef.current[focusedPanelRef.current];
 
-  // Layout constants - fixed heights for each section
-  const FIXED_H = 8; // header(2) + tabBar(2) + footer(2) + margins(2)
+  // Minimum terminal size
+  const MIN_COLS = 80;
+  const MIN_ROWS = 24;
   
+  // Check if terminal is too small
+  if (terminalSize.columns < MIN_COLS || terminalSize.rows < MIN_ROWS) {
+    return (
+      <InkBox flexDirection="column" height="100%" width="100%" flexGrow={1}>
+        <Box flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
+          <Text color="red" bold>⚠ Terminal Too Small</Text>
+          <Box marginTop={1}>
+            <Text color="dim">Minimum: {MIN_COLS}×{MIN_ROWS} | Current: {terminalSize.columns}×{terminalSize.rows}</Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text color="dim">Resize terminal or press q to quit</Text>
+          </Box>
+        </Box>
+      </InkBox>
+    );
+  }
+
   // Calculate bento grid layout - exact viewport fit
   const visibleCount = visiblePanels.length;
-  const gridCols = Math.min(visibleCount, Math.max(2, Math.floor(terminalSize.columns / 38)));
-  const panelWidth = Math.max(28, Math.floor(terminalSize.columns / gridCols) - 1);
-  const availableHeight = terminalSize.rows - FIXED_H;
+  
+  // Calculate grid columns based on available width
+  const maxCols = Math.floor((terminalSize.columns - 2) / 30);
+  const gridCols = Math.min(visibleCount, Math.max(2, Math.min(maxCols, visibleCount)));
+  
+  // Calculate panel width - ensure minimum
+  const gridWidth = terminalSize.columns - 2; // account for borders
+  const panelWidth = Math.max(28, Math.floor(gridWidth / gridCols));
+  
+  // Available height for grid
+  const availableHeight = terminalSize.rows - 8; // header(2) + tabBar(2) + footer(2) + margins(2)
   const gridRows = Math.ceil(visibleCount / gridCols);
   const panelHeight = Math.max(6, Math.floor((availableHeight - gridRows) / gridRows));
 
@@ -196,7 +223,7 @@ export const App = () => {
   };
 
   const truncate = (str: string, max: number) => 
-    str.length > max ? str.slice(0, max - 1) + "…" : str.padEnd(max);
+    str.length > max ? str.slice(0, Math.max(0, max - 1)) + "…" : str;
 
   return (
     <InkBox flexDirection="column" height={terminalSize.rows} width="100%">
@@ -214,34 +241,30 @@ export const App = () => {
         </Box>
       </Box>
 
-      {/* Tab bar - fixed 2 rows */}
+      {/* Tab bar - fixed 2 rows - single line with short names */}
       <Box height={2} flexDirection="row" paddingX={1} paddingY={0}>
         {PANELS.map((panel) => {
           const isVisible = panelStatesRef.current[panel.id].visible;
           const isFocused = focusedPanelRef.current === panel.id;
-          const tabColor = isFocused ? "black" : (isVisible ? "foreground" : "dim");
-          const bgColor = isFocused ? "selectionBg" : "transparent";
-          const borderC = isFocused ? "green" : (isVisible ? panel.color : "dim");
-          const borderS = isFocused ? "double" : "single";
           
           return (
             <Box 
               key={panel.id} 
               marginRight={1} 
-              paddingX={2} 
+              paddingX={1} 
               paddingY={0}
-              borderStyle={borderS} 
-              borderColor={borderC}
-              backgroundColor={bgColor}>
-              <Text color={tabColor} bold={isFocused}>
-                {panel.number} {panel.title}
+              borderStyle={isFocused ? "double" : "single"} 
+              borderColor={isFocused ? "green" : (isVisible ? panel.color : "dim")}
+              backgroundColor={isFocused ? "selectionBg" : "transparent"}>
+              <Text color={isFocused ? "black" : (isVisible ? "foreground" : "dim")} bold={isFocused}>
+                {panel.number}:{panel.short}
               </Text>
             </Box>
           );
         })}
       </Box>
 
-      {/* Main area - fills remaining space exactly */}
+      {/* Main grid area - fills remaining viewport exactly */}
       <Box flexGrow={1} flexDirection="row">
         {/* Left: Panel grid - 60% width */}
         <Box width={Math.floor(terminalSize.columns * 0.58)} flexDirection="row" flexWrap="wrap" flexGrow={1} paddingX={1} paddingY={1} gap={1}>
@@ -304,11 +327,11 @@ export const App = () => {
       <Box height={2} borderStyle="single" borderColor="cyan" flexDirection="row" paddingX={1} paddingY={0}>
         <Box flexDirection="row" gap={2}>
           <Text color="green" bold>1-6</Text>
-          <Text color="dim">toggle panels</Text>
+          <Text color="dim">toggle</Text>
           <Text color="green" bold>Tab</Text>
-          <Text color="dim">focus panel</Text>
+          <Text color="dim">focus</Text>
           <Text color="green" bold>↑↓ j/k</Text>
-          <Text color="dim">navigate</Text>
+          <Text color="dim">nav</Text>
           <Text color="green" bold>Enter</Text>
           <Text color="dim">inspect</Text>
           <Text color="red" bold>q</Text>
