@@ -34,7 +34,7 @@ Phase overview
 - [ ] **P0-T5** Compile it with `bun build --compile` and run the binary. Resolve any bundling errors (⚠️ e.g. optional devtools dependency); log the fix.
 - [ ] **P0-T6** `scripts/dev-sandbox.sh` with `up` / `down` / `status`. Seed resources listed in PROJECT_GUIDE section 9 (except quadlets).
 - [ ] **P0-T7** Socket ping spike: a tiny script that pings the sandbox socket using Bun's unix-socket fetch and prints the Podman version. ⚠️ VERIFY the fetch option and the endpoint.
-- [ ] **P0-T8** Environment report in `docs/DECISIONS.md`: Podman version, Bun version, terminal emulator in use, truecolor and mouse-reporting support (test by printing a color gradient and logging raw mouse sequences).
+- [x] **P0-T8** Environment report in `docs/DECISIONS.md`: Podman version, Bun version, terminal emulator in use, truecolor and mouse-reporting support (test by printing a color gradient and logging raw mouse sequences).
 
 **Automated tests:** `bun run check` passes with one trivial test; CI-ready script exits 0.
 
