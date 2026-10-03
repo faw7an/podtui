@@ -28,7 +28,7 @@ if (parsed.args.help) {
 // real daemon instead of looking only at /tmp.
 const socket = discoverSocket(parsed.args.socket);
 if (socket.kind === "unreachable") {
-  process.stderr.write(`${socket.message}\n${socket.fixCommand}\n`);
+  process.stderr.write(`${socket.message}\nLooked in:\n${socket.tried.map((p) => `  - ${p}`).join("\n")}\n${socket.fixCommand}\n`);
   process.exit(1);
 }
 

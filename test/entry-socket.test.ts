@@ -67,13 +67,30 @@ describe("entry point: socket discovery", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("Podman socket not found");
     expect(result.stderr).toContain("systemctl --user enable --now podman.socket");
+    // The tried paths are listed, so a stale environment diagnoses itself.
+    expect(result.stderr).toContain("/nonexistent-podtui-test/podman/podman.sock");
+    expect(result.stderr).toContain("/run/podman/podman.sock");
     expect(result.stdout).toBe("");
   });
 
-  test("an explicit --socket that does not exist falls through to the same error", async () => {
+  test("an explicit --socket miss names its path, not the daemon default", async () => {
     const result = await runEntry(["--socket", "/nonexistent-podtui-test/x.sock"], NO_SOCKET_ENV);
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain("Podman socket not found");
+    expect(result.stderr).toContain("/nonexistent-podtui-test/x.sock");
+    expect(result.stderr).toContain("--socket");
+    expect(result.stderr).not.toContain("dev-sandbox");
+  });
+
+  test("a missing sandbox socket points at dev-sandbox.sh", async () => {
+    const result = await runEntry([], {
+      PODTUI_SOCKET: "/tmp/podtui-dev/missing.sock",
+      XDG_RUNTIME_DIR: "/nonexistent-podtui-test",
+    });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("/tmp/podtui-dev/missing.sock");
+    expect(result.stderr).toContain("PODTUI_SOCKET");
+    expect(result.stderr).toContain("scripts/dev-sandbox.sh up");
+    expect(result.stdout).toBe("");
   });
 
   test("a valid socket still hits the TTY gate instead of rendering", async () => {

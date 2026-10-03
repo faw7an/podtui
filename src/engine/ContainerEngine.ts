@@ -16,6 +16,7 @@ import type {
   ContainerStatsUI,
 } from "../api/types.ts";
 import type { LogFrame } from "../api/demux.ts";
+import type { SocketResult } from "../api/socket.ts";
 
 export interface EngineError extends Error {
   kind: "unreachable" | "notFound" | "conflict" | "unknown";
@@ -43,7 +44,7 @@ export interface ContainerActionResult {
 
 export interface ContainerEngine {
   // Connection
-  findSocket(cliSocket?: string): Promise<{ kind: "found"; path: string } | { kind: "unreachable"; message: string; fixCommand: string }>;
+  findSocket(cliSocket?: string): Promise<SocketResult>;
   ping(socketPath: string): Promise<boolean>;
 
   // Version & Info

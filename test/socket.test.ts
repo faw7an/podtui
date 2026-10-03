@@ -102,3 +102,37 @@ describe("findAndPingSocket", () => {
     expect(result.kind).toBe("unreachable");
   });
 });
+describe("discoverSocket unreachable diagnostics", () => {
+  test("lists every tried path, in check order", () => {
+    setupEnv({ XDG_RUNTIME_DIR: "/nonexistent", PODTUI_SOCKET: undefined });
+    const result = discoverSocket();
+    expect(result.kind).toBe("unreachable");
+    if (result.kind === "unreachable") {
+      expect(result.tried).toEqual(["/nonexistent/podman/podman.sock", "/run/podman/podman.sock"]);
+    }
+  });
+
+  test("an explicit --socket miss names the path and its source first", () => {
+    setupEnv({ XDG_RUNTIME_DIR: "/nonexistent", PODTUI_SOCKET: undefined });
+    const result = discoverSocket("/tmp/custom.sock");
+    expect(result.kind).toBe("unreachable");
+    if (result.kind === "unreachable") {
+      expect(result.message).toContain("/tmp/custom.sock");
+      expect(result.message).toContain("--socket");
+      expect(result.tried[0]).toBe("/tmp/custom.sock");
+      // A custom path gets path-checking advice, not the sandbox hint.
+      expect(result.fixCommand).not.toContain("dev-sandbox");
+    }
+  });
+
+  test("a missing sandbox socket points at dev-sandbox.sh", () => {
+    setupEnv({ XDG_RUNTIME_DIR: "/nonexistent", PODTUI_SOCKET: "/tmp/podtui-dev/missing.sock" });
+    const result = discoverSocket();
+    expect(result.kind).toBe("unreachable");
+    if (result.kind === "unreachable") {
+      expect(result.message).toContain("/tmp/podtui-dev/missing.sock");
+      expect(result.message).toContain("PODTUI_SOCKET");
+      expect(result.fixCommand).toContain("scripts/dev-sandbox.sh up");
+    }
+  });
+});
