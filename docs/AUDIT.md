@@ -199,7 +199,7 @@ Still unticked, with the exact gap:
 Phase 1 boxes stay unticked: the audit verified the work exists, but several
 task criteria are still unmet (P1-T2 timeout/abort now covered but the
 `{} as T` empty-body case remains; P1-T3 never records `network-inspect.json`;
-P1-T6 stream style is still unrecorded; P1-T7/P1-T8 mapper unit tests and a real
+P1-T7/P1-T8 mapper unit tests and a real
 abort assertion are still missing).
 
 ## Resume point
