@@ -91,9 +91,18 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
   return fit(head + " ".repeat(gap) + clockPainted, cols);
 }
 
+/** Which UI state the footer advertises keys for. `filter` arrives with P2-T5. */
+export type FooterHintContext = "base" | "detail";
+
 export interface FooterOptions {
   theme: Theme;
   color?: boolean;
+  /**
+   * Overrides the model-derived context. When unset, `focus === "detail"`
+   * (which the reducer sets exactly when fullscreen detail opens) selects the
+   * detail hints; anything else selects the list hints.
+   */
+  context?: FooterHintContext;
 }
 
 const HINTS: { key: string; desc: string }[] = [
@@ -102,6 +111,19 @@ const HINTS: { key: string; desc: string }[] = [
   { key: "↑↓jk", desc: "move" },
   { key: "Enter", desc: "inspect" },
   { key: "z", desc: "zoom" },
+  { key: "?", desc: "help" },
+  { key: "q", desc: "quit" },
+];
+
+/**
+ * Keys that matter once detail is fullscreen. Every key here must exist in
+ * KEYMAP (`src/ui/view/help.ts`), which the `?` overlay renders — the R-17
+ * no-drift rule applies to every context, not just the base list.
+ */
+const DETAIL_HINTS: { key: string; desc: string }[] = [
+  { key: "[ ]", desc: "tab" },
+  { key: "↑↓jk", desc: "next" },
+  { key: "Esc", desc: "back" },
   { key: "?", desc: "help" },
   { key: "q", desc: "quit" },
 ];
@@ -127,7 +149,9 @@ export function buildFooter(
       .map((h) => `${paint(h.key, [on ? fg(theme.helpKey) : ""])} ${paint(h.desc, [on ? dim() : ""])}`)
       .join("  ");
 
-  let hints = HINTS;
+  const context: FooterHintContext =
+    opts.context ?? (model.focus === "detail" ? "detail" : "base");
+  let hints = context === "detail" ? DETAIL_HINTS : HINTS;
   while (hints.length > 1 && displayWidth(render(hints)) + displayWidth(error ?? "") > cols - 1) {
     // Drop the least important hint that is not `quit`.
     const dropIndex = hints.length - 2;
