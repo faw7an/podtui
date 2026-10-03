@@ -10,6 +10,7 @@ import type {
   ImageListItem,
   VolumeListItem,
   NetworkListItem,
+  NetworkInspect,
   VersionInfo,
   Info,
   ContainersStatsResponse,
@@ -109,6 +110,24 @@ describe("fixtures parse correctly into types", () => {
       expect(item.id).toBeDefined();
       expect(item.driver).toBeDefined();
     }
+  });
+
+  test("network-inspect.json parses as NetworkInspect", () => {
+    // R-09: this fixture could never be recorded because the recorder looked for
+    // a capital `Id` while /networks/json reports a lowercase `id`. That also
+    // left the `containers` field below unprovable: R-04's network prune preview
+    // reads it from the *inspect* response (it does not exist on the list
+    // response), and this is the fixture that proves it.
+    const data = readFixture<NetworkInspect>("network-inspect.json");
+    expect(data.name).toBeDefined();
+    expect(data.id).toBeDefined();
+    expect(data.driver).toBeDefined();
+    expect(typeof data.internal).toBe("boolean");
+    expect(typeof data.ipv6_enabled).toBe("boolean");
+    expect(Array.isArray(data.subnets)).toBe(true);
+    // Present on inspect, absent from the list object.
+    expect(data.containers).toBeDefined();
+    expect(typeof data.containers).toBe("object");
   });
 
   test("containers-stats.json parses as ContainersStatsResponse", () => {

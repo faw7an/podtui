@@ -1,0 +1,23 @@
+{
+  "name": "test-network",
+  "id": "f684c1eec3b518cc1b094c49fbcfc22cbf4a55551288b1858bdf86474df939a0",
+  "driver": "bridge",
+  "network_interface": "podman1",
+  "created": "2026-10-03T07:24:54.924598753Z",
+  "subnets": [
+    {
+      "subnet": "10.89.0.0/24",
+      "gateway": "10.89.0.1"
+    }
+  ],
+  "ipv6_enabled": false,
+  "internal": false,
+  "dns_enabled": true,
+  "labels": {
+    "podtui.test": "1"
+  },
+  "ipam_options": {
+    "driver": "host-local"
+  },
+  "containers": {}
+}
