@@ -31,6 +31,8 @@ export type Action =
   | { type: "clearFilter" }
   /** `Enter` while a filter is active: keep the query, leave filter mode. */
   | { type: "endFilter" }
+  /** `Ctrl+U` while typing: empty the input line, stay in the popup. */
+  | { type: "clearFilterLine" }
   /** `Space` in the detail pane: fold or unfold every Config section. */
   | { type: "toggleAllSections" }
   /** `PgUp`/`PgDn` in the detail pane: scroll by roughly half a pane. */
@@ -269,10 +271,28 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
     }
 
     case "clearFilter": {
+      // Typing: drop this panel's query and always close the popup, even when
+      // the input is already empty — Esc must never leave a dead popup open.
+      // Otherwise fall back to the focused panel's kept query, so Esc clears
+      // a filter the popup left behind (the Esc chain reaches filter only
+      // after dialog/help/zoom/fullscreen, which all return first).
+      if (state.filterFor !== null) {
+        const filterQuery = { ...state.filterQuery };
+        delete filterQuery[state.filterFor];
+        return { ...state, filterFor: null, filterQuery, detailScroll: 0 };
+      }
+      if (!isPanelId(state.focus) || state.filterQuery[state.focus] === undefined) return state;
+      const kept = { ...state.filterQuery };
+      delete kept[state.focus];
+      return { ...state, filterQuery: kept, detailScroll: 0 };
+    }
+
+    case "clearFilterLine": {
       if (state.filterFor === null) return state;
+      if (state.filterQuery[state.filterFor] === undefined) return state;
       const filterQuery = { ...state.filterQuery };
       delete filterQuery[state.filterFor];
-      return { ...state, filterFor: null, filterQuery, detailScroll: 0 };
+      return { ...state, filterQuery };
     }
 
     case "endFilter": {

@@ -17,6 +17,8 @@ export interface Theme {
   statusOk: string;
   statusWarn: string;
   statusError: string;
+  /** Active-filter chrome: panel border, badge, header marker. */
+  filter: string;
 }
 
 export const defaultTheme: Theme = {
@@ -38,6 +40,7 @@ export const defaultTheme: Theme = {
   statusOk: "#00ff00",
   statusWarn: "#ffff00",
   statusError: "#ff0000",
+  filter: "#ff5fff",
 };
 
 export const lightTheme: Theme = {
@@ -59,6 +62,7 @@ export const lightTheme: Theme = {
   statusOk: "#008000",
   statusWarn: "#b8860b",
   statusError: "#cc0000",
+  filter: "#a020f0",
 };
 
 export function getTheme(name: string): Theme {

@@ -7,7 +7,7 @@ describe("theme", () => {
       "ok", "warn", "error", "dim", "accent", "border",
       "selectionBg", "selectionFg", "background", "foreground",
       "panelTitle", "panelTitleFocused", "helpKey", "helpDesc",
-      "statusOk", "statusWarn", "statusError"
+      "statusOk", "statusWarn", "statusError", "filter"
     ] as const;
 
     for (const key of requiredKeys) {
@@ -22,7 +22,7 @@ describe("theme", () => {
       "ok", "warn", "error", "dim", "accent", "border",
       "selectionBg", "selectionFg", "background", "foreground",
       "panelTitle", "panelTitleFocused", "helpKey", "helpDesc",
-      "statusOk", "statusWarn", "statusError"
+      "statusOk", "statusWarn", "statusError", "filter"
     ] as const;
 
     for (const key of requiredKeys) {

@@ -26,6 +26,12 @@ export interface PanelModel {
    * yet, so an unimplemented panel reads as a placeholder rather than a bug.
    */
   emptyLabel?: string;
+  /**
+   * Active `/` filter (redesigned filter UX). `matched` is always
+   * `items.length`; `total` is the unfiltered row count, so the title renders
+   * `3/6` and the badge `⌕ web (3/6)`. Absent = unfiltered.
+   */
+  filter?: { query: string; total: number };
 }
 
 export interface DetailModel {

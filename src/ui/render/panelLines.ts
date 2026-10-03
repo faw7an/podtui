@@ -46,6 +46,16 @@ export function windowRows<T>(
   };
 }
 
+/**
+ * Persistent "filter active" badge for the panel bottom border:
+ * `⌕ web (3/6)`. The icon leads, so `fit()` truncation (which cuts the tail)
+ * can never remove it; the count never collides with the title because it
+ * lives here, not there. Meaning survives NO_COLOR: the text is the signal.
+ */
+export function formatFilterBadge(query: string, matched: number, total: number): string {
+  return `⌕ ${query} (${matched}/${total})`;
+}
+
 export function scrollHint(above: number, below: number): string {
   if (above > 0 && below > 0) return `↑${above} ↓${below} more`;
   if (below > 0) return `↓${below} more`;

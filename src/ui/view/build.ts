@@ -120,15 +120,20 @@ function quadletRows(items: { id: string; name: string; status: string }[]): Row
 }
 
 /**
- * Narrow rows to those whose name contains the query (case-insensitive).
- * Applied before the stored selection ID resolves to a row, so R-12's cursor
- * stability and the detail pane follow automatically — and the stored ID is
- * never touched, so clearing the query restores the cursor exactly.
+ * Narrow rows to those with a displayed cell containing the query
+ * (case-insensitive, literal substring — never a pattern, so "." and "["
+ * match only themselves). Every cell in `cells` is a shown column, so this is
+ * exactly "the fields currently shown", whatever the panel. Applied before the
+ * stored selection ID resolves to a row, so R-12's cursor stability and the
+ * detail pane follow automatically — and the stored ID is never touched, so
+ * clearing the query restores the cursor exactly.
  */
 export function applyFilter(rows: RowModel[], query: string | undefined): RowModel[] {
   if (query === undefined || query === "") return rows;
   const needle = query.toLowerCase();
-  return rows.filter((r) => (r.cells["name"] ?? "").toLowerCase().includes(needle));
+  return rows.filter((r) =>
+    Object.values(r.cells).some((cell) => (cell ?? "").toLowerCase().includes(needle)),
+  );
 }
 
 export function buildPanelModels(
@@ -153,9 +158,11 @@ export function buildPanelModels(
     return {
     id,
     ...meta,
-    // Echo the query in the title so the narrowed list explains itself;
-    // the footer filter hints stay short because of this.
-    title: query ? `${meta.title} /${query}` : meta.title,
+    // The title stays clean (redesigned filter UX moved the query to the
+    // badge); the filter field below feeds title counts, badge, border and
+    // header marker at render time.
+    title: meta.title,
+    filter: query ? { query, total: rows[id].length } : undefined,
     columns: PANEL_COLUMNS[id],
     items,
     // Resolve the stored item ID to the row index for this render.

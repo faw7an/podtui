@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { initialState, reducer } from "../src/ui/layout/layoutReducer.ts";
 import { buildFrameModel, EMPTY_DATA, type ResourceData } from "../src/ui/view/build.ts";
+import { formatFilterBadge } from "../src/ui/render/panelLines.ts";
+import { fit } from "../src/util/fit.ts";
+import { visibleWidth } from "../src/ui/render/palette.ts";
 import type { ContainerListItem } from "../src/api/types.ts";
 import type { VolumeListItem } from "../src/api/types.ts";
 
@@ -62,7 +65,10 @@ function volume(name: string): VolumeListItem {
 
 const DATA: ResourceData = {
   ...EMPTY_DATA,
-  containers: [container("id-web", "web"), container("id-chatty", "chatty")],
+  containers: [
+    { ...container("id-web", "web"), Image: "docker.io/library/nginx:alpine" },
+    { ...container("id-chatty", "chatty"), Image: "registry.example.com/alpine:latest" },
+  ],
   volumes: [volume("test-volume"), volume("data-volume")],
 };
 
@@ -184,7 +190,12 @@ describe("filter narrows the lists", () => {
     expect(cleared.panels.find((p) => p.id === "containers")?.selected).toBe(1);
   });
 
-  test("the panel title echoes the query", () => {
+  test("the panel title stays clean; the query lives in the filter field", () => {
+    // This asserted `title contains "/web"` until the redesigned filter UX
+    // removed the echo: the title returns to a clean "Containers" and the
+    // query/count travel in `panel.filter` for the badge, border and header
+    // marker instead. Changed per the new spec, not weakened: the assertion
+    // below is stricter about where each piece lives.
     const model = buildFrameModel({
       data: DATA,
       selected: selectedAll("id-web"),
@@ -193,9 +204,89 @@ describe("filter narrows the lists", () => {
       clock: "",
       filter: { containers: "web" } as never,
     });
-    const title = model.panels.find((p) => p.id === "containers")?.title ?? "";
-    expect(title).toContain("/web");
+    const panel = model.panels.find((p) => p.id === "containers");
+    expect(panel?.title ?? "").not.toContain("/");
+    expect(panel?.filter).toEqual({ query: "web", total: 2 });
     const unfiltered = buildFrameModel({ data: DATA, selected: selectedAll("id-web"), focus: "containers", now: 0, clock: "" });
-    expect(unfiltered.panels.find((p) => p.id === "containers")?.title ?? "").not.toContain("/");
+    expect(unfiltered.panels.find((p) => p.id === "containers")?.filter).toBeUndefined();
+  });
+
+  test("zero matches leave the detail on its nothing-selected placeholder", () => {
+    const model = buildFrameModel({
+      data: DATA,
+      selected: selectedAll("id-web"),
+      focus: "containers",
+      now: 0,
+      clock: "",
+      filter: { containers: "zzz" } as never,
+    });
+    const panel = model.panels.find((p) => p.id === "containers");
+    expect(panel?.items).toEqual([]);
+    expect(panel?.filter).toEqual({ query: "zzz", total: 2 });
+    expect(model.detail.title).toBe("(no selection)");
+  });
+});
+describe("filter matches every displayed cell, literally", () => {
+  test("image and status cells match, not just names", () => {
+    expect(names("containers", { containers: "nginx" })).toEqual(["web"]);
+    expect(names("containers", { containers: "RUNNING" })).toEqual(["web", "chatty"]);
+  });
+
+  test("special characters match literally, never as patterns", () => {
+    expect(names("containers", { containers: "[" })).toEqual([]);
+    // "." occurs in chatty's image cell only. As a regex it would match
+    // everything; as a literal substring it matches exactly one row.
+    expect(names("containers", { containers: "." })).toEqual(["chatty"]);
+  });
+});
+
+describe("filter badge composition", () => {
+  test("badge reads ⌕ query (matched/total)", () => {
+    expect(formatFilterBadge("web", 3, 6)).toBe("⌕ web (3/6)");
+    expect(formatFilterBadge("", 0, 0)).toBe("⌕  (0/0)");
+  });
+
+  test("badge keeps the icon and exact width from 20 to 80 cells", () => {
+    const badge = formatFilterBadge("a-very-long-query-string-here", 1, 12);
+    for (let w = 20; w <= 80; w++) {
+      const fitted = fit(badge, w);
+      expect(visibleWidth(fitted)).toBe(w);
+      expect(fitted.startsWith("⌕")).toBe(true);
+    }
+  });
+});
+
+describe("filter reducer: line editing and kept-query clearing", () => {
+  test("Ctrl+U empties the input but stays in the popup", () => {
+    let s = reducer(initialState(), { type: "startFilter" });
+    s = reducer(s, { type: "filterInput", text: "webapp" });
+    s = reducer(s, { type: "clearFilterLine" });
+    expect(s.filterQuery["containers"]).toBeUndefined();
+    expect(s.filterFor).toBe("containers");
+  });
+
+  test("Ctrl+U with no input is a no-op", () => {
+    const s = reducer(initialState(), { type: "startFilter" });
+    expect(reducer(s, { type: "clearFilterLine" })).toBe(s);
+  });
+
+  test("Esc with an empty input still closes the popup", () => {
+    const s = reducer(initialState(), { type: "startFilter" });
+    const closed = reducer(s, { type: "clearFilter" });
+    expect(closed.filterFor).toBeNull();
+  });
+
+  test("Esc with no popup clears the focused panel's kept query", () => {
+    let s = reducer(initialState(), { type: "startFilter" });
+    s = reducer(s, { type: "filterInput", text: "web" });
+    s = reducer(s, { type: "endFilter" });
+    expect(s.filterFor).toBeNull();
+    const cleared = reducer(s, { type: "clearFilter" });
+    expect(cleared.filterQuery["containers"]).toBeUndefined();
+  });
+
+  test("Esc with no popup and no kept query is a no-op", () => {
+    const s = initialState();
+    expect(reducer(s, { type: "clearFilter" })).toBe(s);
   });
 });
