@@ -31,10 +31,24 @@ function buildUrl(socketPath: string, path: string): string {
   return `http://d${BASE_PATH}${path}`;
 }
 
-export async function parseJson<T>(response: Response): Promise<T> {
+/**
+ * Read a JSON body, or fail loudly.
+ *
+ * An empty body is never turned into `{}`: that cast promised a shape the
+ * response did not contain, and the resulting error appeared far from its cause
+ * (e.g. `{}` reaching code that then called `.map`). Endpoints that legitimately
+ * answer `204 No Content` must go through `postVoid`/`delVoid` instead, which
+ * state that they expect nothing.
+ */
+export async function parseJson<T>(response: Response, context?: string): Promise<T> {
   const text = await response.text();
-  if (!text) {
-    return {} as T;
+  if (!text.trim()) {
+    throw new EngineError(
+      "unknown",
+      `Expected a JSON body but the response was empty${context ? ` (${context})` : ""}`,
+      response.status,
+      text,
+    );
   }
   try {
     return JSON.parse(text);
@@ -60,11 +74,17 @@ export function mapHttpError(status: number, body: string): EngineError {
   }
 }
 
-export async function request<T>(
+/**
+ * Perform the request and return the raw response, after the status check and
+ * error mapping. `request` layers JSON parsing on top; the void helpers stop
+ * here. Keeping the body-expectation in the callers means an endpoint that
+ * answers 204 has to say so instead of getting a fabricated `{}`.
+ */
+async function send(
   socketPath: string,
   path: string,
   options: RequestOptions = {}
-): Promise<T> {
+): Promise<Response> {
   const { method = "GET", body, timeout = 10000, signal, headers = {}, query = {} } = options;
 
   const controller = new AbortController();
@@ -102,7 +122,7 @@ export async function request<T>(
       throw mapHttpError(response.status, text);
     }
 
-    return parseJson<T>(response);
+    return response;
   } catch (error) {
     clearTimeout(timeoutId);
     signal?.removeEventListener("abort", onExternalAbort);
@@ -125,6 +145,15 @@ export async function request<T>(
   }
 }
 
+export async function request<T>(
+  socketPath: string,
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const response = await send(socketPath, path, options);
+  return parseJson<T>(response, `${options.method ?? "GET"} ${path}`);
+}
+
 export const get = <T>(socketPath: string, path: string, options?: Omit<RequestOptions, "method" | "body">) =>
   request<T>(socketPath, path, { ...options, method: "GET" });
 
@@ -136,6 +165,33 @@ export const del = <T>(socketPath: string, path: string, options?: Omit<RequestO
 
 export const put = <T>(socketPath: string, path: string, body: unknown, options?: Omit<RequestOptions, "method">) =>
   request<T>(socketPath, path, { ...options, method: "PUT", body });
+
+/**
+ * Action endpoints that answer `204 No Content` (verified against the sandbox:
+ * `POST /containers/{id}/start` and `/stop` both return 204 with an empty body).
+ * These deliberately expect nothing back, so an empty body is success rather
+ * than a protocol error. A non-empty body is still read and discarded — a real
+ * `DELETE /containers/{id}` answers 200 with a JSON report array — which also
+ * keeps the connection from being left half-read.
+ */
+export async function postVoid(
+  socketPath: string,
+  path: string,
+  body?: unknown,
+  options?: Omit<RequestOptions, "method">
+): Promise<void> {
+  const response = await send(socketPath, path, { ...options, method: "POST", body });
+  await response.text();
+}
+
+export async function delVoid(
+  socketPath: string,
+  path: string,
+  options?: Omit<RequestOptions, "method" | "body">
+): Promise<void> {
+  const response = await send(socketPath, path, { ...options, method: "DELETE" });
+  await response.text();
+}
 
 export interface StreamOptions {
   /**

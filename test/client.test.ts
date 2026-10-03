@@ -51,12 +51,28 @@ describe("parseJson", () => {
     expect(result).toEqual({ id: "abc", name: "test" });
   });
 
-  test("returns empty object for empty response", async () => {
+  test("throws on an empty body instead of inventing {}", async () => {
+    // This used to assert `expect(result).toEqual({})`, which pinned the very
+    // lie R-10 removed: an empty body is not an empty object. Endpoints that
+    // really answer 204 use postVoid/delVoid now (test/client-empty-body.test.ts).
     const mockResponse = {
       text: async () => "",
+      status: 204,
     } as Response;
-    const result = await parseJson<Record<string, never>>(mockResponse);
-    expect(result).toEqual({});
+    await expect(parseJson(mockResponse)).rejects.toMatchObject({
+      kind: "unknown",
+      message: "Expected a JSON body but the response was empty",
+    });
+  });
+
+  test("names the request when the body is empty, so the call site is obvious", async () => {
+    const mockResponse = {
+      text: async () => "",
+      status: 204,
+    } as Response;
+    await expect(parseJson(mockResponse, "POST /containers/web/start")).rejects.toMatchObject({
+      message: "Expected a JSON body but the response was empty (POST /containers/web/start)",
+    });
   });
 
   test("throws EngineError on invalid JSON", async () => {
