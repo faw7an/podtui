@@ -1,5 +1,7 @@
 import { render } from "ink";
 import { App } from "./ui/App.tsx";
+import { USAGE, parseArgs } from "./cli.ts";
+import { discoverSocket } from "./api/socket.ts";
 
 /**
  * `alternateScreen: true` keeps scrollback clean and restores the previous
@@ -7,6 +9,28 @@ import { App } from "./ui/App.tsx";
  * restore itself, symmetrically, including on unmount — verified in
  * docs/DECISIONS.md, so we do not hand-roll the escapes.
  */
+
+// Flag parsing comes first so `--help` works even when stdin is a pipe.
+const parsed = parseArgs(process.argv.slice(2));
+if (!parsed.ok) {
+  process.stderr.write(`${parsed.error}\n\n${USAGE}`);
+  process.exit(1);
+}
+if (parsed.args.help) {
+  process.stdout.write(USAGE);
+  process.exit(0);
+}
+
+// The socket is resolved here, once, instead of inside the UI: `--socket`,
+// then PODTUI_SOCKET, then the standard rootless and rootful locations. The
+// old hardcoded sandbox fallback is gone — `bun run dev` sets PODTUI_SOCKET
+// via package.json, and a compiled binary on a real machine now finds the
+// real daemon instead of looking only at /tmp.
+const socket = discoverSocket(parsed.args.socket);
+if (socket.kind === "unreachable") {
+  process.stderr.write(`${socket.message}\n${socket.fixCommand}\n`);
+  process.exit(1);
+}
 
 /**
  * Refuse to start without a TTY, before Ink renders anything.
@@ -25,4 +49,4 @@ if (!process.stdin.isTTY) {
   process.exit(1);
 }
 
-render(<App />, { alternateScreen: true });
+render(<App socketPath={socket.path} />, { alternateScreen: true });

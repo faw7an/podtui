@@ -52,7 +52,7 @@ Phase overview
 
 **Goal:** a typed, tested engine layer. No UI work in this phase.
 
-- [ ] **P1-T1** `api/socket.ts`: discovery order per FR-1; returns path or a typed "unreachable" result containing the suggested fix command. Unit tests with env var and temp-file permutations.
+- [x] **P1-T1** `api/socket.ts`: discovery order per FR-1; returns path or a typed "unreachable" result containing the suggested fix command. Unit tests with env var and temp-file permutations.
 - [ ] **P1-T2** `api/client.ts`: `get`, `post`, `delete` helpers over the unix socket with JSON parsing, timeouts, and error mapping to `EngineError`. Streaming helper that yields chunks and supports abort.
 - [ ] **P1-T3** `scripts/record-fixtures.sh`: save real responses (list/inspect containers, pods, images, volumes, networks, top, a short stats sample, version) from the sandbox into `test/fixtures/`. Trim volatile fields only if documented.
 - [ ] **P1-T4** `api/types.ts`: types derived from the fixtures. Fields that can be missing/null are modeled as such. Add a test that parses every fixture through the mappers without throwing.

@@ -14,8 +14,6 @@ import type { ContainerInspect } from "../api/types.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
 import { resolvePollMs } from "../config.ts";
 
-const SOCKET_PATH = process.env["PODTUI_SOCKET"] ?? "/tmp/podtui-dev/podman.sock";
-
 // FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
 // back to the default rather than reaching setInterval.
 const POLL_MS = resolvePollMs(process.env["PODTUI_POLL_MS"]);
@@ -41,7 +39,7 @@ function selectionStep(
 
 export { PANEL_COLUMNS };
 
-export const App = () => {
+export const App = ({ socketPath }: { socketPath: string }) => {
   const { columns: terminalCols, rows: terminalRows } = useTerminalSize();
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState());
   const [data, setData] = useState<ResourceData>(EMPTY_DATA);
@@ -54,7 +52,7 @@ export const App = () => {
   const dataRef = useRef<ResourceData>(EMPTY_DATA);
 
   const fetchVisible = useMemo(
-    () => createVisibleFetcher(createPodmanEngine(), SOCKET_PATH),
+    () => createVisibleFetcher(createPodmanEngine(), socketPath),
     [],
   );
 
@@ -109,7 +107,7 @@ export const App = () => {
     void (async () => {
       try {
         const engine = createPodmanEngine();
-        const data = await engine.inspectContainer(SOCKET_PATH, selectedItemId);
+        const data = await engine.inspectContainer(socketPath, selectedItemId);
         if (!cancelled) setInspect(data);
       } catch {
         if (!cancelled) setInspect(null);
