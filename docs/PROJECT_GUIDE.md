@@ -83,8 +83,18 @@ The Podman service exposes a **libpod-native REST API** and a Docker-compatible 
 - ✅ Enable rootless socket: `systemctl --user enable --now podman.socket`
 - ✅ Run a throwaway service without systemd: `podman system service --time=0 unix:///path/to.sock`
 
-### Endpoints we expect to use ⚠️ VERIFY EACH with `curl --unix-socket` before coding against it
-Base: `http://d/v<apiVersion>/libpod/...` (a version-less `/libpod/...` path may also work; check). Use `curl --unix-socket $SOCK http://d/_ping` first. Check the official Podman REST API reference (docs.podman.io) for the exact current paths and parameters.
+### Endpoints we expect to use ⚠️ VERIFY EACH against the live sandbox socket before coding against it
+Base: `http://d/v<apiVersion>/libpod/...` (a version-less `/libpod/...` path may also work; check). Check the official Podman REST API reference (docs.podman.io) for the exact current paths and parameters.
+
+⚠️ **`curl --unix-socket` does not work on this machine** (verified 2026-10-03: returns `HTTP:000` against a socket that a raw connect proves is listening and answering 200). Two methods that do work:
+
+```bash
+# CLI (what scripts/dev-sandbox.sh uses)
+podman --url unix:///tmp/podtui-dev/podman.sock ps -a
+
+# Raw JSON over the socket — the same path the app uses
+timeout 20 bun -e 'const r = await fetch("http://d/_ping", { unix: "/tmp/podtui-dev/podman.sock" } as never); console.log(r.status, await r.text())'
+```
 
 | Purpose | Believed endpoint |
 |---|---|

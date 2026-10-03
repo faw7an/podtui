@@ -37,8 +37,6 @@ function selectionStep(
 }
 
 export { PANEL_COLUMNS };
-export { shortenImageName } from "../util/format.ts";
-export { formatBytes } from "../util/format.ts";
 
 export const App = () => {
   const { columns: terminalCols, rows: terminalRows } = useTerminalSize();

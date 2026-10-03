@@ -13,7 +13,12 @@ This project talks to a real Podman daemon and uses fast-moving libraries. Your 
 
 1. **Never invent** an API endpoint, JSON field, CLI flag, library function, or config key. If you did not see it in a real response, official docs, or installed source code in *this* session, it is unverified.
 2. **Verify before using.** Allowed verification methods, in order of preference:
-   - Call the real thing against the **sandbox Podman socket** (see section 3) with `curl --unix-socket` and read the actual JSON.
+   - Call the real thing against the **sandbox Podman socket** (see section 3) and read the actual JSON. ⚠️ **`curl --unix-socket` does NOT work on this machine** (verified 2026-10-03: the socket is `LISTEN`ing and answers 200 to a raw socket request, but `curl --unix-socket` returns `HTTP:000`; `--noproxy` makes no difference). Use one of these instead:
+     - `podman --url unix:///tmp/podtui-dev/podman.sock ...` (CLI; what `scripts/dev-sandbox.sh` uses), or
+     - the same path the app itself uses, which is known good:
+       ```bash
+       timeout 20 bun -e 'const r = await fetch("http://d/_ping", { unix: "/tmp/podtui-dev/podman.sock" } as never); console.log(r.status, await r.text())'
+       ```
    - Read installed package source in `node_modules/` and its `package.json` (`peerDependencies`, `exports`).
    - Read official docs (Podman API reference at docs.podman.io, Ink README, Bun docs) via web fetch if available.
 3. **Record what you verified.** Save real API responses as fixtures in `test/fixtures/` (trimmed, no secrets). Types in `src/api/types.ts` must be derived from these fixtures, not from memory.
