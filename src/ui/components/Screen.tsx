@@ -22,6 +22,8 @@ export interface ScreenProps {
   color?: boolean;
   /** Overrides the model-derived footer hint context (P2-T8). */
   hintContext?: FooterHintContext;
+  /** Detail content scroll offset in rows (P2-T7). */
+  detailScroll?: number;
 }
 
 /**
@@ -43,6 +45,7 @@ export function Screen({
   size,
   color = true,
   hintContext,
+  detailScroll,
 }: ScreenProps) {
   const detected = useTerminalSize();
   const { columns, rows } = size ?? detected;
@@ -60,5 +63,14 @@ export function Screen({
     [columns, rows, visible, model.focus, zoom, detailFullscreen],
   );
 
-  return <Frame layout={layout} model={model} theme={theme} color={color} hintContext={hintContext} />;
+  return (
+    <Frame
+      layout={layout}
+      model={model}
+      theme={theme}
+      color={color}
+      hintContext={hintContext}
+      detailScroll={detailScroll}
+    />
+  );
 }

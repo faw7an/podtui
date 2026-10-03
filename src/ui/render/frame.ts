@@ -12,6 +12,8 @@ export interface FrameOptions {
   color?: boolean;
   /** Overrides the model-derived footer hint context (P2-T8). */
   hintContext?: FooterHintContext;
+  /** Detail content scroll offset in rows (P2-T7). */
+  detailScroll?: number;
 }
 
 /**
@@ -54,6 +56,7 @@ export function renderFrame(layout: Layout, model: FrameModel, opts: FrameOption
       theme: opts.theme,
       prominent,
       color: on,
+      scroll: opts.detailScroll,
     });
     lines.forEach((line, i) => buffer.write(detailRect.x, detailRect.y + i, line));
   }

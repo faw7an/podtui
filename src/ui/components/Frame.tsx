@@ -11,6 +11,7 @@ export interface FrameProps {
   theme: Theme;
   color?: boolean;
   hintContext?: FooterHintContext;
+  detailScroll?: number;
 }
 
 /**
@@ -21,8 +22,8 @@ export interface FrameProps {
  * measure or wrap anything, because it does not clip (verified). See
  * `src/ui/render/frame.ts` and the LAYOUT_SPEC §8 decision in DECISIONS.md.
  */
-export function Frame({ layout, model, theme, color = true, hintContext }: FrameProps) {
-  const lines = renderFrame(layout, model, { theme, color, hintContext });
+export function Frame({ layout, model, theme, color = true, hintContext, detailScroll }: FrameProps) {
+  const lines = renderFrame(layout, model, { theme, color, hintContext, detailScroll });
   return (
     <>
       {lines.map((line, i) => (

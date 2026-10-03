@@ -16,6 +16,8 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "Tab", desc: "focus next panel", section: "panels" },
   { key: "↑↓jk", desc: "move selection", section: "navigation" },
   { key: "/", desc: "filter list", section: "navigation" },
+  { key: "Space", desc: "fold sections", section: "detail" },
+  { key: "PgUp/PgDn", desc: "scroll detail", section: "detail" },
   { key: "Enter", desc: "open detail", section: "detail" },
   { key: "[ ]", desc: "detail tab", section: "detail" },
   { key: "Esc", desc: "back / close", section: "detail" },

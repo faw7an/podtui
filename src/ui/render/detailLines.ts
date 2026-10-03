@@ -3,8 +3,8 @@ import { innerWidth } from "../layout/panelView.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit, padRight } from "../../util/fit.ts";
 import type { DetailModel } from "../view/model.ts";
+import { LABEL_W } from "../view/detail.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
-import { windowRows } from "./panelLines.ts";
 
 const TL = "╭";
 const TR = "╮";
@@ -18,6 +18,24 @@ export interface DetailOptions {
   /** True when the detail pane owns the whole body (mode S / zoom). */
   prominent?: boolean;
   color?: boolean;
+  /** Content scroll offset in rows (PgUp/PgDn); clamped to the content. */
+  scroll?: number;
+}
+
+/**
+ * Paint one content row: section headings bold in the accent colour, the
+ * fixed-width key cell in the accent colour, values default. A row only gets
+ * the key treatment when the key cell boundary is exact (cell 13 is a space):
+ * overlong keys fall back to plain rather than tearing mid-key. Placeholders
+ * (`no selection`, `not implemented yet`) match neither rule and stay plain.
+ */
+function paintContent(line: string, theme: Theme, on: boolean): string {
+  if (!on) return line;
+  if (line.startsWith("# ")) return paint(line, [fg(theme.accent), bold()]);
+  if (line.length > LABEL_W && line[LABEL_W - 1] === " ") {
+    return paint(line.slice(0, LABEL_W), [fg(theme.accent)]) + line.slice(LABEL_W);
+  }
+  return line;
 }
 
 /**
@@ -60,9 +78,12 @@ export function renderDetail(
   const hasTabs = detail.tabs.length > 0;
 
   const contentBudget = Math.max(0, innerRows - (hasTabs ? 1 : 0));
-  const shown = windowRows(detail.lines, 0, contentBudget);
-  const above = detail.lines.length - shown.rows.length;
-  const aboveCount = shown.offset;
+  // Pager semantics, not selection-follow: the offset is the top row, clamped
+  // so the last window is full. (windowRows centers its anchor instead, which
+  // is what panels want and detail does not.)
+  const lastTop = Math.max(0, detail.lines.length - contentBudget);
+  const top = Math.min(Math.max(0, opts.scroll ?? 0), lastTop);
+  const rows = detail.lines.slice(top, top + contentBudget);
 
   for (let i = 0; i < innerRows; i++) {
     let inner: string;
@@ -70,14 +91,14 @@ export function renderDetail(
       inner = padRight(tabStrip, iw);
     } else {
       const slot = i - (hasTabs ? 1 : 0);
-      const line = slot >= 0 ? shown.rows[slot] : undefined;
-      inner = line === undefined ? padRight("", iw) : padRight(fit(line, iw), iw);
+      const line = slot >= 0 ? rows[slot] : undefined;
+      inner = line === undefined ? padRight("", iw) : padRight(fit(paintContent(line, theme, on), iw), iw);
     }
     lines.push(`${bc}${V}${on ? RESET : ""}${inner}${bc}${V}${on ? RESET : ""}`);
   }
 
-  const hidden = above - aboveCount;
-  const hint = hidden > 0 ? ` ↓${hidden} more ` : "";
+  const hiddenBelow = detail.lines.length - top - rows.length;
+  const hint = hiddenBelow > 0 ? ` ↓${hiddenBelow} more ` : "";
   const hintText = hint.length > 0 ? paint(hint, [on ? dim() : ""]) : "";
   const bottomFill = Math.max(0, iw - displayWidth(hintText));
   lines.push(`${bc}${BL}${H.repeat(bottomFill)}${hintText}${bc}${BR}${on ? RESET : ""}`);

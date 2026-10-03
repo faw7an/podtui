@@ -101,8 +101,8 @@ describe("footer hint contexts", () => {
       }
       // The overlay renders one row per KEYMAP entry; the footer may only
       // show keys the overlay also documents.
-      const shown = ["1-6", "Tab", "↑↓jk", "Enter", "[ ]", "Esc", "z", "?", "q"].filter((k) =>
-        line.includes(k),
+      const shown = ["1-6", "Tab", "↑↓jk", "Enter", "[ ]", "Esc", "z", "?", "q", "Space", "/"].filter(
+        (k) => line.includes(k),
       );
       const known = new Set(KEYMAP.map((k) => k.key));
       for (const key of shown) expect(known.has(key)).toBe(true);

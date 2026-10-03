@@ -54,8 +54,11 @@ export interface BuildDetailArgs {
   revealSecrets?: boolean;
 }
 
-/** Fixed-width label column so values line up without a table library. */
-const LABEL_W = 13;
+/**
+ * Fixed-width label column so values line up without a table library.
+ * Exported so the renderer paints exactly the key cell and nothing else.
+ */
+export const LABEL_W = 13;
 
 function row(key: string, value: string): string {
   return `${key.padEnd(LABEL_W)}${value}`;
@@ -196,4 +199,15 @@ export function toggleSection(collapsed: ReadonlySet<string>, section: string): 
   if (next.has(section)) next.delete(section);
   else next.add(section);
   return next;
+}
+
+/**
+ * `Space` in the detail pane: fold everything or unfold everything, with one
+ * predictable result. Per-section targeting would need a section cursor — a
+ * new navigation dimension that belongs to Phase 3 — so the single key flips
+ * the whole tab instead. The singular `toggleSection` stays for that future.
+ */
+export function toggleAllSections(collapsed: ReadonlySet<string>): Set<string> {
+  if (CONFIG_SECTIONS.every((s) => collapsed.has(s))) return new Set();
+  return new Set(CONFIG_SECTIONS);
 }

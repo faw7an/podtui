@@ -133,6 +133,7 @@ const FILTER_HINTS: { key: string; desc: string }[] = [
 const DETAIL_HINTS: { key: string; desc: string }[] = [
   { key: "[ ]", desc: "tab" },
   { key: "↑↓jk", desc: "next" },
+  { key: "Space", desc: "fold" },
   { key: "Esc", desc: "back" },
   { key: "?", desc: "help" },
   { key: "q", desc: "quit" },

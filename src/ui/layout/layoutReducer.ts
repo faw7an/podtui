@@ -1,4 +1,5 @@
 import { PANEL_IDS, isPanelId, type PaneId, type PanelId } from "./types";
+import { toggleAllSections } from "../view/detail.ts";
 
 export type Action =
   | { type: "toggle"; id: PanelId }
@@ -29,7 +30,13 @@ export type Action =
   /** `Esc` while a filter is active: drop the query and leave filter mode. */
   | { type: "clearFilter" }
   /** `Enter` while a filter is active: keep the query, leave filter mode. */
-  | { type: "endFilter" };
+  | { type: "endFilter" }
+  /** `Space` in the detail pane: fold or unfold every Config section. */
+  | { type: "toggleAllSections" }
+  /** `PgUp`/`PgDn` in the detail pane: scroll by roughly half a pane. */
+  | { type: "detailScroll"; dir: 1 | -1 }
+  /** Selection, tab and filter changes return the detail to the top. */
+  | { type: "resetDetailScroll" };
 
 export interface LayoutState {
   visible: Set<PanelId>;
@@ -60,10 +67,21 @@ export interface LayoutState {
    */
   filterFor: PanelId | null;
   filterQuery: Partial<Record<PanelId, string>>;
+  /** Folded Config sections (P2-T7). Empty = everything expanded. */
+  collapsed: ReadonlySet<string>;
+  /** Detail content scroll offset in rows (P2-T7); clamped at render time. */
+  detailScroll: number;
 }
 
 /** At least one list panel must stay visible (LAYOUT_SPEC §4). */
 const MIN_VISIBLE = 1;
+
+/**
+ * PgUp/PgDn step in the detail pane: roughly half of a typical pane, so one
+ * press visibly moves without losing place. The renderer clamps the top end
+ * against the actual content length.
+ */
+export const DETAIL_SCROLL_PAGE = 10;
 
 export function initialState(
   visible?: readonly PanelId[],
@@ -82,6 +100,8 @@ export function initialState(
     selected,
     filterFor: null,
     filterQuery: {},
+    collapsed: new Set(),
+    detailScroll: 0,
   };
 }
 
@@ -196,7 +216,27 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
 
     case "select": {
       if (state.selected[action.id] === action.itemId) return state;
-      return { ...state, selected: { ...state.selected, [action.id]: action.itemId } };
+      return {
+        ...state,
+        selected: { ...state.selected, [action.id]: action.itemId },
+        detailScroll: 0,
+      };
+    }
+
+    case "toggleAllSections": {
+      return { ...state, collapsed: toggleAllSections(state.collapsed) };
+    }
+
+    case "detailScroll": {
+      return {
+        ...state,
+        detailScroll: Math.max(0, state.detailScroll + action.dir * DETAIL_SCROLL_PAGE),
+      };
+    }
+
+    case "resetDetailScroll": {
+      if (state.detailScroll === 0) return state;
+      return { ...state, detailScroll: 0 };
     }
 
     case "startFilter": {
@@ -212,6 +252,7 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
       return {
         ...state,
         filterQuery: { ...state.filterQuery, [state.filterFor]: prev + action.text },
+        detailScroll: 0,
       };
     }
 
@@ -231,12 +272,12 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
       if (state.filterFor === null) return state;
       const filterQuery = { ...state.filterQuery };
       delete filterQuery[state.filterFor];
-      return { ...state, filterFor: null, filterQuery };
+      return { ...state, filterFor: null, filterQuery, detailScroll: 0 };
     }
 
     case "endFilter": {
       if (state.filterFor === null) return state;
-      return { ...state, filterFor: null };
+      return { ...state, filterFor: null, detailScroll: 0 };
     }
   }
 }

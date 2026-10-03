@@ -89,8 +89,19 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         activeTab,
         inspect,
         filter: state.filterQuery,
+        collapsedSections: state.collapsed,
       }),
-    [data, state.selected, state.focus, lastRefresh, error, activeTab, inspect, state.filterQuery],
+    [
+      data,
+      state.selected,
+      state.focus,
+      lastRefresh,
+      error,
+      activeTab,
+      inspect,
+      state.filterQuery,
+      state.collapsed,
+    ],
   );
 
   const focusId: PanelId = isPanelId(state.focus) ? state.focus : "containers";
@@ -197,6 +208,20 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         const idx = DETAIL_TABS.findIndex((t) => t.id === prev);
         return DETAIL_TABS[nextTabIndex(idx, input === "]" ? 1 : -1)]?.id ?? "config";
       });
+      dispatch({ type: "resetDetailScroll" });
+      return;
+    }
+
+    // Space folds/unfolds every Config section; PgUp/PgDn scroll the detail.
+    // Both are inert while filtering (the filter branch above returns first),
+    // where Space types a space and PgUp/PgDn have no text to append.
+    if (input === " ") {
+      dispatch({ type: "toggleAllSections" });
+      return;
+    }
+
+    if (key.pageUp || key.pageDown) {
+      dispatch({ type: "detailScroll", dir: key.pageUp ? -1 : 1 });
       return;
     }
 
@@ -237,6 +262,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       zoom={state.zoom}
       detailFullscreen={state.detailFullscreen}
       hintContext={state.filterFor !== null ? "filter" : undefined}
+      detailScroll={state.detailScroll}
     />
   );
 };

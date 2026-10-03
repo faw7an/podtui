@@ -1,10 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { buildDetail, DETAIL_TABS, type DetailTabId } from "../src/ui/view/detail";
+import {
+  buildDetail,
+  CONFIG_SECTIONS,
+  DETAIL_TABS,
+  toggleAllSections,
+  type DetailTabId,
+} from "../src/ui/view/detail";
 import { renderDetail } from "../src/ui/render/detailLines";
 import { stripAnsi, visibleWidth } from "../src/ui/render/palette";
 import type { ContainerInspect } from "../src/api/types";
+import { initialState, reducer } from "../src/ui/layout/layoutReducer";
 
 /**
  * R-16 / ROADMAP P2-T7: detail pane with a TabBar, and a Config tab that
@@ -167,3 +174,130 @@ function nextTabIndex(current: number, delta: number): number {
   const wrapped = ((current + delta) % n + n) % n;
   return Math.min(n - 1, Math.max(0, wrapped));
 }
+describe("P2-T7: section folding", () => {
+  test("toggleAllSections expands and collapses the whole Config tab", () => {
+    expect(toggleAllSections(new Set())).toEqual(new Set(CONFIG_SECTIONS));
+    expect(toggleAllSections(new Set(CONFIG_SECTIONS))).toEqual(new Set());
+    // Partially folded still folds everything: one key, one predictable result.
+    expect(toggleAllSections(new Set(["state"]))).toEqual(new Set(CONFIG_SECTIONS));
+  });
+
+  test("a folded Config tab shows headings with (+) and no body rows", () => {
+    const folded = buildDetail({ inspect, activeTab: "config", hasSelection: true, collapsed: new Set(CONFIG_SECTIONS) });
+    expect(folded.lines).toContain("# State (+)");
+    expect(folded.lines).toContain("# Config (+)");
+    expect(folded.lines.some((l) => l.includes("daemon off;"))).toBe(false);
+  });
+
+  test("the reducer owns the collapsed set; Space toggles it via toggleAllSections", () => {
+    let s = reducer(initialState(), { type: "toggleAllSections" });
+    expect(s.collapsed).toEqual(new Set(CONFIG_SECTIONS));
+    s = reducer(s, { type: "toggleAllSections" });
+    expect(s.collapsed).toEqual(new Set());
+  });
+
+  test("folding does not disturb the scroll offset beyond the new end", () => {
+    // Scroll position survives folding; the renderer clamps it.
+    let s = reducer(initialState(), { type: "detailScroll", dir: 1 });
+    s = reducer(s, { type: "toggleAllSections" });
+    expect(s.detailScroll).toBeGreaterThan(0);
+  });
+});
+
+describe("P2-T7: detail scrolling", () => {
+  const long = buildDetail({ inspect, activeTab: "config", hasSelection: true });
+  const rect = { x: 0, y: 0, w: 60, h: 10 };
+  const theme = {
+    accent: "#00ffff",
+    border: "#444444",
+    dim: "#888888",
+    panelTitle: "#888888",
+    selectionBg: "#00ffff",
+    selectionFg: "#000000",
+  } as never;
+
+  test("the window starts at the top and signals overflow", () => {
+    const lines = renderDetail(rect, long, { theme, color: false });
+    expect(lines).toHaveLength(10);
+    expect(stripAnsi(lines.join("\n"))).toContain("more");
+  });
+
+  test("a scroll offset windows the content instead of the top", () => {
+    const top = renderDetail(rect, long, { theme, color: false });
+    const scrolled = renderDetail(rect, long, { theme, color: false, scroll: 5 });
+    expect(stripAnsi(scrolled.join("\n"))).not.toBe(stripAnsi(top.join("\n")));
+    expect(scrolled).toHaveLength(10);
+    for (const line of scrolled) expect(visibleWidth(line)).toBe(60);
+  });
+
+  test("an offset past the end clamps to the last window", () => {
+    const a = renderDetail(rect, long, { theme, color: false, scroll: 10_000 });
+    const b = renderDetail(rect, long, { theme, color: false, scroll: long.lines.length });
+    expect(stripAnsi(a.join("\n"))).toBe(stripAnsi(b.join("\n")));
+    expect(a).toHaveLength(10);
+  });
+
+  test("the reducer moves by a page, never below zero", () => {
+    let s = reducer(initialState(), { type: "detailScroll", dir: 1 });
+    expect(s.detailScroll).toBeGreaterThan(0);
+    const page = s.detailScroll;
+    s = reducer(s, { type: "detailScroll", dir: 1 });
+    expect(s.detailScroll).toBe(page * 2);
+    s = reducer(s, { type: "detailScroll", dir: -1 });
+    expect(s.detailScroll).toBe(page);
+    s = reducer(initialState(), { type: "detailScroll", dir: -1 });
+    expect(s.detailScroll).toBe(0);
+  });
+
+  test("selection, filter and tab changes reset the scroll", () => {
+    const scrolled = reducer(initialState(), { type: "detailScroll", dir: 1 });
+    expect(scrolled.detailScroll).toBeGreaterThan(0);
+    expect(reducer(scrolled, { type: "select", id: "containers", itemId: "x" }).detailScroll).toBe(0);
+    const filtering = reducer(scrolled, { type: "startFilter" });
+    const typing = reducer(filtering, { type: "filterInput", text: "x" });
+    expect(typing.detailScroll).toBe(0);
+    const rescrolled = reducer(typing, { type: "detailScroll", dir: 1 });
+    expect(reducer(rescrolled, { type: "clearFilter" }).detailScroll).toBe(0);
+    const rescrolled2 = reducer(typing, { type: "detailScroll", dir: 1 });
+    expect(reducer(rescrolled2, { type: "endFilter" }).detailScroll).toBe(0);
+    expect(reducer(scrolled, { type: "resetDetailScroll" }).detailScroll).toBe(0);
+  });
+});
+
+describe("P2-T7: Config key/value colours", () => {
+  const detail = buildDetail({ inspect, activeTab: "config", hasSelection: true });
+  const rect = { x: 0, y: 0, w: 60, h: 30 };
+  const theme = {
+    accent: "#00ffff",
+    border: "#444444",
+    dim: "#888888",
+    panelTitle: "#888888",
+    selectionBg: "#00ffff",
+    selectionFg: "#000000",
+  } as never;
+
+  test("keys are painted but the text is unchanged", () => {
+    const lines = renderDetail(rect, detail, { theme, color: true });
+    const joined = lines.join("\n");
+    expect(joined).toContain("\u001B[");
+    expect(stripAnsi(joined)).toContain("Name");
+    expect(stripAnsi(joined)).toContain("# State");
+  });
+
+  test("colour off still means zero escape sequences", () => {
+    const lines = renderDetail(rect, detail, { theme, color: false });
+    expect(lines.join("\n")).not.toContain("\u001B");
+    for (const line of lines) expect(visibleWidth(line)).toBe(60);
+  });
+
+  test("overlong keys fall back to plain rather than tearing the row", () => {
+    const odd = {
+      ...detail,
+      lines: ["VERYLONGKEYNAME=value", "# Heading", "short       value"],
+    };
+    const lines = renderDetail(rect, odd, { theme, color: true });
+    expect(lines).toHaveLength(30);
+    for (const line of lines) expect(visibleWidth(line)).toBe(60);
+    expect(stripAnsi(lines.join("\n"))).toContain("VERYLONGKEYNAME=value");
+  });
+});
