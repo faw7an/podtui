@@ -46,6 +46,12 @@ last    1-6 toggle · Tab focus · ↑↓ nav · Enter inspect · z zoom · ? he
   - hidden panel: dim, with a `·` or strikethrough-like dim style (never remove it, so the user can toggle it back)
   - narrow widths: shorten labels (`2 Cont`), then numbers only (`1 2 3 4 5 6`).
   - If even numbers-only does not fit, drop the title and clock first.
+- **Status lives in the chrome rows; there is no third chrome row.** P2-T2's
+  "status bar" is the header-right clock (data freshness: the last successful
+  refresh time) plus the footer-right error slot (latest engine error),
+  alongside the tab visibility/focus states. A dedicated status row would
+  shrink the body for information that already has a home — at 40×10 every
+  row counts, and header/footer are exactly 1 row each by the rule above.
 - Root container has `width = cols`, `height = rows` (⚠️ VERIFY whether `rows − 1` avoids Ink's scroll/flicker when output height equals terminal height; record in DECISIONS.md).
 - Use the terminal **alternate screen buffer** so the app does not pollute scrollback and restores the screen on exit (⚠️ VERIFY how to combine with Ink; ensure it is restored on every exit path per FR-10).
 

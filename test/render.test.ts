@@ -556,3 +556,20 @@ function displayWidthRaw(text: string): number {
   // stripped value so this is the true cell count.
   return visibleWidth(text);
 }
+
+describe("status chrome (P2-T2)", () => {
+  test("header keeps the clock when there is room", () => {
+    const wide = computeLayout({ cols: 200, rows: 24, visible: ALL, focused: "containers" });
+    expect(stripAnsi(buildHeader(wide, model(), PLAIN))).toContain("9:40 PM");
+  });
+
+  test("header drops the clock before the tabs when narrow", () => {
+    // A long locale clock (seconds, day period) does not fit next to the tabs
+    // at minimum width; the tabs survive because they carry navigation.
+    const narrow = computeLayout({ cols: 40, rows: 24, visible: ALL, focused: "containers" });
+    const text = stripAnsi(buildHeader(narrow, { ...model(), clock: "09:40:15 PM X" }, PLAIN));
+    expect(visibleWidth(buildHeader(narrow, { ...model(), clock: "09:40:15 PM X" }, PLAIN))).toBe(40);
+    expect(text).not.toContain("09:40");
+    expect(text).toContain("2");
+  });
+});

@@ -77,7 +77,7 @@ Phase overview
 **Goal:** the lazydocker-like frame with numbered, toggleable panels.
 
 - [x] **P2-T1** `theme/theme.ts`: `Theme` type + default palette (semantic colors: ok, warn, error, dim, accent, border, selectionBg, selectionFg).
-- [ ] **P2-T2** Layout: left column of panels, right detail pane, footer key hints, status bar. Handles terminal resize and a minimum size message ("terminal too small").
+- [x] **P2-T2** Layout: left column of panels, right detail pane, footer key hints, status bar. Handles terminal resize and a minimum size message ("terminal too small").
 - [x] **P2-T3** Panel visibility: `1`–`6` toggle (FR-3). Each panel title shows its number, e.g. `[2] Containers`. At least one visible panel enforced. Hidden panels do not fetch or poll (assert in a test via a mock engine call counter).
 - [x] **P2-T4** Focus: `Tab`/`Shift+Tab` cycles visible panels; focused panel has a highlighted border.
 - [x] **P2-T5** `useContainers` hook + Containers panel: list with state color (running green, exited red/dim, paused yellow), healthy/unhealthy suffix, selection by ID, `↑↓`/`j k`, `/` filter.
