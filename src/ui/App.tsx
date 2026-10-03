@@ -12,10 +12,13 @@ import { createVisibleFetcher } from "./view/refresh.ts";
 import { DETAIL_TABS, nextTabIndex, type DetailTabId } from "./view/detail.ts";
 import type { ContainerInspect } from "../api/types.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
+import { resolvePollMs } from "../config.ts";
 
 const SOCKET_PATH = process.env["PODTUI_SOCKET"] ?? "/tmp/podtui-dev/podman.sock";
 
-const POLL_MS = 5000;
+// FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
+// back to the default rather than reaching setInterval.
+const POLL_MS = resolvePollMs(process.env["PODTUI_POLL_MS"]);
 
 /**
  * Next/previous item id in `ids`, clamped at both ends. With nothing selected

@@ -192,7 +192,7 @@ Still unticked, with the exact gap:
 |---|---|
 | P2-T2 | No dedicated status bar (errors render in the footer). Everything else verified by the LAYOUT_SPEC §9 matrix |
 | P2-T5 | No `/` filter, no healthy/unhealthy suffix, no `useContainers` hook (data lives in `App` + `view/refresh.ts`) |
-| P2-T6 | Poll interval still hardcoded (`POLL_MS`); no event stream (FR-2 stream-first) |
+| P2-T6 | Poll interval is now configurable via `PODTUI_POLL_MS` (R-14), but FR-2's preferred event stream is verified-available and deliberately not adopted yet — the decision record in DECISIONS.md lists exactly what is still unverified |
 | P2-T7 | TabBar + Config rendering work, but no key binding for collapsing sections and no per-field colouring; manual item 5 will partially fail |
 | P2-T8 | Footer shows a fixed hint list, not *context-sensitive* hints |
 
