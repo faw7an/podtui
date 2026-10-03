@@ -39,11 +39,15 @@ export function computeFilterPopupRect(
   if (w < FILTER_POPUP_MIN_W) return layout.footer ? { kind: "bar" } : { kind: "none" };
 
   const x = Math.min(Math.max(0, panel.x + Math.floor((panel.w - w) / 2)), layout.cols - w);
-  // Below the header row, above the footer row.
+  // Below the header row, above the footer row. Vertically centered over the
+  // panel, then biased one row down: the row of list content showing above
+  // the top border is the popup's breathing room (it otherwise lands flush
+  // against the rows above it). Clamps dominate at the extremes.
   const top = 1;
   const bottom = layout.rows - 1 - FILTER_POPUP_H;
   if (bottom < top) return layout.footer ? { kind: "bar" } : { kind: "none" };
-  const y = Math.min(Math.max(top, panel.y + Math.floor((panel.h - FILTER_POPUP_H) / 2)), bottom);
+  const centered = panel.y + Math.floor((panel.h - FILTER_POPUP_H) / 2);
+  const y = Math.min(Math.max(top, centered + 1), bottom);
 
   return { kind: "popup", rect: { x, y, w, h: FILTER_POPUP_H } };
 }

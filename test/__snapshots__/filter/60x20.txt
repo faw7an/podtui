@@ -6,11 +6,11 @@
 │  web-pod-backend               ● running alpine:lat… now │
 │                                                          │
 │                                                          │
+│                                                          │
 │       ╭─Filter: Containers                       ╮       │
 │       │> web▌                                    │       │
 │       │Enter apply  Esc clear · 3/7 matches      │       │
 │       └──────────────────────────────────────────┘       │
-│                                                          │
 │                                                          │
 │                                                          │
 │                                                          │

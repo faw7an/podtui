@@ -1,10 +1,10 @@
 ▲ podtui   1  2⌕  3  4  5  6            
 ╭─[2] Containers 3/7                   ╮
 │  NAME         STATUS    IMAGE    AGE │
-│▸╭─Filter: Containers               ╮ │
+│▸ web          ● running nginx:a… now │
+│ ╭─Filter: Containers               ╮ │
 │ │> web▌                            │ │
 │ │Enter apply  Esc clear · 3/7 matc…│ │
 │ └──────────────────────────────────┘ │
-│                                      │
 └⌕ web (3/7)                           ┘
 Esc clear  Enter keep                   

@@ -6,11 +6,11 @@
 └────────────────────────────────────────────────────┘│state      ● running                                            │
 ╭─[2] Containers 3/7                                 ╮│image      nginx:alpine                                         │
 │  NAME                     STATUS    IMAGE      AGE ││age        now                                                  │
-│▸ we╭─Filter: Containers                       ╮now ││                                                                │
+│▸ web                      ● running nginx:alp… now ││                                                                │
+│  we╭─Filter: Containers                       ╮now ││                                                                │
 │  we│> web▌                                    │now ││                                                                │
-│  we│Enter apply  Esc clear · 3/7 matches      │now ││                                                                │
+│    │Enter apply  Esc clear · 3/7 matches      │    ││                                                                │
 │    └──────────────────────────────────────────┘    ││                                                                │
-│                                                    ││                                                                │
 └⌕ web (3/7)                                         ┘│                                                                │
 ╭─[3] Images 0                                       ╮│                                                                │
 │  (empty)                                           ││                                                                │

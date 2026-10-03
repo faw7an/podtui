@@ -268,8 +268,8 @@ detail-following are free.
 
 - **Popup geometry** comes from `computeFilterPopupRect(layout, panel)`, never
   fresh measurement: width `min(panelW − 4, 44)`, 4 rows, centered over the
-  focused panel and clamped inside the body (below the header, above the
-  footer). When the panel has no rect (detail fullscreen) or is too narrow,
+  focused panel and biased one row down so list content shows above the top
+  border, clamped inside the body (below the header, above the footer). When the panel has no rect (detail fullscreen) or is too narrow,
   a 1-row bar replaces the footer row instead; at TOO_SMALL nothing draws
   (typing state persists, Esc still clears). Composition reuses the frame's
   `LineBuffer`: the popup rect is excised first (segments are split with

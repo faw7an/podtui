@@ -59,7 +59,25 @@ describe("computeFilterPopupRect", () => {
       const panelCx = panel.x + panel.w / 2;
       const popupCx = placed.rect.x + placed.rect.w / 2;
       expect(Math.abs(panelCx - popupCx)).toBeLessThanOrEqual(1);
+      // Vertically centered, then biased one row down for clearance above
+      // the box — clamped to the body at the extremes.
+      const centered = panel.y + Math.floor((panel.h - FILTER_POPUP_H) / 2);
+      const bottom = layout.rows - 1 - FILTER_POPUP_H;
+      expect(placed.rect.y).toBe(Math.min(Math.max(1, centered + 1), bottom));
     }
+  });
+
+  test("the popup sits one row below the old center", () => {
+    // Regression pin for the breathing-room offset: at 120x35 the containers
+    // panel leaves ample room, so the +1 bias must show exactly.
+    const layout = computeLayout({ cols: 120, rows: 35, visible: ALL, focused: "containers" });
+    const panel = layout.panels.find((p) => p.id === "containers")!;
+    const placed = computeFilterPopupRect(layout, "containers");
+    expect(placed.kind).toBe("popup");
+    if (placed.kind !== "popup") return;
+    const centered = panel.y + Math.floor((panel.h - FILTER_POPUP_H) / 2);
+    expect(placed.rect.y).toBe(centered + 1);
+    expect(placed.rect.y).toBeGreaterThan(panel.y);
   });
 
   test("works for every panel, not just containers", () => {
