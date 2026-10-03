@@ -61,7 +61,7 @@ export function collapsedTitle(
   marker: string,
   number: number,
   label: string,
-  count: number,
+  count: number | string,
 ): string {
   return `${marker}${number} ${label} (${count})`;
 }

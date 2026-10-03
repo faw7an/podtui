@@ -160,9 +160,11 @@ export function buildPanelModels(
     ...meta,
     // The title stays clean (redesigned filter UX moved the query to the
     // badge); the filter field below feeds title counts, badge, border and
-    // header marker at render time.
+    // header marker at render time. An empty query still sets the field: it
+    // means "popup open but unfiltered", which is what makes `/` alone show
+    // the popup instead of waiting for the first keystroke.
     title: meta.title,
-    filter: query ? { query, total: rows[id].length } : undefined,
+    filter: query !== undefined ? { query, total: rows[id].length } : undefined,
     columns: PANEL_COLUMNS[id],
     items,
     // Resolve the stored item ID to the row index for this render.

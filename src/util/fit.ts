@@ -83,6 +83,35 @@ export function sliceToWidth(text: string, width: number): string {
   return out;
 }
 
+/**
+ * Keep the cell span `[start, end)` of `text`, escapes intact. Wide glyphs
+ * are kept only when fully inside the span — never split, so a straddling
+ * glyph is dropped rather than tearing the grid. Like `truncate`, a kept span
+ * that contains escapes is terminated with a reset so colour cannot bleed
+ * past the slice; a span without escapes gains nothing.
+ */
+export function sliceCells(text: string, start: number, end?: number): string {
+  const stop = end ?? Number.POSITIVE_INFINITY;
+  if (stop <= 0 || start >= stop) return "";
+  const from = Math.max(0, start);
+  let out = "";
+  let keptAnsi = false;
+  let cursor = 0;
+  for (const t of tokenize(text)) {
+    if (t.w === 0) {
+      if (cursor >= from && cursor < stop) {
+        out += t.text;
+        if (t.text !== "" && t.text.charCodeAt(0) === 27) keptAnsi = true;
+      }
+      continue;
+    }
+    if (cursor >= from && cursor + t.w <= stop) out += t.text;
+    cursor += t.w;
+  }
+  if (keptAnsi && !out.endsWith(RESET)) out += RESET;
+  return out;
+}
+
 const ELLIPSIS = "…";
 
 /** Truncate to `width` cells, appending `…` when something was cut. */

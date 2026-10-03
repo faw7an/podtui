@@ -1,0 +1,20 @@
+▲ podtui   1 Pods  2 Cont⌕  3 Imgs  4 Vols  5 Nets  6 Quads…
+╭─[2] Containers 3/7                                       ╮
+│  NAME                          STATUS    IMAGE       AGE │
+│▸ web                           ● running nginx:alpi… now │
+│  web-pod-frontend              ● running nginx:alpi… now │
+│  web-pod-backend               ● running alpine:lat… now │
+│                                                          │
+│                                                          │
+│       ╭─Filter: Containers                       ╮       │
+│       │> web▌                                    │       │
+│       │Enter apply  Esc clear · 3/7 matches      │       │
+│       └──────────────────────────────────────────┘       │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+└⌕ web (3/7)                                               ┘
+Esc clear  Enter keep                                       

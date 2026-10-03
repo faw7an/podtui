@@ -1,9 +1,12 @@
 import type { Layout } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
+import type { PanelId } from "../layout/types.ts";
 import { LineBuffer } from "./compose.ts";
 import { buildFooter, buildHeader, type FooterHintContext } from "./chrome.ts";
+import { computeFilterPopupRect } from "../layout/filterPopup.ts";
 import { renderDetail, renderMessage } from "./detailLines.ts";
+import { renderFilterBar, renderFilterPopup, type FilterPopupData } from "./filterPopup.ts";
 import { renderPanel } from "./panelLines.ts";
 
 export interface FrameOptions {
@@ -14,6 +17,12 @@ export interface FrameOptions {
   hintContext?: FooterHintContext;
   /** Detail content scroll offset in rows (P2-T7). */
   detailScroll?: number;
+  /**
+   * Open filter popup for this panel (redesigned filter UX): a box over the
+   * frame, or a bar replacing the footer when no box fits. The query lives in
+   * the panel model's `filter` field; this only says the popup is open.
+   */
+  filterPopup?: PanelId | null;
 }
 
 /**
@@ -61,11 +70,38 @@ export function renderFrame(layout: Layout, model: FrameModel, opts: FrameOption
     lines.forEach((line, i) => buffer.write(detailRect.x, detailRect.y + i, line));
   }
 
+  // Filter popup overlay (redesigned filter UX): drawn after panels and
+  // detail so it covers them, before the footer so the bar variant can take
+  // the footer row. Never drawn over the TOO_SMALL message.
+  let barData: FilterPopupData | null = null;
+  if (opts.filterPopup && !layout.message) {
+    const placement = computeFilterPopupRect(layout, opts.filterPopup);
+    const panel = model.panels.find((p) => p.id === opts.filterPopup);
+    const data: FilterPopupData | null =
+      panel?.filter != null
+        ? {
+            panelTitle: panel.title,
+            query: panel.filter.query,
+            matched: panel.items.length,
+            total: panel.filter.total,
+          }
+        : null;
+    if (placement.kind === "popup" && data) {
+      buffer.excise(placement.rect.x, placement.rect.y, placement.rect.w, placement.rect.h);
+      const lines = renderFilterPopup(placement.rect, data, opts.theme, on);
+      lines.forEach((line, i) => buffer.write(placement.rect.x, placement.rect.y + i, line));
+    } else if (placement.kind === "bar") {
+      barData = data;
+    }
+  }
+
   if (layout.footer) {
     buffer.write(
       0,
       layout.footer.y,
-      buildFooter(layout, model, { theme: opts.theme, color: on, context: opts.hintContext }),
+      barData
+        ? renderFilterBar(layout.cols, barData, opts.theme, on)
+        : buildFooter(layout, model, { theme: opts.theme, color: on, context: opts.hintContext }),
     );
   }
 

@@ -1,0 +1,50 @@
+▲ podtui   1 Pods  2 Containers⌕  3 Images  4 Volumes  5 Networks  6 Quadlets                                                                                                                           
+╭─[1] Pods 0                                          ╮╭─[2] Containers 3/7                                  ╮╭─web · running                                                                          ╮
+│  NAME                                  STATUS    CNT││  NAME                      STATUS    IMAGE      AGE ││Logs Stats Env Config Top                                                               │
+│  (empty)                                            ││▸ web                       ● running nginx:alp… now ││no selection                                                                            │
+│                                                     ││  web-pod-frontend          ● running nginx:alp… now ││name       web                                                                          │
+│                                                     ││  web-pod-backend           ● running alpine:la… now ││state      ● running                                                                    │
+│                                                     ││                                                     ││image      nginx:alpine                                                                 │
+│                                                     ││                                                     ││age        now                                                                          │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││    ╭─Filter: Containers                       ╮     ││                                                                                        │
+│                                                     ││    │> web▌                                    │     ││                                                                                        │
+│                                                     ││    │Enter apply  Esc clear · 3/7 matches      │     ││                                                                                        │
+│                                                     ││    └──────────────────────────────────────────┘     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+└─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
+╭─[3] Images 0                                        ╮│                                                     ││                                                                                        │
+│  NAME                                   SIZE    AGE ││                                                     ││                                                                                        │
+│  (empty)                                            ││                                                     ││                                                                                        │
+│                                                     │└⌕ web (3/7)                                          ┘│                                                                                        │
+│                                                     │╭─[4] Volumes 0                                       ╮│                                                                                        │
+│                                                     ││  NAME                         STATUS   MOUNTPOINT   ││                                                                                        │
+│                                                     ││  (empty)                                            ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+└─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
+╭─[5] Networks 0                                      ╮│                                                     ││                                                                                        │
+│  NAME                                       STATUS  │└─────────────────────────────────────────────────────┘│                                                                                        │
+│  (empty)                                            │╭─[6] Quadlets 0                                      ╮│                                                                                        │
+│                                                     ││  NAME                                      STATUS   ││                                                                                        │
+│                                                     ││  not implemented yet (phase 6)                      ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+│                                                     ││                                                     ││                                                                                        │
+└─────────────────────────────────────────────────────┘└─────────────────────────────────────────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘
+Esc clear  Enter keep                                                                                                                                                                                   

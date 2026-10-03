@@ -244,8 +244,15 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
     case "startFilter": {
       // Only a list panel can be filtered. From fullscreen detail the key is
       // ignored: the frame shows no list, so there is nothing to narrow.
+      // An empty query means "open but unfiltered" — it makes the popup
+      // render on `/` instead of only after the first keystroke, and matches
+      // everything until typed into.
       if (!isPanelId(state.focus)) return state;
-      return { ...state, filterFor: state.focus };
+      return {
+        ...state,
+        filterFor: state.focus,
+        filterQuery: { ...state.filterQuery, [state.focus]: state.filterQuery[state.focus] ?? "" },
+      };
     }
 
     case "filterInput": {
@@ -297,6 +304,13 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
 
     case "endFilter": {
       if (state.filterFor === null) return state;
+      // An empty query keeps nothing: applying it would leave a badge and
+      // footer hints around an unfiltered list.
+      if ((state.filterQuery[state.filterFor] ?? "") === "") {
+        const filterQuery = { ...state.filterQuery };
+        delete filterQuery[state.filterFor];
+        return { ...state, filterFor: null, filterQuery, detailScroll: 0 };
+      }
       return { ...state, filterFor: null, detailScroll: 0 };
     }
   }

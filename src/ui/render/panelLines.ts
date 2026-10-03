@@ -3,7 +3,7 @@ import { collapsedTitle, innerWidth, panelMetrics } from "../layout/panelView.ts
 import { computeColumns } from "../layout/computeColumns.ts";
 import type { PanelLayout } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
-import { displayWidth, fit, padRight } from "../../util/fit.ts";
+import { center, displayWidth, fit, padRight } from "../../util/fit.ts";
 import { COLUMN_HEADERS, type PanelModel, type RowModel } from "../view/model.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 
@@ -100,7 +100,8 @@ export function renderPanel(
   // The strip always carries the `▸` marker, per LAYOUT_SPEC §6: meaning must
   // survive with no colour. Bold+accent only when focused.
   if (rect.collapsed) {
-    const text = collapsedTitle(FOCUS_MARKER, panel.number, panel.title, panel.items.length);
+    const count = panel.filter ? `${panel.items.length}/${panel.filter.total}` : panel.items.length;
+    const text = collapsedTitle(FOCUS_MARKER, panel.number, panel.title, count);
     const painted = focused
       ? paint(text, [on ? bold() : "", on ? fg(theme.accent) : ""])
       : paint(text, [on ? dim() : ""]);
@@ -112,7 +113,9 @@ export function renderPanel(
   const w = rect.w;
   const iw = innerWidth(w);
   const m = panelMetrics(rect.h);
-  const border = focused ? theme.accent : theme.border;
+  // A filtered panel takes the filter border even unfocused, so the state is
+  // visible from afar; focus keeps accent because it is the primary signal.
+  const border = focused ? theme.accent : panel.filter ? theme.filter : theme.border;
   const bc = on ? fg(border) : "";
 
   // The 2-cell marker column is reserved on every data row so the marker never
@@ -167,9 +170,10 @@ export function renderPanel(
 
   const lines: string[] = [];
 
-  // --- Top border: [N] Title count (LAYOUT_SPEC §6) ---
+  // --- Top border: [N] Title matched/total (LAYOUT_SPEC §6) ---
+  const count = panel.filter ? `${panel.items.length}/${panel.filter.total}` : `${panel.items.length}`;
   const titleText = fit(
-    `[${panel.number}] ${panel.title} ${panel.items.length}`,
+    `[${panel.number}] ${panel.title} ${count}`,
     Math.max(0, iw - 1),
   );
   const topFill = Math.max(0, iw - displayWidth(titleText) - 1);
@@ -191,11 +195,20 @@ export function renderPanel(
       const item = slot < 0 ? undefined : shown.rows[slot];
       if (!item) {
         // An empty panel says why, rather than looking like a rendering failure.
-        const label = panel.items.length === 0 ? (panel.emptyLabel ?? "(empty)") : undefined;
+        // A filter that matches nothing names the query and the way out,
+        // centered so it reads as a state, not a row.
+        const filtered = panel.items.length === 0 && panel.filter != null;
+        const label =
+          panel.items.length === 0
+            ? (panel.filter != null
+                ? `No matches for '${panel.filter.query}'  (Esc to clear)`
+                : (panel.emptyLabel ?? "(empty)"))
+            : undefined;
         const empty = slot === 0 && label !== undefined && contentW >= 3;
+        const placed = filtered && label !== undefined ? center(label, contentW) : label !== undefined ? fit(label, contentW) : "";
         inner =
           " ".repeat(markerW) +
-          (empty && label !== undefined ? paint(fit(label, contentW), [on ? dim() : ""]) : padRight("", contentW));
+          (empty && label !== undefined ? paint(placed, [on ? dim() : ""]) : padRight("", contentW));
       } else {
         const isSelected = shown.offset + slot === panel.selected;
         if (isSelected && focused) {
@@ -221,11 +234,22 @@ export function renderPanel(
     lines.push(`${bc}${V}${on ? RESET : ""}${inner}${bc}${V}${on ? RESET : ""}`);
   }
 
-  // --- Bottom border carries the scroll hint, so it costs no data row ---
+  // --- Bottom border carries the filter badge (left) and the scroll hint
+  // (right), so neither costs a data row. The badge is status and goes first;
+  // the hint is convenience and is dropped when both do not fit. `fit()`
+  // truncates the tail, so the leading ⌕ survives every width.
   const hint = scrollHint(shown.above, shown.below);
   const hintText = hint.length > 0 ? paint(` ${hint} `, [on ? dim() : ""]) : "";
-  const fill = Math.max(0, iw - displayWidth(hintText));
-  lines.push(`${bc}${BL}${H.repeat(fill)}${hintText}${bc}${BR}${on ? RESET : ""}`);
+  const badge =
+    panel.filter != null && panel.filter.query !== ""
+      ? formatFilterBadge(panel.filter.query, panel.items.length, panel.filter.total)
+      : "";
+  const hintKept = badge === "" || iw - displayWidth(hintText) >= 1;
+  const shownHint = hintKept ? hintText : "";
+  const badgeText =
+    badge === "" ? "" : paint(fit(badge, Math.max(0, iw - displayWidth(shownHint))), [on ? fg(theme.filter) : ""]);
+  const fill = Math.max(0, iw - displayWidth(badgeText) - displayWidth(shownHint));
+  lines.push(`${bc}${BL}${badgeText}${H.repeat(fill)}${shownHint}${bc}${BR}${on ? RESET : ""}`);
 
   return lines;
 }

@@ -1,0 +1,24 @@
+▲ podtui   1 Pods  2 Containers⌕  3 Images  4 Volumes  5 Networks  6 Quadlets   
+╭─[1] Pods 0                           ╮╭─[2] Containers 0/7                   ╮
+│  NAME                   STATUS    CNT││  NAME         STATUS    IMAGE    AGE │
+│  (empty)                             ││  No matches for 'zzz'  (Esc to clear)│
+│                                      ││                                      │
+│                                      ││                                      │
+│                                      ││                                      │
+│                                      ││                                      │
+│                                      ││                                      │
+└──────────────────────────────────────┘└⌕ zzz (0/7)                           ┘
+▸ 3 Images (0)                          ▸ 4 Volumes (0)                         
+▸ 5 Networks (0)                        ▸ 6 Quadlets (0)                        
+╭─(no selection)                                                               ╮
+│Logs Stats Env Config Top                                                     │
+│no selection                                                                  │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+Esc clear filter  1-6 panel  Tab focus  ↑↓jk move  Enter inspect  q quit        

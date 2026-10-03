@@ -1,0 +1,24 @@
+▲ podtui   1 Pods  2 Containers⌕  3 Images  4 Volumes  5 Networks  6 Quadlets   
+╭─[1] Pods 0                           ╮╭─[2] Containers 3/7                   ╮
+│  NAME                   STATUS    CNT││  NAME         STATUS    IMAGE    AGE │
+│  (empty)                             ││▸╭─Filter: Containers               ╮ │
+│                                      ││ │> web▌                            │ │
+│                                      ││ │Enter apply  Esc clear · 3/7 matc…│ │
+│                                      ││ └──────────────────────────────────┘ │
+│                                      ││                                      │
+│                                      ││                                      │
+└──────────────────────────────────────┘└⌕ web (3/7)                           ┘
+▸ 3 Images (0)                          ▸ 4 Volumes (0)                         
+▸ 5 Networks (0)                        ▸ 6 Quadlets (0)                        
+╭─web · running                                                                ╮
+│Logs Stats Env Config Top                                                     │
+│no selection                                                                  │
+│name       web                                                                │
+│state      ● running                                                          │
+│image      nginx:alpine                                                       │
+│age        now                                                                │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+Esc clear  Enter keep                                                           

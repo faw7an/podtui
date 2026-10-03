@@ -53,27 +53,40 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
   const brand = "▲ podtui";
   const brandW = displayWidth(brand) + 2;
 
-  let tabs = "";
-  for (const id of PANEL_IDS) {
-    const text = tabText(id, visible.has(id), focusedId === id, style);
-    const isFocused = focusedId === id;
-    const isVisible = visible.has(id);
-    // Every tab gets the same one-cell padding so the spacing is uniform
-    // whether or not a tab is focused (focus is marked, not re-spaced).
-    const body = ` ${text} `;
-    // Explicit background/foreground rather than `inverse()`: the highlight is
-    // then the same, predictable colours as the selected row in a list.
-    const painted = isFocused
-      ? paint(body, [on ? bg(theme.accent) : "", on ? fg(theme.selectionFg) : "", on ? bold() : ""])
-      : isVisible
-        ? body
-        : paint(body, [on ? dim() : ""]);
-    tabs += painted;
-  }
+  const buildTabs = (markFiltered: boolean): string => {
+    let out = "";
+    for (const id of PANEL_IDS) {
+      const text = tabText(id, visible.has(id), focusedId === id, style);
+      // A kept filter marks its tab; the marker is the first thing sacrificed
+      // when the header narrows (see below), never the label or number.
+      const marked =
+        markFiltered && model.panels.find((p) => p.id === id)?.filter ? `${text}⌕` : text;
+      const isFocused = focusedId === id;
+      const isVisible = visible.has(id);
+      // Every tab gets the same one-cell padding so the spacing is uniform
+      // whether or not a tab is focused (focus is marked, not re-spaced).
+      const body = ` ${marked} `;
+      // Explicit background/foreground rather than `inverse()`: the highlight is
+      // then the same, predictable colours as the selected row in a list.
+      const painted = isFocused
+        ? paint(body, [on ? bg(theme.accent) : "", on ? fg(theme.selectionFg) : "", on ? bold() : ""])
+        : isVisible
+          ? body
+          : paint(body, [on ? dim() : ""]);
+      out += painted;
+    }
+    return out;
+  };
+  let tabs = buildTabs(true);
 
   // Fit the tab block; if numbers-only still overflows, drop tabs entirely
-  // rather than letting a tab wrap (LAYOUT_SPEC §3).
+  // rather than letting a tab wrap (LAYOUT_SPEC §3). The filter marker is the
+  // first sacrifice: a marked header that overflows is rebuilt bare in the
+  // same style before any label shortening.
   const room = cols - brandW;
+  if (displayWidth(tabs) > room) {
+    tabs = buildTabs(false);
+  }
   if (displayWidth(tabs) > room) {
     tabs = PANEL_IDS.map((id) => ` ${tabText(id, true, false, "number")} `).join("");
     if (displayWidth(tabs) > room) tabs = "";
@@ -92,7 +105,7 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
 }
 
 /** Which UI state the footer advertises keys for. */
-export type FooterHintContext = "base" | "detail" | "filter";
+export type FooterHintContext = "base" | "detail" | "filter" | "filterKept";
 
 export interface FooterOptions {
   theme: Theme;
@@ -140,6 +153,22 @@ const DETAIL_HINTS: { key: string; desc: string }[] = [
 ];
 
 /**
+ * Hints when a kept (non-typing) filter sits on the focused panel. `Esc` leads
+ * because it clears the filter — the priority hint above the rest — and the
+ * drop rule then keeps `[Esc, q]` at minimum width. Every key is in KEYMAP.
+ */
+const FILTER_KEPT_HINTS: { key: string; desc: string }[] = [
+  { key: "Esc", desc: "clear filter" },
+  { key: "1-6", desc: "panel" },
+  { key: "Tab", desc: "focus" },
+  { key: "↑↓jk", desc: "move" },
+  { key: "Enter", desc: "inspect" },
+  { key: "z", desc: "zoom" },
+  { key: "?", desc: "help" },
+  { key: "q", desc: "quit" },
+];
+
+/**
  * The one-row footer. Hints are dropped by ascending priority (help first) when
  * the row is too narrow; `quit` is never dropped.
  */
@@ -162,7 +191,14 @@ export function buildFooter(
 
   const context: FooterHintContext =
     opts.context ?? (model.focus === "detail" ? "detail" : "base");
-  let hints = context === "detail" ? DETAIL_HINTS : context === "filter" ? FILTER_HINTS : HINTS;
+  let hints =
+    context === "detail"
+      ? DETAIL_HINTS
+      : context === "filter"
+        ? FILTER_HINTS
+        : context === "filterKept"
+          ? FILTER_KEPT_HINTS
+          : HINTS;
   while (hints.length > 1 && displayWidth(render(hints)) + displayWidth(error ?? "") > cols - 1) {
     // Drop the least important hint that is not `quit`.
     const dropIndex = hints.length - 2;

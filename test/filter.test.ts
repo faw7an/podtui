@@ -265,9 +265,11 @@ describe("filter reducer: line editing and kept-query clearing", () => {
     expect(s.filterFor).toBe("containers");
   });
 
-  test("Ctrl+U with no input is a no-op", () => {
+  test("Ctrl+U with no input empties nothing but stays in the popup", () => {
     const s = reducer(initialState(), { type: "startFilter" });
-    expect(reducer(s, { type: "clearFilterLine" })).toBe(s);
+    const cleared = reducer(s, { type: "clearFilterLine" });
+    expect(cleared.filterFor).toBe("containers");
+    expect(cleared.filterQuery["containers"]).toBeUndefined();
   });
 
   test("Esc with an empty input still closes the popup", () => {
@@ -288,5 +290,32 @@ describe("filter reducer: line editing and kept-query clearing", () => {
   test("Esc with no popup and no kept query is a no-op", () => {
     const s = initialState();
     expect(reducer(s, { type: "clearFilter" })).toBe(s);
+  });
+});
+
+describe("empty query means open but unfiltered", () => {
+  test("startFilter initializes an empty query so the popup renders on /", () => {
+    const s = reducer(initialState(), { type: "startFilter" });
+    expect(s.filterFor).toBe("containers");
+    expect(s.filterQuery["containers"]).toBe("");
+  });
+
+  test("startFilter keeps an existing query when reopening", () => {
+    let s = reducer(initialState(), { type: "startFilter" });
+    s = reducer(s, { type: "filterInput", text: "web" });
+    s = reducer(s, { type: "endFilter" });
+    s = reducer(s, { type: "startFilter" });
+    expect(s.filterQuery["containers"]).toBe("web");
+  });
+
+  test("endFilter with an empty query keeps nothing", () => {
+    let s = reducer(initialState(), { type: "startFilter" });
+    s = reducer(s, { type: "endFilter" });
+    expect(s.filterFor).toBeNull();
+    expect(s.filterQuery["containers"]).toBeUndefined();
+  });
+
+  test("an empty query matches everything", () => {
+    expect(names("containers", { containers: "" })).toEqual(["web", "chatty"]);
   });
 });

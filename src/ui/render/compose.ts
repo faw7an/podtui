@@ -1,4 +1,4 @@
-import { fit, truncate } from "../../util/fit.ts";
+import { fit, sliceCells, truncate } from "../../util/fit.ts";
 import { visibleWidth } from "./palette.ts";
 
 /**
@@ -77,6 +77,35 @@ export class LineBuffer {
   /** Raw segments, exposed for tests that assert placement. */
   entries(): readonly Segment[] {
     return this.segments;
+  }
+
+  /**
+   * Clear a cell rectangle so an overlay can be drawn there. Composition keeps
+   * the leftmost segment (`composeRow` never re-writes an occupied cell), so
+   * an overlay written last would lose every cell — excising first hands the
+   * rectangle to the overlay while the stubs outside it survive, escapes
+   * intact via `sliceCells`.
+   */
+  excise(x: number, y: number, w: number, h: number): void {
+    if (w <= 0 || h <= 0) return;
+    const kept: Segment[] = [];
+    for (const seg of this.segments) {
+      if (seg.y < y || seg.y >= y + h) {
+        kept.push(seg);
+        continue;
+      }
+      const left = sliceCells(seg.text, 0, x - seg.x);
+      const right = sliceCells(seg.text, x + w - seg.x);
+      if (visibleWidth(left) > 0) kept.push({ x: seg.x, y: seg.y, text: left });
+      // Right part starts at the cut. A wide glyph straddling the boundary is
+      // dropped by sliceCells, so the stub can sit up to one cell early — the
+      // gap pads with a space and the popup covers the rect itself anyway.
+      if (visibleWidth(right) > 0) {
+        kept.push({ x: Math.max(seg.x, x + w), y: seg.y, text: right });
+      }
+    }
+    this.segments.length = 0;
+    this.segments.push(...kept);
   }
 }
 

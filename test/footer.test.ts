@@ -138,3 +138,33 @@ describe("footer filter context", () => {
     }
   });
 });
+
+describe("footer kept-filter context", () => {
+  test("a kept filter on the focused panel leads with Esc clear filter", () => {
+    const layout = computeLayout({ cols: 200, rows: 24, visible: ALL, focused: "containers" });
+    const line = stripAnsi(buildFooter(layout, model("containers"), { ...PLAIN, context: "filterKept" }));
+    expect(line).toContain("Esc");
+    expect(line).toContain("clear filter");
+    // Not typing anymore: Enter inspects again, q quits again.
+    expect(line).toContain("inspect");
+    expect(line).toContain("quit");
+    expect(line).not.toContain("keep");
+  });
+
+  test("kept hints fit exactly and keep quit at minimum width", () => {
+    const layout = computeLayout({ cols: 40, rows: 12, visible: ALL, focused: "containers" });
+    const line = buildFooter(layout, model("containers"), { ...PLAIN, context: "filterKept" });
+    expect(visibleWidth(line)).toBe(40);
+    expect(stripAnsi(line)).toContain("q");
+  });
+
+  test("kept keys exist in KEYMAP (no drift)", () => {
+    const layout = computeLayout({ cols: 200, rows: 24, visible: ALL, focused: "containers" });
+    const line = stripAnsi(buildFooter(layout, model("containers"), { ...PLAIN, context: "filterKept" }));
+    const known = new Set(KEYMAP.map((k) => k.key));
+    for (const key of ["Esc", "1-6", "Tab", "Enter", "?", "q"]) {
+      if (line.includes(key)) expect(known.has(key)).toBe(true);
+    }
+    expect(line).toContain("Esc");
+  });
+});

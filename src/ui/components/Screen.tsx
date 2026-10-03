@@ -24,6 +24,8 @@ export interface ScreenProps {
   hintContext?: FooterHintContext;
   /** Detail content scroll offset in rows (P2-T7). */
   detailScroll?: number;
+  /** Open filter popup for this panel, if any (redesigned filter UX). */
+  filterPopup?: PanelId | null;
 }
 
 /**
@@ -46,6 +48,7 @@ export function Screen({
   color = true,
   hintContext,
   detailScroll,
+  filterPopup,
 }: ScreenProps) {
   const detected = useTerminalSize();
   const { columns, rows } = size ?? detected;
@@ -71,6 +74,7 @@ export function Screen({
       color={color}
       hintContext={hintContext}
       detailScroll={detailScroll}
+      filterPopup={filterPopup}
     />
   );
 }

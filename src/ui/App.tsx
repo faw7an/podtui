@@ -13,6 +13,7 @@ import { DETAIL_TABS, nextTabIndex, type DetailTabId } from "./view/detail.ts";
 import type { ContainerInspect } from "../api/types.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
 import { resolvePollMs } from "../config.ts";
+import { routeFilterKey } from "../input/filterKeys.ts";
 
 // FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
 // back to the default rather than reaching setInterval.
@@ -40,8 +41,8 @@ function selectionStep(
 export { PANEL_COLUMNS };
 
 export const App = ({ socketPath }: { socketPath: string }) => {
-  const { columns: terminalCols, rows: terminalRows } = useTerminalSize();
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState());
+  const { columns: terminalCols, rows: terminalRows } = useTerminalSize();
   const [data, setData] = useState<ResourceData>(EMPTY_DATA);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [error, setError] = useState<string | undefined>(undefined);
@@ -137,11 +138,15 @@ export const App = ({ socketPath }: { socketPath: string }) => {
 
     // --- Escape: dialog > help > zoom/fullscreen > filter > nothing ---
     // Single path for the whole priority chain; the filter branch below never
-    // sees an Escape that a higher-priority state should consume first.
+    // sees an Escape that a higher-priority state should consume first. A kept
+    // (non-typing) filter on the focused panel counts as active, so Esc clears
+    // it — at base Esc otherwise does nothing, so nothing is overwritten.
     if (key.escape) {
       const action = resolveEscape(state, {
         helpOpen: state.help,
-        filterActive: state.filterFor !== null,
+        filterActive:
+          state.filterFor !== null ||
+          (isPanelId(state.focus) && state.filterQuery[state.focus] !== undefined),
         clearFilter: { type: "clearFilter" },
       });
       if (action) dispatch(action);
@@ -149,30 +154,13 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     }
 
     // --- Filter mode (P2-T5): the focused panel captures typing. ---
-    // Everything is text except the keys that leave the mode. In particular
-    // `q` and `?` type characters here — they must not quit or open help,
-    // which is also why the footer hides those hints while filtering.
+    // Routed through the pure `routeFilterKey` so the "global keys are dead
+    // inside the popup" contract is unit-testable without mounting anything.
+    // In particular `q` and `?` type characters here — they must not quit or
+    // open help, which is also why the footer hides those hints while filtering.
     if (state.filterFor !== null) {
-      if (key.return) {
-        dispatch({ type: "endFilter" });
-        return;
-      }
-      if (key.backspace || key.delete) {
-        dispatch({ type: "filterBackspace" });
-        return;
-      }
-      if (
-        input &&
-        !key.ctrl &&
-        !key.meta &&
-        !key.tab &&
-        !key.upArrow &&
-        !key.downArrow &&
-        !key.leftArrow &&
-        !key.rightArrow
-      ) {
-        dispatch({ type: "filterInput", text: input });
-      }
+      const action = routeFilterKey(input, key);
+      if (action) dispatch(action);
       return;
     }
 
@@ -261,8 +249,15 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       visible={state.visible}
       zoom={state.zoom}
       detailFullscreen={state.detailFullscreen}
-      hintContext={state.filterFor !== null ? "filter" : undefined}
+      hintContext={
+        state.filterFor !== null
+          ? "filter"
+          : isPanelId(state.focus) && state.filterQuery[state.focus] !== undefined
+            ? "filterKept"
+            : undefined
+      }
       detailScroll={state.detailScroll}
+      filterPopup={state.filterFor}
     />
   );
 };

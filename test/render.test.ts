@@ -6,7 +6,7 @@ import { buildFooter, buildHeader } from "../src/ui/render/chrome";
 import { LineBuffer, composeInline } from "../src/ui/render/compose";
 import { stripAnsi, visibleWidth } from "../src/ui/render/palette";
 import { computeLayout } from "../src/ui/layout/computeLayout";
-import { PANEL_IDS, type PanelId } from "../src/ui/layout/types";
+import { PANEL_IDS, type PanelId, type PanelLayout } from "../src/ui/layout/types";
 import {
   COLUMN_HEADERS,
   PANEL_COLUMNS,
@@ -571,5 +571,137 @@ describe("status chrome (P2-T2)", () => {
     expect(visibleWidth(buildHeader(narrow, { ...model(), clock: "09:40:15 PM X" }, PLAIN))).toBe(40);
     expect(text).not.toContain("09:40");
     expect(text).toContain("2");
+  });
+});
+
+describe("filtered panel chrome (redesigned filter UX)", () => {
+  const rrect = (h: number, w: number, id: PanelId = "containers"): PanelLayout => ({
+    id,
+    x: 0,
+    y: 0,
+    w,
+    h,
+    collapsed: h < 4,
+    showHeader: h >= 6,
+    focused: true,
+  });
+  const rpanel = (id: PanelId, n: number, query = "web", total = 6): PanelModel => ({
+    ...panel(id, items(n)),
+    filter: { query, total },
+  });
+  const plain = (focused = false) => ({ ...PLAIN, focused });
+  const vivid = (focused = false) => ({ theme: defaultTheme, color: true, focused });
+
+  test("title shows matched/total instead of the bare count", () => {
+    const lines = renderPanel(rrect(8, 40), rpanel("containers", 1), plain());
+    expect(stripAnsi(lines[0] ?? "")).toContain("[2] Containers 1/6");
+    const unfiltered = renderPanel(rrect(8, 40), panel("containers", items(1)), plain());
+    expect(stripAnsi(unfiltered[0] ?? "")).toContain("[2] Containers 1");
+  });
+
+  test("a filtered border uses the filter role, unless focused", () => {
+    const unfocused = renderPanel(rrect(8, 40), rpanel("containers", 1), vivid(false));
+    expect(unfocused[0]).toContain("38;2;255;95;255");
+    // Focus keeps the accent border (primary signal); the badge still carries
+    // the filter colour so the state is never lost.
+    const focused = renderPanel(rrect(8, 40), rpanel("containers", 1), vivid(true));
+    expect(focused[0]).not.toContain("38;2;255;95;255");
+    expect(focused[focused.length - 1]).toContain("38;2;255;95;255");
+    const plainPanel = renderPanel(rrect(8, 40), panel("containers", items(1)), vivid(false));
+    expect(plainPanel.join("\n")).not.toContain("38;2;255;95;255");
+  });
+
+  test("badge sits bottom-left, scroll hint bottom-right", () => {
+    const lines = renderPanel(rrect(8, 50), rpanel("containers", 12, "container", 12), plain());
+    const bottom = stripAnsi(lines[lines.length - 1] ?? "");
+    expect(bottom).toContain("⌕ container (12/12)");
+    expect(bottom).toContain("more");
+    expect(bottom.indexOf("⌕")).toBeLessThan(bottom.indexOf("more"));
+  });
+
+  test("a narrow badge truncates but never loses the icon", () => {
+    const lines = renderPanel(rrect(6, 24), rpanel("containers", 1, "a-very-long-query-string", 8), plain());
+    expect(lines).toHaveLength(6);
+    for (const line of lines) expect(visibleWidth(line)).toBe(24);
+    const bottom = stripAnsi(lines[lines.length - 1] ?? "");
+    expect(bottom).toContain("⌕");
+  });
+
+  test("a collapsed strip shows the matched/total count", () => {
+    const lines = renderPanel(rrect(1, 30, "images"), rpanel("images", 1, "alpine", 4), plain());
+    expect(stripAnsi(lines[0] ?? "")).toContain("(1/4)");
+  });
+
+  test("colour off: filtered panels emit zero escapes at exact widths", () => {
+    for (const w of [24, 40, 80]) {
+      const lines = renderPanel(rrect(8, w), rpanel("containers", 3, "web", 8), plain());
+      expect(lines.join("\n")).not.toContain("");
+      for (const line of lines) expect(visibleWidth(line)).toBe(w);
+    }
+  });
+
+  test("header marks the filtered tab, dropped first when narrow", () => {
+    const marked = model();
+    marked.panels = marked.panels.map((p) =>
+      p.id === "containers" ? { ...p, filter: { query: "web", total: 6 } } : p,
+    );
+    const wide = computeLayout({ cols: 200, rows: 24, visible: ALL, focused: "containers" });
+    expect(stripAnsi(buildHeader(wide, marked, PLAIN))).toContain("Containers⌕");
+    // Three markers overflow at 60 cols: labels survive, markers go first.
+    const pressured = model();
+    pressured.panels = pressured.panels.map((p, i) =>
+      i < 3 ? { ...p, filter: { query: "x", total: 1 } } : p,
+    );
+    const narrow = computeLayout({ cols: 60, rows: 24, visible: ALL, focused: "containers" });
+    const text = stripAnsi(buildHeader(narrow, pressured, PLAIN));
+    expect(text).not.toContain("⌕");
+    expect(text).toContain("Cont");
+  });
+});
+
+describe("zero-match filter state", () => {
+  const rrect = (h: number, w: number): PanelLayout => ({
+    id: "containers",
+    x: 0,
+    y: 0,
+    w,
+    h,
+    collapsed: false,
+    showHeader: true,
+    focused: true,
+  });
+
+  test("names the query and the way out, centered and dim", () => {
+    const p: PanelModel = {
+      ...panel("containers", []),
+      filter: { query: "zzz", total: 4 },
+    };
+    const lines = renderPanel(rrect(8, 50), p, PLAIN);
+    expect(lines).toHaveLength(8);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toContain("No matches for 'zzz'");
+    expect(text).toContain("Esc to clear");
+    // Centered, not left-aligned like a row.
+    const msgLine = lines.find((l) => stripAnsi(l).includes("No matches")) ?? "";
+    expect(msgLine.indexOf("No matches")).toBeGreaterThan(2);
+  });
+
+  test("a long query still fits exactly at narrow widths", () => {
+    const p: PanelModel = {
+      ...panel("containers", []),
+      filter: { query: "a-very-long-query-string-that-overflows", total: 4 },
+    };
+    for (const w of [30, 50]) {
+      const lines = renderPanel(rrect(8, w), p, PLAIN);
+      expect(lines).toHaveLength(8);
+      for (const line of lines) expect(visibleWidth(line)).toBe(w);
+      expect(lines.join("\n")).not.toContain("");
+    }
+  });
+
+  test("an unfiltered empty panel keeps its old message", () => {
+    const lines = renderPanel(rrect(8, 50), panel("containers", []), PLAIN);
+    expect(stripAnsi(lines.join("\n"))).toContain("(empty)");
+    expect(stripAnsi(lines.join("\n"))).not.toContain("No matches");
   });
 });

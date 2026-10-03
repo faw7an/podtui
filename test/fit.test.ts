@@ -6,9 +6,11 @@ import {
   fit,
   padLeft,
   padRight,
+  sliceCells,
   sliceToWidth,
   truncate,
 } from "../src/util/fit";
+import { stripAnsi } from "../src/ui/render/palette";
 
 /** Mirrors the escape-sequence pattern used by src/util/fit.ts. */
 const ANSI_PATTERN_G =
@@ -188,5 +190,39 @@ describe("fill", () => {
   test("truncates when the pattern is too long", () => {
     expect(displayWidth(fill("toolong", 3))).toBe(3);
     expect(fill("toolong", 3)).toBe("too");
+  });
+});
+
+describe("sliceCells", () => {
+  test("takes a cell span from the middle", () => {
+    expect(sliceCells("abcdef", 2, 4)).toBe("cd");
+    expect(sliceCells("abcdef", 0, 2)).toBe("ab");
+    expect(sliceCells("abcdef", 4)).toBe("ef");
+  });
+
+  test("clamps out-of-range spans instead of crashing", () => {
+    expect(sliceCells("ab", 5, 9)).toBe("");
+    expect(sliceCells("ab", 0, 99)).toBe("ab");
+    expect(sliceCells("", 0, 3)).toBe("");
+  });
+
+  test("never splits a wide glyph; a straddling glyph is dropped", () => {
+    expect(displayWidth(sliceCells("a中b", 1, 3))).toBeLessThanOrEqual(2);
+    expect(sliceCells("a中b", 0, 1)).toBe("a");
+  });
+
+  test("keeps escapes covering the span and resets at the end", () => {
+    const painted = "\u001B[38;2;0;255;255mhello world\u001B[0m";
+    // An opener outside the span is dropped with it: nothing to terminate,
+    // so no reset is appended and colour cannot bleed.
+    expect(sliceCells(painted, 6, 11)).toBe("world");
+    // An opener inside the span is kept, and terminated so it cannot bleed.
+    const head = sliceCells(painted, 0, 5);
+    expect(stripAnsi(head)).toBe("hello");
+    expect(head.endsWith("\u001B[0m")).toBe(true);
+  });
+
+  test("a span with no escapes gains no reset", () => {
+    expect(sliceCells("hello", 1, 3)).toBe("el");
   });
 });

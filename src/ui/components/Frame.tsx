@@ -1,5 +1,5 @@
 import { Text } from "ink";
-import type { Layout } from "../layout/types.ts";
+import type { Layout, PanelId } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
 import { renderFrame } from "../render/frame.ts";
@@ -12,6 +12,7 @@ export interface FrameProps {
   color?: boolean;
   hintContext?: FooterHintContext;
   detailScroll?: number;
+  filterPopup?: PanelId | null;
 }
 
 /**
@@ -22,8 +23,8 @@ export interface FrameProps {
  * measure or wrap anything, because it does not clip (verified). See
  * `src/ui/render/frame.ts` and the LAYOUT_SPEC §8 decision in DECISIONS.md.
  */
-export function Frame({ layout, model, theme, color = true, hintContext, detailScroll }: FrameProps) {
-  const lines = renderFrame(layout, model, { theme, color, hintContext, detailScroll });
+export function Frame({ layout, model, theme, color = true, hintContext, detailScroll, filterPopup }: FrameProps) {
+  const lines = renderFrame(layout, model, { theme, color, hintContext, detailScroll, filterPopup });
   return (
     <>
       {lines.map((line, i) => (

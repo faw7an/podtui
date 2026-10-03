@@ -257,3 +257,39 @@ src/ui/components/Table.tsx     windowed rows using computeColumns
 
 ## 12. Out of scope for this task
 Mouse support, themes beyond using the existing `Theme` object, new data features. Keep the current data hooks and tabs; only replace the frame/layout/rendering approach.
+
+## 13. Filter UX (redesigned 2026-10-04)
+
+`/` on a focused list panel opens a small bordered popup over the frame; the
+filter itself is per-panel state (`filterFor` = typing target, `filterQuery` =
+one remembered query per panel, both in the reducer). Narrowing runs in
+`buildPanelModels` before selection resolves, so cursor stability and
+detail-following are free.
+
+- **Popup geometry** comes from `computeFilterPopupRect(layout, panel)`, never
+  fresh measurement: width `min(panelW − 4, 44)`, 4 rows, centered over the
+  focused panel and clamped inside the body (below the header, above the
+  footer). When the panel has no rect (detail fullscreen) or is too narrow,
+  a 1-row bar replaces the footer row instead; at TOO_SMALL nothing draws
+  (typing state persists, Esc still clears). Composition reuses the frame's
+  `LineBuffer`: the popup rect is excised first (segments are split with
+  ANSI-aware cell slicing), then the popup lines are written — the same
+  leftmost-wins rule as everything else, minus the overlap.
+- **Persistent indicator** (popup closed, query kept): the panel's bottom
+  border carries `⌕ query (matched/total)` at the left in the `filter` theme
+  role (text always present — never colour alone), the scroll hint stays
+  bottom-right and is dropped last; the title count reads `matched/total`;
+  the unfocused border takes the `filter` role (focus keeps accent); the
+  header tab gains a `⌕` marker dropped before any label shortening; the
+  footer switches to an `Esc clear filter`-led hint set when the focused
+  panel holds a query.
+- **Keys**: typing is live (every keystroke narrows); printable text, `q`/`1`
+  included, goes only to the input. `Enter` applies and closes (filter stays);
+  `Esc` cancels typing *and* clears, and also clears a kept filter on the
+  focused panel (at base `Esc` otherwise does nothing, and zoom/fullscreen
+  still win first). `Backspace` is grapheme-safe; `Ctrl+U` clears the line.
+  `/` reopens pre-filled. Matching is a literal case-insensitive substring
+  over every displayed cell — never a pattern.
+- **Zero matches** render a centered dim `No matches for 'xyz' (Esc to
+  clear)` in the body, never a blank panel; the detail pane falls back to
+  its nothing-selected placeholder.
