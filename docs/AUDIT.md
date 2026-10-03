@@ -217,7 +217,8 @@ Order:
 5. **R-09** fix `scripts/record-fixtures.sh` so `network-inspect.json` is
    recorded; drop or justify the dead `container-stats.json` (S).
 6. **R-03** non-zero exit when raw mode is unavailable (S).
-7. **R-18** verify the Ctrl+C restore path (S).
+7. ~~**R-18**~~ — satisfied by manual check 5 (see sign-off); only `kill -TERM`
+   and crash restore remain, tracked in UNKNOWNS #11.
 8. **R-02** complete the P0-T8 environment report (terminal name, truecolor
    gradient, SGR mouse log) (S).
 9. **R-08** record the stream-style decision (S).
@@ -229,3 +230,41 @@ Order:
 
 Do not start Phase 3 work before the maintainer has run the manual checklist and
 confirmed the stop-point items below.
+
+---
+
+## Manual sign-off — 2026-10-03
+
+Verdict: **all 11 numbered manual items passed** on the maintainer's real
+terminal, driving the app against the sandbox socket
+(`/tmp/podtui-dev/podman.sock`). This includes the mid-resize flicker watch that
+no automated test can cover.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Resize large → tiny → large: no overlap, cut-off rows or leftover cells; centered too-small message | pass |
+| 2 | Toggle panels `1`-`6`: expand/shrink immediately; hiding the last visible panel refused | pass |
+| 3 | `z` zooms and restores; selection preserved | pass |
+| 4 | Narrow (~60 cols): single panel, `Enter` opens detail, `Esc` returns | pass |
+| 5 | `q` **and** `Ctrl+C` both restore the screen, cursor and shell echo | pass |
+| 6 | Cursor stays on `web` after a container above it is removed (R-12) | pass |
+| 7 | Hidden Volumes panel does not update until re-shown (R-13) | pass |
+| 8 | `[` `]` cycle the detail tab strip; Config shows State/Config/Host/Network; unimplemented tabs say so (R-16) | pass |
+| 9 | `?` overlay lists every binding; `Esc` closes it (R-17) | pass |
+| 10 | `API_TOKEN` renders as `********`; the value appears nowhere (R-16) | pass |
+| 11 | Rapid resize through tiny sizes: too-small message, no panic (UNKNOWN #15) | pass |
+
+Unknowns closed by these checks: **#10** (Ink fullscreen-frame flicker/scroll),
+**#12** (box-drawing cell geometry on the real terminal and font), **#13**
+(real-TTY resize flicker / leftover cells), **#14** (alt-screen restore on `q`).
+
+**R-18 is satisfied** by check 5: screen, cursor and echo all restore on
+Ctrl+C. Note there is still no explicit SIGINT handler in app code — Ink's
+default exit path covers it. `kill -TERM` and crash restore remain unverified
+and stay in UNKNOWNS #11.
+
+**No ROADMAP boxes were ticked as a result of this.** P2-T5, P2-T6, P2-T7 and
+P2-T8 keep their unticked boxes: the human verified the behaviour that exists,
+but their unimplemented criteria (`/` filter, healthy/unhealthy suffix,
+configurable poll interval, per-field colouring, context-sensitive footer) are
+still missing, so the Phase 2 gate is **not** passed.
