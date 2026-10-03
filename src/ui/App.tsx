@@ -88,8 +88,9 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         error,
         activeTab,
         inspect,
+        filter: state.filterQuery,
       }),
-    [data, state.selected, state.focus, lastRefresh, error, activeTab, inspect],
+    [data, state.selected, state.focus, lastRefresh, error, activeTab, inspect, state.filterQuery],
   );
 
   const focusId: PanelId = isPanelId(state.focus) ? state.focus : "containers";
@@ -122,6 +123,48 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     if (key.ctrl && input === "c") {
       process.exit(0);
     }
+
+    // --- Escape: dialog > help > zoom/fullscreen > filter > nothing ---
+    // Single path for the whole priority chain; the filter branch below never
+    // sees an Escape that a higher-priority state should consume first.
+    if (key.escape) {
+      const action = resolveEscape(state, {
+        helpOpen: state.help,
+        filterActive: state.filterFor !== null,
+        clearFilter: { type: "clearFilter" },
+      });
+      if (action) dispatch(action);
+      return;
+    }
+
+    // --- Filter mode (P2-T5): the focused panel captures typing. ---
+    // Everything is text except the keys that leave the mode. In particular
+    // `q` and `?` type characters here — they must not quit or open help,
+    // which is also why the footer hides those hints while filtering.
+    if (state.filterFor !== null) {
+      if (key.return) {
+        dispatch({ type: "endFilter" });
+        return;
+      }
+      if (key.backspace || key.delete) {
+        dispatch({ type: "filterBackspace" });
+        return;
+      }
+      if (
+        input &&
+        !key.ctrl &&
+        !key.meta &&
+        !key.tab &&
+        !key.upArrow &&
+        !key.downArrow &&
+        !key.leftArrow &&
+        !key.rightArrow
+      ) {
+        dispatch({ type: "filterInput", text: input });
+      }
+      return;
+    }
+
     if (input === "q") {
       process.exit(0);
     }
@@ -131,10 +174,10 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       return;
     }
 
-    // --- Escape: dialog > help > zoom/fullscreen > filter > nothing ---
-    if (key.escape) {
-      const action = resolveEscape(state, { helpOpen: state.help });
-      if (action) dispatch(action);
+    // `/` filters the focused list; in the Phase 3 Logs tab the same key will
+    // search instead. From fullscreen detail it is a no-op (see startFilter).
+    if (input === "/") {
+      dispatch({ type: "startFilter" });
       return;
     }
 
@@ -193,6 +236,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       visible={state.visible}
       zoom={state.zoom}
       detailFullscreen={state.detailFullscreen}
+      hintContext={state.filterFor !== null ? "filter" : undefined}
     />
   );
 };

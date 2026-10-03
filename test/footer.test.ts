@@ -47,7 +47,11 @@ function model(focus: FrameModel["focus"]): FrameModel {
   };
 }
 
-function text(cols: number, focus: FrameModel["focus"], context?: "base" | "detail"): string {
+function text(
+  cols: number,
+  focus: FrameModel["focus"],
+  context?: "base" | "detail" | "filter",
+): string {
   const layout = computeLayout({ cols, rows: 24, visible: ALL, focused: "containers" });
   return stripAnsi(buildFooter(layout, model(focus), { ...PLAIN, context }));
 }
@@ -103,6 +107,34 @@ describe("footer hint contexts", () => {
       const known = new Set(KEYMAP.map((k) => k.key));
       for (const key of shown) expect(known.has(key)).toBe(true);
       expect(shown.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("footer filter context", () => {
+  test("while filtering, Esc/Enter are advertised and q/? are not", () => {
+    const line = text(200, "containers", "filter");
+    expect(line).toContain("Esc");
+    expect(line).toContain("clear");
+    expect(line).toContain("Enter");
+    expect(line).toContain("keep");
+    // Both type characters in this mode; advertising them would lie.
+    expect(line).not.toContain("quit");
+    expect(line).not.toContain("?");
+  });
+
+  test("a narrow filter footer still fits", () => {
+    const layout = computeLayout({ cols: 40, rows: 12, visible: ALL, focused: "containers" });
+    const line = buildFooter(layout, model("containers"), { ...PLAIN, context: "filter" });
+    expect(visibleWidth(line)).toBe(40);
+  });
+
+  test("filter keys exist in KEYMAP (no drift)", () => {
+    const line = text(200, "containers", "filter");
+    const known = new Set(KEYMAP.map((k) => k.key));
+    for (const key of ["Esc", "Enter"]) {
+      expect(line).toContain(key);
+      expect(known.has(key)).toBe(true);
     }
   });
 });

@@ -2,7 +2,7 @@ import type { Layout } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
 import { LineBuffer } from "./compose.ts";
-import { buildFooter, buildHeader } from "./chrome.ts";
+import { buildFooter, buildHeader, type FooterHintContext } from "./chrome.ts";
 import { renderDetail, renderMessage } from "./detailLines.ts";
 import { renderPanel } from "./panelLines.ts";
 
@@ -10,6 +10,8 @@ export interface FrameOptions {
   theme: Theme;
   /** Set false for NO_COLOR frames. */
   color?: boolean;
+  /** Overrides the model-derived footer hint context (P2-T8). */
+  hintContext?: FooterHintContext;
 }
 
 /**
@@ -57,7 +59,11 @@ export function renderFrame(layout: Layout, model: FrameModel, opts: FrameOption
   }
 
   if (layout.footer) {
-    buffer.write(0, layout.footer.y, buildFooter(layout, model, { theme: opts.theme, color: on }));
+    buffer.write(
+      0,
+      layout.footer.y,
+      buildFooter(layout, model, { theme: opts.theme, color: on, context: opts.hintContext }),
+    );
   }
 
   return buffer.toLines();

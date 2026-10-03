@@ -91,8 +91,8 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
   return fit(head + " ".repeat(gap) + clockPainted, cols);
 }
 
-/** Which UI state the footer advertises keys for. `filter` arrives with P2-T5. */
-export type FooterHintContext = "base" | "detail";
+/** Which UI state the footer advertises keys for. */
+export type FooterHintContext = "base" | "detail" | "filter";
 
 export interface FooterOptions {
   theme: Theme;
@@ -120,6 +120,16 @@ const HINTS: { key: string; desc: string }[] = [
  * KEYMAP (`src/ui/view/help.ts`), which the `?` overlay renders — the R-17
  * no-drift rule applies to every context, not just the base list.
  */
+/**
+ * Keys that matter while a `/` filter is capturing typing. Deliberately short:
+ * the query itself is echoed in the panel title, and `q`/`?` must NOT appear —
+ * they type characters in this mode, so advertising them as quit/help would lie.
+ */
+const FILTER_HINTS: { key: string; desc: string }[] = [
+  { key: "Esc", desc: "clear" },
+  { key: "Enter", desc: "keep" },
+];
+
 const DETAIL_HINTS: { key: string; desc: string }[] = [
   { key: "[ ]", desc: "tab" },
   { key: "↑↓jk", desc: "next" },
@@ -151,7 +161,7 @@ export function buildFooter(
 
   const context: FooterHintContext =
     opts.context ?? (model.focus === "detail" ? "detail" : "base");
-  let hints = context === "detail" ? DETAIL_HINTS : HINTS;
+  let hints = context === "detail" ? DETAIL_HINTS : context === "filter" ? FILTER_HINTS : HINTS;
   while (hints.length > 1 && displayWidth(render(hints)) + displayWidth(error ?? "") > cols - 1) {
     // Drop the least important hint that is not `quit`.
     const dropIndex = hints.length - 2;

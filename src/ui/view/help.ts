@@ -15,6 +15,7 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "1-6", desc: "toggle panel", section: "panels" },
   { key: "Tab", desc: "focus next panel", section: "panels" },
   { key: "↑↓jk", desc: "move selection", section: "navigation" },
+  { key: "/", desc: "filter list", section: "navigation" },
   { key: "Enter", desc: "open detail", section: "detail" },
   { key: "[ ]", desc: "detail tab", section: "detail" },
   { key: "Esc", desc: "back / close", section: "detail" },
@@ -25,11 +26,6 @@ export const KEYMAP: readonly KeyBinding[] = [
 
 export const HELP_TITLE = "podtui — keys";
 export const HELP_CLOSE_HINT = "Esc close · q quit";
-
-/** Keys the footer advertises, derived from the key map's primary bindings. */
-export const FOOTER_KEYS: readonly string[] = KEYMAP.filter(
-  (k) => k.key !== "[ ]" && k.key !== "Esc",
-).map((k) => k.key);
 
 /** Pre-formatted help rows, grouped by section. */
 export function helpLines(): string[] {

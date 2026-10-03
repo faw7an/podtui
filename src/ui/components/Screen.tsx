@@ -5,6 +5,7 @@ import { useTerminalSize, type TerminalSize } from "../hooks/useTerminalSize.ts"
 import type { PanelId, PaneId } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
+import type { FooterHintContext } from "../render/chrome.ts";
 
 export interface ScreenProps {
   model: FrameModel;
@@ -19,6 +20,8 @@ export interface ScreenProps {
    */
   size?: TerminalSize;
   color?: boolean;
+  /** Overrides the model-derived footer hint context (P2-T8). */
+  hintContext?: FooterHintContext;
 }
 
 /**
@@ -39,6 +42,7 @@ export function Screen({
   detailFullscreen,
   size,
   color = true,
+  hintContext,
 }: ScreenProps) {
   const detected = useTerminalSize();
   const { columns, rows } = size ?? detected;
@@ -56,5 +60,5 @@ export function Screen({
     [columns, rows, visible, model.focus, zoom, detailFullscreen],
   );
 
-  return <Frame layout={layout} model={model} theme={theme} color={color} />;
+  return <Frame layout={layout} model={model} theme={theme} color={color} hintContext={hintContext} />;
 }

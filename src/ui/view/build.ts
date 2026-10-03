@@ -5,7 +5,7 @@ import type {
   PodListItem,
   VolumeListItem,
 } from "../../api/types.ts";
-import { formatAge, formatBytes, parsePodmanTime, shortenImageName, statusText, statusGlyph } from "../../util/format.ts";
+import { formatAge, formatBytes, healthSuffix, parsePodmanTime, shortenImageName, statusText, statusGlyph } from "../../util/format.ts";
 import { PANEL_IDS, type PaneId, type PanelId } from "../layout/types.ts";
 import { selectedIndex } from "../layout/layoutReducer.ts";
 import { PANEL_COLUMNS, panelMeta, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
@@ -43,12 +43,13 @@ function imageName(image: ImageListItem): string {
 function containerRows(items: ContainerListItem[], now: number): RowModel[] {
   return items.map((c) => {
     const st = statusText(c.State ?? "unknown");
+    const health = healthSuffix(c.Status);
     return {
       id: c.Id,
-      tone: st.tone,
+      tone: health.tone ?? st.tone,
       cells: {
         name: c.Names?.[0]?.replace(/^\//, "") || c.Id.slice(0, 12),
-        state: st.text,
+        state: health.suffix ? `${st.text} ${health.suffix}` : st.text,
         image: shortenImageName(c.Image ?? ""),
         age: formatAge(parsePodmanTime(c.Created) ?? NaN, now),
       },
@@ -118,10 +119,23 @@ function quadletRows(items: { id: string; name: string; status: string }[]): Row
   });
 }
 
+/**
+ * Narrow rows to those whose name contains the query (case-insensitive).
+ * Applied before the stored selection ID resolves to a row, so R-12's cursor
+ * stability and the detail pane follow automatically — and the stored ID is
+ * never touched, so clearing the query restores the cursor exactly.
+ */
+export function applyFilter(rows: RowModel[], query: string | undefined): RowModel[] {
+  if (query === undefined || query === "") return rows;
+  const needle = query.toLowerCase();
+  return rows.filter((r) => (r.cells["name"] ?? "").toLowerCase().includes(needle));
+}
+
 export function buildPanelModels(
   data: ResourceData,
   selected: Record<PanelId, string>,
   now: number,
+  filter?: Partial<Record<PanelId, string>>,
 ): PanelModel[] {
   const rows: Record<PanelId, RowModel[]> = {
     containers: containerRows(data.containers, now),
@@ -132,19 +146,27 @@ export function buildPanelModels(
     quadlets: quadletRows(data.quadlets),
   };
 
-  return PANEL_IDS.map((id) => ({
+  return PANEL_IDS.map((id) => {
+    const query = filter?.[id];
+    const items = applyFilter(rows[id], query);
+    const meta = panelMeta(id);
+    return {
     id,
-    ...panelMeta(id),
+    ...meta,
+    // Echo the query in the title so the narrowed list explains itself;
+    // the footer filter hints stay short because of this.
+    title: query ? `${meta.title} /${query}` : meta.title,
     columns: PANEL_COLUMNS[id],
-    items: rows[id],
+    items,
     // Resolve the stored item ID to the row index for this render.
-    selected: selectedIndex(selected[id] ?? "", rows[id].map((r) => r.id)),
+    selected: selectedIndex(selected[id] ?? "", items.map((r) => r.id)),
     // Quadlets has no data source until Phase 6. Say so explicitly instead of
     // showing an empty box that looks like a bug; no fake data is invented.
     ...(id === "quadlets" && rows.quadlets.length === 0
       ? { emptyLabel: "not implemented yet (phase 6)" }
       : {}),
-  }));
+  };
+  });
 }
 
 export interface BuildFrameArgs {
@@ -158,12 +180,14 @@ export interface BuildFrameArgs {
   activeTab?: DetailTabId;
   /** Inspect payload for the selected container, when available. */
   inspect?: ContainerInspect | null;
+  /** Per-panel `/` filter queries; absent or empty means unfiltered. */
+  filter?: Partial<Record<PanelId, string>>;
   collapsedSections?: ReadonlySet<string>;
   revealSecrets?: boolean;
 }
 
 export function buildFrameModel(args: BuildFrameArgs): FrameModel {
-  const panels = buildPanelModels(args.data, args.selected, args.now);
+  const panels = buildPanelModels(args.data, args.selected, args.now, args.filter);
 
   // Detail shows whatever is selected in the focused list panel.
   const focusId: PanelId = args.focus === "detail" ? "containers" : args.focus;

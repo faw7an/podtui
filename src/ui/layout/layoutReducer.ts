@@ -19,7 +19,17 @@ export type Action =
   /** `?` toggles the help overlay. */
   | { type: "toggleHelp" }
   /** Select an item by its stable ID (never by row index). */
-  | { type: "select"; id: PanelId; itemId: string };
+  | { type: "select"; id: PanelId; itemId: string }
+  /** `/`: the focused panel starts capturing typing. */
+  | { type: "startFilter" }
+  /** Text typed while a filter is active. */
+  | { type: "filterInput"; text: string }
+  /** Backspace while a filter is active. */
+  | { type: "filterBackspace" }
+  /** `Esc` while a filter is active: drop the query and leave filter mode. */
+  | { type: "clearFilter" }
+  /** `Enter` while a filter is active: keep the query, leave filter mode. */
+  | { type: "endFilter" };
 
 export interface LayoutState {
   visible: Set<PanelId>;
@@ -42,6 +52,14 @@ export interface LayoutState {
    * at render time by `selectedIndex`.
    */
   selected: Record<PanelId, string>;
+  /**
+   * `/` filter: the panel currently capturing typing, or null. Queries are
+   * remembered per panel so switching focus does not lose them; narrowing
+   * itself happens in `buildPanelModels`, before the stored selection ID
+   * resolves to a row.
+   */
+  filterFor: PanelId | null;
+  filterQuery: Partial<Record<PanelId, string>>;
 }
 
 /** At least one list panel must stay visible (LAYOUT_SPEC §4). */
@@ -62,6 +80,8 @@ export function initialState(
     tab: 0,
     help: false,
     selected,
+    filterFor: null,
+    filterQuery: {},
   };
 }
 
@@ -177,6 +197,46 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
     case "select": {
       if (state.selected[action.id] === action.itemId) return state;
       return { ...state, selected: { ...state.selected, [action.id]: action.itemId } };
+    }
+
+    case "startFilter": {
+      // Only a list panel can be filtered. From fullscreen detail the key is
+      // ignored: the frame shows no list, so there is nothing to narrow.
+      if (!isPanelId(state.focus)) return state;
+      return { ...state, filterFor: state.focus };
+    }
+
+    case "filterInput": {
+      if (state.filterFor === null || action.text === "") return state;
+      const prev = state.filterQuery[state.filterFor] ?? "";
+      return {
+        ...state,
+        filterQuery: { ...state.filterQuery, [state.filterFor]: prev + action.text },
+      };
+    }
+
+    case "filterBackspace": {
+      if (state.filterFor === null) return state;
+      const prev = state.filterQuery[state.filterFor] ?? "";
+      if (prev === "") return state;
+      // Grapheme-safe: slicing code units would split emoji in half.
+      const next = Array.from(prev).slice(0, -1).join("");
+      const filterQuery = { ...state.filterQuery };
+      if (next === "") delete filterQuery[state.filterFor];
+      else filterQuery[state.filterFor] = next;
+      return { ...state, filterQuery };
+    }
+
+    case "clearFilter": {
+      if (state.filterFor === null) return state;
+      const filterQuery = { ...state.filterQuery };
+      delete filterQuery[state.filterFor];
+      return { ...state, filterFor: null, filterQuery };
+    }
+
+    case "endFilter": {
+      if (state.filterFor === null) return state;
+      return { ...state, filterFor: null };
     }
   }
 }

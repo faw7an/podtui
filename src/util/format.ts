@@ -85,6 +85,28 @@ export function toneForState(state: string): Tone {
   }
 }
 
+export interface HealthSuffix {
+  /** Appended to the state text, e.g. `"· healthy"`. Empty when there is none. */
+  suffix: string;
+  /** Overrides the row tone when present. */
+  tone?: Tone;
+}
+
+/**
+ * Health suffix for container rows, read from the list endpoint's `Status`
+ * field (P2-T5). Verified live 2026-10-04: `"healthy"`, `"unhealthy"`, or `""`
+ * when the container has no healthcheck. An unhealthy container forces the
+ * error tone whatever its lifecycle state — `running` + `unhealthy` must read
+ * as a problem. Unrecognized values pass through unstyled: displaying what the
+ * API sent is honest, inventing a colour for it is not.
+ */
+export function healthSuffix(status: string | undefined | null): HealthSuffix {
+  if (status === undefined || status === null || status === "") return { suffix: "" };
+  if (status === "healthy") return { suffix: "· healthy" };
+  if (status === "unhealthy") return { suffix: "· unhealthy", tone: "error" };
+  return { suffix: `· ${status}` };
+}
+
 /** `● running` — glyph plus text, never colour alone. */
 export function statusText(state: string): { text: string; tone: Tone } {
   const lower = state.toLowerCase();
