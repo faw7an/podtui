@@ -219,8 +219,7 @@ Order:
 6. **R-03** non-zero exit when raw mode is unavailable (S).
 7. ~~**R-18**~~ — satisfied by manual check 5 (see sign-off); only `kill -TERM`
    and crash restore remain, tracked in UNKNOWNS #11.
-8. **R-02** complete the P0-T8 environment report (terminal name, truecolor
-   gradient, SGR mouse log) (S).
+8. ~~**R-02**~~ — done: Ghostty identified, truecolor smooth by eye, SGR mouse verified from pasted `ESC[<0;84;26M/m` pairs; P0-T8 ticked.
 9. **R-08** record the stream-style decision (S).
 10. Remaining manual-gated Phase 2 gaps: P2-T2 status bar, P2-T5 filter +
     healthy/unhealthy, P2-T7 collapse/colour keys, P2-T8 context-sensitive
