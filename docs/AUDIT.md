@@ -191,10 +191,10 @@ Still unticked, with the exact gap:
 | Task | Remaining gap |
 |---|---|
 | P2-T2 | Defined as the chrome rows (header-right clock + footer-right error slot) via a LAYOUT_SPEC §3 amendment; no dedicated row by design. Ticked. |
-| P2-T5 | No `/` filter, no healthy/unhealthy suffix, no `useContainers` hook (data lives in `App` + `view/refresh.ts`) |
+| P2-T5 | Done 2026-10-04: `/` filters the focused list (all six, per-panel queries), healthy/unhealthy suffix from a live-verified mapping, hook deliberately not created (documented). Ticked. |
 | P2-T6 | Poll interval is now configurable via `PODTUI_POLL_MS` (R-14), but FR-2's preferred event stream is verified-available and deliberately not adopted yet — the decision record in DECISIONS.md lists exactly what is still unverified |
-| P2-T7 | TabBar + Config rendering work, but no key binding for collapsing sections and no per-field colouring; manual item 5 will partially fail |
-| P2-T8 | Footer shows a fixed hint list, not *context-sensitive* hints |
+| P2-T7 | Done 2026-10-04: `Space` folds all sections, `PgUp`/`PgDn` scroll, keys coloured. Ticked. |
+| P2-T8 | Done 2026-10-04: base/detail/filter hint contexts derived from UI state, no-drift vs KEYMAP. Ticked. |
 
 Phase 1 boxes stay unticked: the audit verified the work exists, but several
 task criteria are still unmet (P1-T2 timeout/abort now covered but the
