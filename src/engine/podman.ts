@@ -6,7 +6,6 @@ import {
   streamChunks,
   streamJson,
   streamLines,
-  EngineError,
 } from "../api/client.ts";
 import {
   MultiplexedLogDecoder,
@@ -31,7 +30,6 @@ import type {
 import type {
   ContainerEngine,
   PrunePreview,
-  PruneResult,
 } from "./ContainerEngine.ts";
 
 function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
@@ -48,47 +46,94 @@ function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
   }));
 }
 
-function mapPruneResult(raw: unknown, resource: string): PruneResult {
-  const key = resource.charAt(0).toLowerCase() + resource.slice(1) + "s";
-  // API returns either { Containers: [...] } or [] directly
-  let items: Record<string, unknown>[] = [];
-  if (Array.isArray(raw)) {
-    items = raw as Record<string, unknown>[];
-  } else if (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>)[`${resource}s`])) {
-    items = (raw as Record<string, unknown>)[`${resource}s`] as Record<string, unknown>[];
-  }
-  return {
-    [key]: {
-      count: items.length,
-      names: items.map((r) => String(r["Name"] || r["Id"] || "")),
-      reclaimedBytes: items.reduce((sum, r) => sum + Number(r["Size"] || 0), 0),
-    },
-  } as PruneResult;
+/**
+ * One entry of a libpod prune response. Containers, images and volumes answer
+ * `{Id, Size, Err?}`; networks answer `{Name, Error}` (verified live on 5.8.4).
+ * `Err`/`Error` is a serialized Go `error`, which can arrive as a string, as
+ * `{}` (Go marshals most error values to an empty object) or as null.
+ */
+interface RawPruneReport {
+  Id?: string;
+  Name?: string;
+  Size?: number;
+  Err?: unknown;
+  Error?: unknown;
+}
+
+const SHORT_ID = /^[0-9a-f]{64}$/;
+
+/** Full 64-hex IDs are shortened to 12 like the CLI; names pass through. */
+function displayId(value: string): string {
+  return SHORT_ID.test(value) ? value.slice(0, 12) : value;
+}
+
+function errorText(err: unknown): string | undefined {
+  if (err === undefined || err === null) return undefined;
+  if (typeof err === "string") return err || "removal failed";
+  return "removal failed";
 }
 
 /**
- * Prune PREVIEWS are computed from list endpoints only.
- *
- * The libpod prune endpoints take no parameters: a `{dryRun:true}` body is
- * silently ignored and the prune really runs (proved live — a "dry run"
- * deleted a seeded container). So a preview must never POST. Instead we ask
- * the list endpoints what the matching CLI prune would remove, using the
- * semantics documented in `podman <resource> prune --help`:
- *
- *   container  "Removes all non running containers"      -> State != running
- *   image      "dangling or unused", default = dangling  -> no RepoTags
- *   volume     default removes only ANONYMOUS unused     -> MountCount 0 and
- *              an auto-generated (64 hex char) name. See docs/UNKNOWNS.md:
- *              "prune unused named volumes" is NOT reachable via this
- *              endpoint and must be built from confirmed per-volume deletes.
- *   network    "unused networks"                         -> inspect `containers` empty
- *
- * Every predicate below reads a field verified present in test/fixtures.
+ * Map a prune response to a result. Entries carrying an error are reported
+ * under `failed` and are NOT counted as removed — the old mapper counted every
+ * entry, so a partial failure read as a full success.
  */
-const ANONYMOUS_VOLUME_NAME = /^[0-9a-f]{64}$/;
+export function mapPruneReports(raw: unknown): { count: number; names: string[]; reclaimedBytes: number; failed: { name: string; error: string }[] } {
+  const items: RawPruneReport[] = Array.isArray(raw) ? (raw as RawPruneReport[]) : [];
+  const names: string[] = [];
+  const failed: { name: string; error: string }[] = [];
+  let reclaimedBytes = 0;
+  for (const item of items) {
+    const name = displayId(String(item.Name ?? item.Id ?? ""));
+    const error = errorText(item.Err ?? item.Error);
+    if (error !== undefined) {
+      failed.push({ name, error });
+      continue;
+    }
+    names.push(name);
+    reclaimedBytes += Number(item.Size ?? 0);
+  }
+  return { count: names.length, names, reclaimedBytes, failed };
+}
 
-function previewContainers(raw: ContainerListItem[]): PrunePreview {
-  const prunable = raw.filter((c) => (c.State ?? "").toLowerCase() !== "running");
+/**
+ * Prune PREVIEWS: what the real prune would remove, computed without removing
+ * anything.
+ *
+ * The libpod prune endpoints have no dry-run mode (a `{dryRun:true}` body is
+ * silently ignored and the prune really runs), so a preview must never POST.
+ * Each preview reproduces the server's own selection rule, read from the
+ * Podman v5.8.4 source and then verified by `test/prune-contract.test.ts`,
+ * which runs the REAL prune on a throwaway service and asserts that exactly
+ * the previewed set disappeared:
+ *
+ *   container  libpod/runtime_ctr.go PruneContainers: not in a pod, and state
+ *              stopped | exited | created | configured (paused is kept).
+ *   image      pkg/domain/infra/abi/images.go Prune: dangling (untagged, no
+ *              children, not in a manifest list), not used by a container,
+ *              repeated "until we converge" — removing a dangling image can
+ *              orphan its untagged parent, which goes in the next round.
+ *   volume     libpod/runtime_volume.go PruneVolumes: every volume the server
+ *              can remove without force, i.e. not referenced by ANY container
+ *              (stopped ones included). Named volumes are NOT spared — the
+ *              previous "anonymous only" rule under-reported and let a prune
+ *              delete named volumes the preview never mentioned.
+ *   network    pkg/domain/infra/abi/network.go NetworkPrune: the `dangling`
+ *              filter — no container (stopped included) references it, and
+ *              never the default network.
+ *
+ * Volumes and networks use the server's own `dangling=true` list filter, the
+ * same predicate the prune applies, so there is no client-side copy of the
+ * rule to drift.
+ */
+const PRUNABLE_CONTAINER_STATES = new Set(["stopped", "exited", "created", "configured"]);
+
+const DANGLING_FILTER = { filters: JSON.stringify({ dangling: ["true"] }) };
+
+export function previewContainers(raw: ContainerListItem[]): PrunePreview {
+  const prunable = raw.filter(
+    (c) => !c.Pod && PRUNABLE_CONTAINER_STATES.has((c.State ?? "").toLowerCase()),
+  );
   return {
     containers: {
       count: prunable.length,
@@ -97,37 +142,73 @@ function previewContainers(raw: ContainerListItem[]): PrunePreview {
   };
 }
 
-function previewImages(raw: ImageListItem[]): PrunePreview {
-  const dangling = raw.filter((i) => (i.RepoTags ?? []).length === 0);
+function isUntagged(image: ImageListItem): boolean {
+  return (image.Names ?? []).length === 0;
+}
+
+/**
+ * Simulate the image prune's convergence loop.
+ *
+ * `danglingIds` is the server's own `dangling=true` answer for the first round
+ * (it alone knows about manifest-list membership). Later rounds are derived
+ * locally: an image becomes prunable once its last child is pruned, if it is
+ * untagged, unused and not a manifest list. `ParentId` comes from the same
+ * layer tree libimage uses to find children.
+ */
+export function previewImages(all: ImageListItem[], danglingIds: ReadonlySet<string>): PrunePreview {
+  const byId = new Map(all.map((i) => [i.Id, i]));
+  const childCount = new Map<string, number>();
+  for (const image of all) {
+    if (image.ParentId) childCount.set(image.ParentId, (childCount.get(image.ParentId) ?? 0) + 1);
+  }
+
+  const unused = (i: ImageListItem) => (i.Containers ?? 0) === 0;
+  const removed: ImageListItem[] = [];
+  const removedIds = new Set<string>();
+  let round = all.filter((i) => danglingIds.has(i.Id) && unused(i));
+
+  while (round.length > 0) {
+    const next: ImageListItem[] = [];
+    for (const image of round) {
+      if (removedIds.has(image.Id)) continue;
+      removedIds.add(image.Id);
+      removed.push(image);
+
+      const parent = image.ParentId ? byId.get(image.ParentId) : undefined;
+      if (!parent) continue;
+      const left = (childCount.get(parent.Id) ?? 1) - 1;
+      childCount.set(parent.Id, left);
+      if (left === 0 && isUntagged(parent) && unused(parent) && !parent.IsManifestList && !removedIds.has(parent.Id)) {
+        next.push(parent);
+      }
+    }
+    round = next;
+  }
+
   return {
     images: {
-      count: dangling.length,
-      names: dangling.map((i) => i.RepoTags?.[0] ?? i.Id.slice(0, 19)),
+      count: removed.length,
+      names: removed.map((i) => i.Id.slice(0, 12)),
     },
   };
 }
 
-function previewVolumes(raw: VolumeListItem[]): PrunePreview {
-  const unused = raw.filter(
-    (v) => (v.MountCount ?? 0) === 0 && ANONYMOUS_VOLUME_NAME.test(v.Name),
-  );
-  return { volumes: { count: unused.length, names: unused.map((v) => v.Name) } };
+async function previewImagesFromServer(socketPath: string): Promise<PrunePreview> {
+  const [all, dangling] = await Promise.all([
+    get<ImageListItem[]>(socketPath, "/images/json", { query: { all: "true" } }),
+    get<ImageListItem[]>(socketPath, "/images/json", { query: { all: "true", ...DANGLING_FILTER } }),
+  ]);
+  return previewImages(all, new Set(dangling.map((i) => i.Id)));
+}
+
+async function previewVolumes(socketPath: string): Promise<PrunePreview> {
+  const dangling = await get<VolumeListItem[]>(socketPath, "/volumes/json", { query: DANGLING_FILTER });
+  return { volumes: { count: dangling.length, names: dangling.map((v) => v.Name) } };
 }
 
 async function previewNetworks(socketPath: string): Promise<PrunePreview> {
-  // The LIST response has no attachment information (verified: the live
-  // /networks/json keys are created, dns_enabled, driver, id, internal,
-  // ipam_options, ipv6_enabled, name, network_interface, subnets — no
-  // `containers`), and /networks/{name}/containers is a 404 on 6.1.1. The
-  // per-network INSPECT response does carry `containers`, so that is what we
-  // read. Network counts are small, so the N+1 calls are acceptable.
-  const list = await get<NetworkListItem[]>(socketPath, "/networks/json");
-  const unused: string[] = [];
-  for (const n of list) {
-    const detail = await get<NetworkInspect>(socketPath, `/networks/${n.name}/json`);
-    if (Object.keys(detail.containers ?? {}).length === 0) unused.push(n.name);
-  }
-  return { networks: { count: unused.length, names: unused } };
+  const dangling = await get<NetworkListItem[]>(socketPath, "/networks/json", { query: DANGLING_FILTER });
+  return { networks: { count: dangling.length, names: dangling.map((n) => n.name) } };
 }
 
 export function createPodmanEngine(): ContainerEngine {
@@ -245,7 +326,7 @@ export function createPodmanEngine(): ContainerEngine {
           query: { all: "true" },
         }));
       }
-      return mapPruneResult(await post<unknown>(socketPath, "/containers/prune", {}), "Container");
+      return { containers: mapPruneReports(await post<unknown>(socketPath, "/containers/prune", {})) };
     },
 
     // Pods
@@ -301,12 +382,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneImages(socketPath: string, dryRun = false) {
-      if (dryRun) {
-        return previewImages(await get<ImageListItem[]>(socketPath, "/images/json", {
-          query: { all: "true" },
-        }));
-      }
-      return mapPruneResult(await post<unknown>(socketPath, "/images/prune", {}), "Image");
+      if (dryRun) return previewImagesFromServer(socketPath);
+      return { images: mapPruneReports(await post<unknown>(socketPath, "/images/prune", {})) };
     },
 
     // Volumes
@@ -324,10 +401,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneVolumes(socketPath: string, dryRun = false) {
-      if (dryRun) {
-        return previewVolumes(await get<VolumeListItem[]>(socketPath, "/volumes/json"));
-      }
-      return mapPruneResult(await post<unknown>(socketPath, "/volumes/prune", {}), "Volume");
+      if (dryRun) return previewVolumes(socketPath);
+      return { volumes: mapPruneReports(await post<unknown>(socketPath, "/volumes/prune", {})) };
     },
 
     // Networks
@@ -345,20 +420,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async pruneNetworks(socketPath: string, dryRun = false) {
-      try {
-        if (dryRun) {
-          return await previewNetworks(socketPath);
-        }
-        return mapPruneResult(await post<unknown>(socketPath, "/networks/prune", {}), "Network");
-      } catch (e: unknown) {
-        // Network prune may not be available in all Podman versions
-        if (e instanceof EngineError && e.statusCode === 404) {
-          return dryRun 
-            ? { networks: { count: 0, names: [] } } 
-            : { networks: { count: 0, names: [], reclaimedBytes: 0 } };
-        }
-        throw e;
-      }
+      if (dryRun) return previewNetworks(socketPath);
+      return { networks: mapPruneReports(await post<unknown>(socketPath, "/networks/prune", {})) };
     },
 
     // Events
