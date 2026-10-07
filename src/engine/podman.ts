@@ -35,12 +35,19 @@ import type {
   PrunePreview,
 } from "./ContainerEngine.ts";
 
-function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
+/**
+ * `AvgCPU`/`CPU` and `MemPerc` are already PERCENTAGES, not fractions.
+ * Verified live 2026-10-08 against `podman stats --no-stream` on Podman 5.8.4:
+ * CLI "123.80%" ↔ API AvgCPU 123.78; CLI "0.11%" ↔ API MemPerc 0.105
+ * (= MemUsage/MemLimit × 100). The earlier `× 100` turned a busy container's
+ * 124% CPU into 12378%. Values pass through unchanged.
+ */
+export function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
   return stats.map((s) => ({
-    cpuPercent: s.AvgCPU * 100,
+    cpuPercent: s.AvgCPU,
     memUsage: s.MemUsage,
     memLimit: s.MemLimit,
-    memPercent: s.MemPerc * 100,
+    memPercent: s.MemPerc,
     netRx: s.Network ? Object.values(s.Network).reduce((sum, n) => sum + (n.RxBytes || 0), 0) : 0,
     netTx: s.Network ? Object.values(s.Network).reduce((sum, n) => sum + (n.TxBytes || 0), 0) : 0,
     blockRead: s.BlockInput || 0,
