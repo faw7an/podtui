@@ -3,7 +3,7 @@ import { USAGE, parseArgs } from "../src/cli.ts";
 
 /**
  * Socket discovery wiring: the entry point parses `--socket` and hands the
- * value to the existing `discoverSocket()` instead of `App` hardcoding the
+ * value to `resolveSocket()` instead of `App` hardcoding the
  * sandbox path. `parseArgs` takes an already-sliced argv (no node/bun prefix,
  * no script name) so it stays a pure function.
  *

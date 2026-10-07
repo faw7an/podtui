@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { fakeUnixServer, httpResponse, type FakeServer } from "./helpers/unixServer.ts";
 import * as path from "node:path";
 
 /**
@@ -7,13 +8,27 @@ import * as path from "node:path";
  * Before this, `App` hardcoded `/tmp/podtui-dev/podman.sock`, so a compiled
  * binary on a real machine looked only at the dev sandbox path. Now
  * `src/index.tsx` resolves `--socket` → `PODTUI_SOCKET` → the standard
- * locations via `discoverSocket()` and refuses to start cleanly when nothing
+ * locations via `resolveSocket()` and refuses to start cleanly when nothing
  * is found. These tests spawn the real entry, like test/entry-raw-mode.test.ts.
  */
 
 const ROOT = path.join(import.meta.dirname, "..");
 const ENTRY = path.join(ROOT, "src", "index.tsx");
-const SANDBOX = "/tmp/podtui-dev/podman.sock";
+
+/**
+ * A fake Podman that answers the discovery probe, so these tests do not need
+ * the dev sandbox running (they used to fail whenever it was down).
+ */
+let fakePodman: FakeServer;
+let SANDBOX = "";
+beforeAll(() => {
+  fakePodman = fakeUnixServer("entry", (s) => {
+    s.write(httpResponse(200, "OK", "OK", "text/plain"));
+    s.end();
+  });
+  SANDBOX = fakePodman.path;
+});
+afterAll(() => fakePodman.stop());
 
 interface RunResult {
   code: number | null;
@@ -43,7 +58,14 @@ async function runEntry(args: string[], extraEnv: Record<string, string | undefi
   return { code, stdout, stderr };
 }
 
-const NO_SOCKET_ENV = { PODTUI_SOCKET: undefined, XDG_RUNTIME_DIR: "/nonexistent-podtui-test" };
+// DOCKER_HOST / CONTAINER_HOST are candidates too; clear them so a developer
+// machine that sets them cannot change these results.
+const NO_SOCKET_ENV = {
+  PODTUI_SOCKET: undefined,
+  DOCKER_HOST: undefined,
+  CONTAINER_HOST: undefined,
+  XDG_RUNTIME_DIR: "/nonexistent-podtui-test",
+};
 
 describe("entry point: socket discovery", () => {
   test("--help works without a TTY and without any socket", async () => {
@@ -65,7 +87,7 @@ describe("entry point: socket discovery", () => {
   test("nothing found anywhere is a clean error with the fix command", async () => {
     const result = await runEntry([], NO_SOCKET_ENV);
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain("Podman socket not found");
+    expect(result.stderr).toContain("No running Podman socket found");
     expect(result.stderr).toContain("systemctl --user enable --now podman.socket");
     // The tried paths are listed, so a stale environment diagnoses itself.
     expect(result.stderr).toContain("/nonexistent-podtui-test/podman/podman.sock");

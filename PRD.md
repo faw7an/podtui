@@ -69,7 +69,7 @@ IDs are referenced by the roadmap and tests.
 
 | ID | Requirement |
 |---|---|
-| FR-1 | On start, discover the Podman socket: `--socket`, `PODTUI_SOCKET`, then `$XDG_RUNTIME_DIR/podman/podman.sock`, then `/run/podman/podman.sock`. Ping it. If unreachable, show a full-screen help message with the command to enable it. |
+| FR-1 | On start, discover the Podman socket: `--socket`, `PODTUI_SOCKET` (both explicit: used or fail, never a fallback), then the first working one of `CONTAINER_HOST`, `DOCKER_HOST` (set by podman-docker), `$XDG_RUNTIME_DIR/podman/podman.sock`, `/run/podman/podman.sock`, and podman-docker's `$XDG_RUNTIME_DIR/docker.sock` / `/run/docker.sock` links. `unix://` URIs are accepted. Each candidate must answer `GET /libpod/_ping` (a Docker daemon does not, and is never used). If none works, show a help message listing every candidate with the reason it was rejected and the command to enable the socket (amended 2026-10-08, see DECISIONS). |
 | FR-2 | Refresh lists using the event stream when available, with a polling fallback. UI must not flicker on refresh and must keep selection stable by ID. |
 | FR-3 | Panels 1–6 toggle with number keys. Hidden panels do not poll or stream. At least one panel must remain visible. |
 | FR-4 | The detail pane shows tabs for the selected item. `[` / `]` or clicking switches tabs. Streams start when a tab is shown and stop when hidden. |
