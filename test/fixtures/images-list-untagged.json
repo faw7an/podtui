@@ -1,0 +1,44 @@
+[
+  {
+    "Id": "320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "ParentId": "",
+    "RepoTags": [
+      "docker.io/library/alpine:latest"
+    ],
+    "RepoDigests": [
+      "docker.io/library/alpine@sha256:4d5cf6fa4d69da5c2b2a04a7ac06083e9d567e768c4f44c4333bb335a0226b06"
+    ],
+    "Created": 1789677440,
+    "Size": 8705465,
+    "SharedSize": 0,
+    "VirtualSize": 8705465,
+    "Labels": null,
+    "Containers": 0,
+    "Arch": "amd64",
+    "Digest": "sha256:4d5cf6fa4d69da5c2b2a04a7ac06083e9d567e768c4f44c4333bb335a0226b06",
+    "IsManifestList": false,
+    "Names": [
+      "docker.io/library/alpine:latest"
+    ],
+    "Os": "linux"
+  },
+  {
+    "Id": "285cb8336d5a06c550532b349555cd1781c94e9db0a152f79922009a2cc07458",
+    "ParentId": "320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "RepoTags": null,
+    "RepoDigests": [],
+    "Created": 1791416144,
+    "Size": 8708547,
+    "SharedSize": 0,
+    "VirtualSize": 8708547,
+    "Labels": {
+      "io.buildah.version": "1.43.2"
+    },
+    "Containers": 0,
+    "Dangling": true,
+    "Arch": "amd64",
+    "Digest": "sha256:e6ee9a32aa70db19f3b12f5d627af21f0f88ab9586ae2e37cf601343b068a327",
+    "IsManifestList": false,
+    "Os": "linux"
+  }
+]

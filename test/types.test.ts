@@ -90,6 +90,18 @@ describe("fixtures parse correctly into types", () => {
     }
   });
 
+  test("images-list-untagged.json: an untagged image has RepoTags null and no Names", () => {
+    // Recorded 2026-10-08 on Podman 5.8.4 from a built-then-untagged image
+    // (`History` trimmed). The prune preview's dangling rule depends on this.
+    const data = readFixture<ImageListItem[]>("images-list-untagged.json");
+    const untagged = data.filter((i) => i.RepoTags === null);
+    expect(untagged.length).toBe(1);
+    expect(untagged[0]?.Names).toBeUndefined();
+    expect(untagged[0]?.ParentId).toBeTruthy();
+    const tagged = data.filter((i) => i.RepoTags !== null);
+    expect(tagged.every((i) => (i.Names ?? []).length > 0)).toBe(true);
+  });
+
   test("volumes-list.json parses as VolumeListItem[]", () => {
     const data = readFixture<VolumeListItem[]>("volumes-list.json");
     expect(Array.isArray(data)).toBe(true);

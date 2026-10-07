@@ -267,3 +267,26 @@ P2-T8 keep their unticked boxes: the human verified the behaviour that exists,
 but their unimplemented criteria (`/` filter, healthy/unhealthy suffix,
 configurable poll interval, per-field colouring, context-sensitive footer) are
 still missing, so the Phase 2 gate is **not** passed.
+
+---
+
+## Corrections — review 2026-10-08
+
+Two claims above were wrong; both were re-measured live on Podman 5.8.4 and
+fixed on branch `fix/review-2026-10-08` (details in DECISIONS.md):
+
+- Part 1 says "`AvgCPU`/`MemPerc` are fractions; `mapContainerStats` ×100 is
+  correct". **They are percentages.** `podman stats` showed 123.80% CPU /
+  0.11% memory while the API returned `AvgCPU` 123.78 / `MemPerc` 0.105; the
+  ×100 is removed (`test/stats.test.ts`).
+- R-04 / the 2026-10-03 DECISIONS entry say volume prune removes only
+  anonymous volumes. **It removes every volume no container references,
+  named ones included** (preview said 1, prune removed 3). All four prune
+  previews were rebuilt from the Podman source and are now proved against
+  the real prune (`test/prune-contract.test.ts`).
+
+ROADMAP after the review: P0-T1..T8 and P1-T1..T8 ticked (criteria met,
+tests green incl. integration). P2-T6 stays open (FR-2 prefers the event
+stream, which is verified available but not adopted). The Phase 1 and
+Phase 2 **gates** still need the maintainer's manual tests.
+
