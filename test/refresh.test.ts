@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createVisibleFetcher } from "../src/ui/view/refresh";
+import { createVisibleFetcher, startPollLoop } from "../src/ui/view/refresh";
 import { EMPTY_DATA, type ResourceData } from "../src/ui/view/build";
 import type { PanelId } from "../src/ui/layout/types";
 
@@ -158,5 +158,50 @@ describe("R-13: hidden panels are not fetched", () => {
     expect(error).toContain("pods");
     // The failed resource keeps its previous value rather than being blanked.
     expect(data.pods).toBe(EMPTY_DATA.pods);
+  });
+});
+describe("startPollLoop: one refresh at a time", () => {
+  test("a tick slower than the interval never overlaps the next one", async () => {
+    // With setInterval(5ms) and 40ms ticks, ~8 ticks would be in flight at once.
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let ticks = 0;
+    const stop = startPollLoop(async () => {
+      ticks++;
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await Bun.sleep(40);
+      inFlight--;
+    }, 5);
+    await Bun.sleep(300);
+    stop();
+    expect(ticks).toBeGreaterThan(2);
+    expect(maxInFlight).toBe(1);
+  });
+
+  test("stop prevents further ticks and marks a running tick as stale", async () => {
+    let ticks = 0;
+    let staleSeen: boolean | undefined;
+    const stop = startPollLoop(async (isCurrent) => {
+      ticks++;
+      await Bun.sleep(30);
+      staleSeen = !isCurrent();
+    }, 5);
+    await Bun.sleep(10);
+    stop();
+    await Bun.sleep(80);
+    expect(ticks).toBe(1);
+    expect(staleSeen).toBe(true);
+  });
+
+  test("a failing tick does not end the loop", async () => {
+    let ticks = 0;
+    const stop = startPollLoop(async () => {
+      ticks++;
+      throw new Error("daemon down");
+    }, 5);
+    await Bun.sleep(60);
+    stop();
+    expect(ticks).toBeGreaterThan(2);
   });
 });

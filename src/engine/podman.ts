@@ -215,6 +215,42 @@ async function previewNetworks(socketPath: string): Promise<PrunePreview> {
 }
 
 /**
+ * Stop grace periods.
+ *
+ * The libpod container endpoints read the grace period from `timeout`, NOT
+ * Docker's `t` (pkg/api/handlers/compat/containers_{stop,restart}.go, v5.8.4).
+ * Verified live: `stop?t=1` waited the 10s default, `stop?timeout=1` took 1s;
+ * and restart ALWAYS uses `timeout`, defaulting to 0 — so `restart?t=10`
+ * SIGKILLed the container after ~100ms with no graceful shutdown, while
+ * `restart?timeout=10` let its TERM handler run. We therefore always send
+ * `timeout`, and when the caller does not choose one we use the container's
+ * own configured `Config.StopTimeout`, so `podman run --stop-timeout` and
+ * containers.conf are respected.
+ *
+ * The HTTP deadline must outlast the grace period (a forced remove of a
+ * TERM-ignoring container took 10.07s against a 10s client timeout).
+ */
+const DEFAULT_STOP_TIMEOUT_S = 10;
+const GRACE_SLACK_MS = 30_000;
+
+/**
+ * Pod actions stop several containers, each with its own grace period, and
+ * prunes / forced image removals can stop containers or delete many layers.
+ * Their duration is not known up front, so they get a generous fixed bound.
+ */
+const LONG_ACTION_MS = 300_000;
+
+async function graceSeconds(socketPath: string, id: string, explicit?: number): Promise<number> {
+  if (explicit !== undefined) return Math.max(0, Math.trunc(explicit));
+  const inspect = await get<ContainerInspect>(socketPath, `/containers/${id}/json`);
+  return inspect.Config?.StopTimeout ?? DEFAULT_STOP_TIMEOUT_S;
+}
+
+export function graceDeadlineMs(graceSeconds: number): number {
+  return graceSeconds * 1000 + GRACE_SLACK_MS;
+}
+
+/**
  * Podman answers 304 when an action is a no-op (start a running container,
  * start a running pod, stop a stopped pod — verified live). That is success,
  * but the UI should be able to say nothing changed.
@@ -311,12 +347,20 @@ export function createPodmanEngine(): ContainerEngine {
       return actionResult(await postVoid(socketPath, `/containers/${id}/start`, {}));
     },
 
-    async stopContainer(socketPath: string, id: string, timeout = 30) {
-      return actionResult(await postVoid(socketPath, `/containers/${id}/stop`, {}, { query: { t: timeout.toString() }, timeout: timeout * 1000 + 5000 }));
+    async stopContainer(socketPath: string, id: string, timeout?: number) {
+      const grace = await graceSeconds(socketPath, id, timeout);
+      return actionResult(await postVoid(socketPath, `/containers/${id}/stop`, {}, {
+        query: { timeout: String(grace) },
+        timeout: graceDeadlineMs(grace),
+      }));
     },
 
-    async restartContainer(socketPath: string, id: string, timeout = 10) {
-      return actionResult(await postVoid(socketPath, `/containers/${id}/restart`, {}, { query: { t: timeout.toString() } }));
+    async restartContainer(socketPath: string, id: string, timeout?: number) {
+      const grace = await graceSeconds(socketPath, id, timeout);
+      return actionResult(await postVoid(socketPath, `/containers/${id}/restart`, {}, {
+        query: { timeout: String(grace) },
+        timeout: graceDeadlineMs(grace),
+      }));
     },
 
     async killContainer(socketPath: string, id: string, signal = "SIGKILL") {
@@ -324,7 +368,15 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeContainer(socketPath: string, id: string, force = false) {
-      return actionResult(await delVoid(socketPath, `/containers/${id}`, { query: { force: force.toString() } }));
+      if (!force) {
+        return actionResult(await delVoid(socketPath, `/containers/${id}`, { query: { force: "false" } }));
+      }
+      // A forced remove stops a running container first, with its grace period.
+      const grace = await graceSeconds(socketPath, id);
+      return actionResult(await delVoid(socketPath, `/containers/${id}`, {
+        query: { force: "true", timeout: String(grace) },
+        timeout: graceDeadlineMs(grace),
+      }));
     },
 
     async pruneContainers(socketPath: string, dryRun = false) {
@@ -333,7 +385,7 @@ export function createPodmanEngine(): ContainerEngine {
           query: { all: "true" },
         }));
       }
-      return { containers: mapPruneReports(await post<unknown>(socketPath, "/containers/prune", {})) };
+      return { containers: mapPruneReports(await post<unknown>(socketPath, "/containers/prune", {}, { timeout: LONG_ACTION_MS })) };
     },
 
     // Pods
@@ -350,19 +402,19 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async stopPod(socketPath: string, id: string) {
-      return actionResult(await postVoid(socketPath, `/pods/${id}/stop`, {}));
+      return actionResult(await postVoid(socketPath, `/pods/${id}/stop`, {}, { timeout: LONG_ACTION_MS }));
     },
 
     async restartPod(socketPath: string, id: string) {
-      return actionResult(await postVoid(socketPath, `/pods/${id}/restart`, {}));
+      return actionResult(await postVoid(socketPath, `/pods/${id}/restart`, {}, { timeout: LONG_ACTION_MS }));
     },
 
     async killPod(socketPath: string, id: string) {
-      return actionResult(await postVoid(socketPath, `/pods/${id}/kill`, {}));
+      return actionResult(await postVoid(socketPath, `/pods/${id}/kill`, {}, { timeout: LONG_ACTION_MS }));
     },
 
     async removePod(socketPath: string, id: string, force = false) {
-      return actionResult(await delVoid(socketPath, `/pods/${id}`, { query: { force: force.toString() } }));
+      return actionResult(await delVoid(socketPath, `/pods/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS }));
     },
 
     // Images
@@ -379,12 +431,12 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeImage(socketPath: string, id: string, force = false) {
-      return actionResult(await delVoid(socketPath, `/images/${id}`, { query: { force: force.toString() } }));
+      return actionResult(await delVoid(socketPath, `/images/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS }));
     },
 
     async pruneImages(socketPath: string, dryRun = false) {
       if (dryRun) return previewImagesFromServer(socketPath);
-      return { images: mapPruneReports(await post<unknown>(socketPath, "/images/prune", {})) };
+      return { images: mapPruneReports(await post<unknown>(socketPath, "/images/prune", {}, { timeout: LONG_ACTION_MS })) };
     },
 
     // Volumes
@@ -402,7 +454,7 @@ export function createPodmanEngine(): ContainerEngine {
 
     async pruneVolumes(socketPath: string, dryRun = false) {
       if (dryRun) return previewVolumes(socketPath);
-      return { volumes: mapPruneReports(await post<unknown>(socketPath, "/volumes/prune", {})) };
+      return { volumes: mapPruneReports(await post<unknown>(socketPath, "/volumes/prune", {}, { timeout: LONG_ACTION_MS })) };
     },
 
     // Networks
@@ -420,7 +472,7 @@ export function createPodmanEngine(): ContainerEngine {
 
     async pruneNetworks(socketPath: string, dryRun = false) {
       if (dryRun) return previewNetworks(socketPath);
-      return { networks: mapPruneReports(await post<unknown>(socketPath, "/networks/prune", {})) };
+      return { networks: mapPruneReports(await post<unknown>(socketPath, "/networks/prune", {}, { timeout: LONG_ACTION_MS })) };
     },
 
     // Events
