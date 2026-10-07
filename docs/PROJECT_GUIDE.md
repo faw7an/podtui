@@ -150,6 +150,8 @@ Do **not** write `types.ts` from memory. Record real responses to `test/fixtures
 - Compile: `bun build --compile src/index.tsx --outfile dist/podtui` ⚠️ verify flags for the installed Bun version.
 - ⚠️ Known class of issue: Ink may reference an optional dev-only dependency (`react-devtools-core`) that the bundler tries to resolve and fails on. If `bun build` complains about it, resolve by installing it as a devDependency or marking it external, whichever works; record in DECISIONS.md.
 - Distribution plan: GitHub Releases binary, then an AUR `PKGBUILD` (`podtui-bin`), then optional Omarchy integration.
+- ✅ Release pipeline (2026-10-08): `.github/workflows/ci.yml` runs `bun run check` and the release build on native x64 and arm64 runners for every PR; `.github/workflows/release.yml` publishes `podtui-<version>-linux-{x64,arm64}.tar.gz` + `SHA256SUMS` when a `vX.Y.Z` tag matching package.json is pushed (`0.x` and `-suffix` versions are pre-releases). Both call `scripts/build-release.sh`.
+- ✅ Compiled Bun binaries autoload `.env` and `bunfig.toml` from the directory they are **run** in unless built with `--no-compile-autoload-dotenv --no-compile-autoload-bunfig` (verified: a `.env` with `PODTUI_SOCKET` redirected the default build). Every build uses both flags.
 
 ## 9. Dev sandbox (mandatory for development)
 
