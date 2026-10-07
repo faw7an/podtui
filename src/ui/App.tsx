@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useInput } from "ink";
 import { Screen } from "./components/Screen.tsx";
 import { HelpOverlay } from "./components/HelpOverlay.tsx";
@@ -8,7 +8,7 @@ import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/la
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
 import { defaultTheme } from "../theme/theme.ts";
 import { EMPTY_DATA, buildFrameModel, type ResourceData } from "./view/build.ts";
-import { createVisibleFetcher } from "./view/refresh.ts";
+import { createVisibleFetcher, startPollLoop } from "./view/refresh.ts";
 import { DETAIL_TABS, nextTabIndex, type DetailTabId } from "./view/detail.ts";
 import type { ContainerInspect } from "../api/types.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
@@ -58,25 +58,25 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   );
 
   // Only panels that are visible are fetched (FR-3); hidden panels keep their
-  // last known data and stop polling.
-  const refresh = useCallback(async () => {
-    const visible = state.visible;
-    try {
-      const { data, error } = await fetchVisible(visible, dataRef.current);
-      dataRef.current = data;
-      setData(data);
-      setError(error);
-      setLastRefresh(Date.now());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch data");
-    }
-  }, [fetchVisible, state.visible]);
-
-  useEffect(() => {
-    void refresh();
-    const id = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(id);
-  }, [refresh]);
+  // last known data and stop polling. One refresh at a time: the next starts
+  // POLL_MS after the previous one settles, and a refresh still running when
+  // the visible set changes drops its result (see startPollLoop).
+  useEffect(
+    () =>
+      startPollLoop(async (isCurrent) => {
+        try {
+          const { data, error } = await fetchVisible(state.visible, dataRef.current);
+          if (!isCurrent()) return;
+          dataRef.current = data;
+          setData(data);
+          setError(error);
+          setLastRefresh(Date.now());
+        } catch (e) {
+          if (isCurrent()) setError(e instanceof Error ? e.message : "Failed to fetch data");
+        }
+      }, POLL_MS),
+    [fetchVisible, state.visible],
+  );
 
   const model = useMemo(
     () =>
