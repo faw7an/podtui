@@ -1,11 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SANDBOX_ROOT="/tmp/podtui-dev/root"
-SANDBOX_RUNROOT="/tmp/podtui-dev/run"
-SOCKET_PATH="/tmp/podtui-dev/podman.sock"
-PID_FILE="/tmp/podtui-dev/podman.pid"
+SANDBOX_DIR="/tmp/podtui-dev"
+SANDBOX_ROOT="$SANDBOX_DIR/root"
+SANDBOX_RUNROOT="$SANDBOX_DIR/run"
+SANDBOX_TMPDIR="$SANDBOX_DIR/tmp"
+SOCKET_PATH="$SANDBOX_DIR/podman.sock"
+PID_FILE="$SANDBOX_DIR/podman.pid"
+# The storage flags `up` used, so `down` can address the same database even
+# when the service is gone. Podman records the tmpdir in its database and
+# validates it, so `down` must not guess.
+FLAGS_FILE="$SANDBOX_DIR/storage-flags"
 LABEL="podtui.test=1"
+
+# Isolation: storage, run state, libpod tmp state and events all live under
+# $SANDBOX_DIR. Without --tmpdir and a file events backend, the sandbox shared
+# $XDG_RUNTIME_DIR/libpod/tmp and the journald event stream with the user's
+# real Podman, so sandbox activity showed up in their `podman events`.
+STORAGE_FLAGS=(
+  --root "$SANDBOX_ROOT"
+  --runroot "$SANDBOX_RUNROOT"
+  --tmpdir "$SANDBOX_TMPDIR"
+  --events-backend file
+)
+# The file events backend cannot follow logs written by the journald log
+# driver (Podman: "using --follow with the journald --log-driver but without
+# the journald --events-backend (file) is not supported"), so sandbox
+# containers log with k8s-file. That also keeps their output out of the
+# user's journal. Applied to the service only, via a sandbox containers.conf.
+CONF_FILE="$SANDBOX_DIR/containers.conf"
+
+# What sandboxes created before 2026-10-08 used.
+LEGACY_STORAGE_FLAGS=(--root "$SANDBOX_ROOT" --runroot "$SANDBOX_RUNROOT")
 
 export PODTUI_SOCKET="$SOCKET_PATH"
 
@@ -37,13 +63,13 @@ up() {
   fi
 
   echo "Creating sandbox directories..."
-  mkdir -p "$SANDBOX_ROOT" "$SANDBOX_RUNROOT"
+  mkdir -p "$SANDBOX_ROOT" "$SANDBOX_RUNROOT" "$SANDBOX_TMPDIR"
+  printf '%s\n' "${STORAGE_FLAGS[@]}" > "$FLAGS_FILE"
+  printf '[containers]\nlog_driver = "k8s-file"\n' > "$CONF_FILE"
 
   echo "Starting Podman system service..."
-  setsid podman \
-    --root "$SANDBOX_ROOT" \
-    --runroot "$SANDBOX_RUNROOT" \
-    system service --time=0 "unix://$SOCKET_PATH" >/tmp/podtui-dev/podman.log 2>&1 &
+  CONTAINERS_CONF_OVERRIDE="$CONF_FILE" setsid podman "${STORAGE_FLAGS[@]}" \
+    system service --time=0 "unix://$SOCKET_PATH" >"$SANDBOX_DIR/podman.log" 2>&1 &
 
   PID=$!
   echo "$PID" > "$PID_FILE"
@@ -73,6 +99,24 @@ up() {
 }
 
 down() {
+  # 1. Remove every pod and container. Killing only the API service leaves
+  #    them running under conmon (observed: all seeded containers survived).
+  #    Prefer the live API; without it, use the flags the sandbox was made with.
+  if podman --url "unix://$SOCKET_PATH" version &>/dev/null; then
+    echo "Removing sandbox pods and containers..."
+    podman --url "unix://$SOCKET_PATH" pod rm -a -f -t 0 >/dev/null 2>&1 || true
+    podman --url "unix://$SOCKET_PATH" rm -a -f -t 0 >/dev/null 2>&1 || true
+  elif [[ -d "$SANDBOX_ROOT" ]]; then
+    local flags=("${LEGACY_STORAGE_FLAGS[@]}")
+    if [[ -f "$FLAGS_FILE" ]]; then
+      mapfile -t flags < "$FLAGS_FILE"
+    fi
+    echo "Service not responding; removing containers directly..."
+    podman "${flags[@]}" pod rm -a -f -t 0 >/dev/null 2>&1 || true
+    podman "${flags[@]}" rm -a -f -t 0 >/dev/null 2>&1 || true
+  fi
+
+  # 2. Stop the API service.
   if [[ -f "$PID_FILE" ]]; then
     PID=$(cat "$PID_FILE")
     if kill -0 "$PID" 2>/dev/null; then
@@ -80,11 +124,18 @@ down() {
       kill "$PID"
       wait "$PID" 2>/dev/null || true
     fi
-    rm -f "$PID_FILE"
   fi
 
-  echo "Removing sandbox directory..."
-  rm -rf /tmp/podtui-dev
+  # 3. Delete the directory inside the user namespace: rootless storage holds
+  #    files owned by sub-UIDs that a plain `rm -rf` cannot remove
+  #    (observed: "Permission denied" on overlay layers).
+  if [[ -d "$SANDBOX_DIR" ]]; then
+    echo "Removing sandbox directory..."
+    if ! podman unshare rm -rf "$SANDBOX_DIR"; then
+      echo "ERROR: could not remove $SANDBOX_DIR" >&2
+      exit 1
+    fi
+  fi
 
   echo "Sandbox stopped and cleaned up"
 }

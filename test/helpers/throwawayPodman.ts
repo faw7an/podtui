@@ -71,9 +71,15 @@ export async function startThrowawayPodman(): Promise<ThrowawayPodman> {
     "--events-backend", "file",
   ];
 
+  // The file events backend cannot follow journald logs ("using --follow with
+  // the journald --log-driver but without the journald --events-backend
+  // (file) is not supported"), so containers here log with k8s-file.
+  const confFile = `${dir}/containers.conf`;
+  await Bun.write(confFile, '[containers]\nlog_driver = "k8s-file"\n');
+
   const service = Bun.spawn(
     ["podman", ...storageFlags, "system", "service", "--time=0", `unix://${socket}`],
-    { stdout: "ignore", stderr: "ignore" },
+    { stdout: "ignore", stderr: "ignore", env: { ...process.env, CONTAINERS_CONF_OVERRIDE: confFile } },
   );
 
   const deadline = Date.now() + 15_000;
