@@ -1,0 +1,71 @@
+# CI (ROADMAP P8-T7): every push to main and every pull request.
+#
+#   check  typecheck + lint + unit tests (`bun run check`). Integration tests
+#          need a Podman sandbox and stay manual (`PODTUI_INTEGRATION=1`).
+#   build  the exact release build (scripts/build-release.sh) on native x64
+#          and arm64 runners, so each binary is smoke-tested on its own
+#          architecture, including in a clean container with no Bun.
+#
+# Bun comes from package.json "packageManager" (setup-bun reads it; bun.lock
+# is lockfileVersion 2, which older Bun cannot parse). Actions are pinned to
+# full commit SHAs.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Typecheck, lint, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+
+  build:
+    name: Build and smoke-test (linux-${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: Build, smoke-test and package
+        run: scripts/build-release.sh "$ARCH"
+        env:
+          ARCH: ${{ matrix.arch }}
+          SMOKE_CONTAINER: "1"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: podtui-linux-${{ matrix.arch }}-${{ github.sha }}
+          path: dist/release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
