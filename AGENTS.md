@@ -53,7 +53,7 @@ This project talks to a real Podman daemon and uses fast-moving libraries. Your 
 
 The app has destructive actions (remove, prune). A bug during development can destroy the human's real containers.
 
-- **During development and tests, only ever connect to the sandbox Podman**, never the human's real one. Start it with `scripts/dev-sandbox.sh` (isolated `--root`/`--runroot` under `/tmp/podtui-dev`). The app reads the socket from `--socket <path>` or `PODTUI_SOCKET`; dev scripts must set this.
+- **During development and tests, only ever connect to the sandbox Podman**, never the human's real one. Start it with `scripts/dev-sandbox.sh` (isolated `--root`/`--runroot`/`--tmpdir` and a file events backend, all under `/tmp/podtui-dev`). Tests that run real prunes/removals use their own throwaway service under `/tmp/podtui-test/` (`test/helpers/throwawayPodman.ts`). The app reads the socket from `--socket <path>` or `PODTUI_SOCKET`; dev scripts must set this.
 - Automated tests must **never** call prune/remove against the default socket. Add a guard: if the socket path is not under `/tmp/podtui-dev` or `/tmp/podtui-test`, destructive calls in tests throw.
 - Every destructive action in the UI requires a confirmation dialog that names exactly what will be removed (count and names).
 - Do not run `podman system reset`, `podman system prune --all`, or `rm -rf` outside `/tmp/podtui-*` for any reason.
@@ -70,7 +70,7 @@ The app has destructive actions (remove, prune). A bug during development can de
 
 | Command | Purpose |
 |---|---|
-| `bun install` | install deps |
+| `bun install` | install deps (needs the Bun pinned in `package.json` `packageManager`, currently 1.4.2: `bun.lock` is lockfileVersion 2 and Bun 1.3.x cannot read it) |
 | `bun run dev` | run the TUI from source against the sandbox socket |
 | `bun run check` | typecheck + lint + unit tests |
 | `bun test` | tests only |

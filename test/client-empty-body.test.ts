@@ -27,7 +27,10 @@ async function fixedSocket(
   status: number,
   body: string
 ): Promise<{ path: string; stop: () => void }> {
-  const path = `/tmp/${name}.sock`;
+  // Under /tmp/podtui-test with a per-process name, and unlinked on stop:
+  // `server.stop()` alone left `/tmp/<name>.sock` behind after every run.
+  fs.mkdirSync("/tmp/podtui-test", { recursive: true });
+  const path = `/tmp/podtui-test/${name}-${process.pid}.sock`;
   try {
     fs.unlinkSync(path);
   } catch {
@@ -48,7 +51,17 @@ async function fixedSocket(
       },
     },
   });
-  return { path, stop: () => server.stop(true) };
+  return {
+    path,
+    stop: () => {
+      server.stop(true);
+      try {
+        fs.unlinkSync(path);
+      } catch {
+        // already gone
+      }
+    },
+  };
 }
 
 describe("request: a JSON-expecting call must not invent {}", () => {
