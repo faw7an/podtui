@@ -11,7 +11,7 @@
  */
 
 export interface CliArgs {
-  /** Explicit `--socket` value, if given. Otherwise `discoverSocket()` decides. */
+  /** Explicit `--socket` value, if given. Otherwise `resolveSocket()` decides. */
   socket?: string;
   help: boolean;
 }
@@ -24,10 +24,13 @@ Usage:
   podtui [--socket <path>] [--help]
 
 Options:
-  --socket <path>  Podman socket to connect to.
-                   Falls back to PODTUI_SOCKET, then the standard
-                   rootless ($XDG_RUNTIME_DIR/podman/podman.sock)
-                   and rootful (/run/podman/podman.sock) locations.
+  --socket <path>  Podman socket to use (a path or a unix:// URI).
+                   Without it podtui uses PODTUI_SOCKET, else the first
+                   working Podman socket among: CONTAINER_HOST,
+                   DOCKER_HOST (podman-docker sets it), the rootless
+                   ($XDG_RUNTIME_DIR/podman/podman.sock) and rootful
+                   (/run/podman/podman.sock) sockets, and podman-docker's
+                   docker.sock links. A Docker daemon is never used.
   --help, -h       Print this message and exit.
 `;
 

@@ -28,6 +28,7 @@ import type {
   ContainerStatsUI,
 } from "../api/types.ts";
 import type { VoidResult } from "../api/client.ts";
+import { probeSocket, resolveSocket } from "../api/socket.ts";
 import type {
   ContainerActionResult,
   ContainerEngine,
@@ -227,13 +228,11 @@ export function actionResult(result: VoidResult): ContainerActionResult {
 export function createPodmanEngine(): ContainerEngine {
   return {
     async findSocket(cliSocket?: string) {
-      const { discoverSocket } = await import("../api/socket.ts");
-      return discoverSocket(cliSocket);
+      return resolveSocket(cliSocket);
     },
 
     async ping(socketPath: string) {
-      const { pingSocket } = await import("../api/socket.ts");
-      return pingSocket(socketPath);
+      return (await probeSocket(socketPath)) === "podman";
     },
 
     async getVersion(socketPath: string) {

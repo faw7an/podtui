@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeAll } from "bun:test";
 import { createPodmanEngine } from "../src/engine/podman.ts";
-import { findAndPingSocket } from "../src/api/socket.ts";
+import { resolveSocket } from "../src/api/socket.ts";
 
 /**
  * R-05: log streams must be abortable.
@@ -44,7 +44,7 @@ describe("R-05: abortable log streams", () => {
       return;
     }
     assertSandboxSocket(SOCKET_PATH);
-    const result = await findAndPingSocket(SOCKET_PATH);
+    const result = await resolveSocket(SOCKET_PATH);
     if (result.kind === "unreachable") throw new Error(`Sandbox not reachable: ${result.message}`);
   });
 

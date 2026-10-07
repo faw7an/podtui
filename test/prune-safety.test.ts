@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeAll } from "bun:test";
 import { createPodmanEngine } from "../src/engine/podman.ts";
-import { findAndPingSocket } from "../src/api/socket.ts";
+import { resolveSocket } from "../src/api/socket.ts";
 import { assertSandboxSocket } from "./helpers/sandboxGuard.ts";
 
 /**
@@ -42,7 +42,7 @@ async function snapshot() {
 describe.skipIf(!enabled)("R-04: prune previews are read-only", () => {
   beforeAll(async () => {
     assertSandboxSocket(SOCKET_PATH);
-    const result = await findAndPingSocket(SOCKET_PATH);
+    const result = await resolveSocket(SOCKET_PATH);
     if (result.kind === "unreachable") {
       throw new Error(`Sandbox not reachable: ${result.message}`);
     }

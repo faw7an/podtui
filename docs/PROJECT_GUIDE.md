@@ -80,6 +80,8 @@ The Podman service exposes a **libpod-native REST API** and a Docker-compatible 
 ### Socket locations
 - ✅ Rootless: `$XDG_RUNTIME_DIR/podman/podman.sock`
 - ✅ Rootful: `/run/podman/podman.sock`
+- ✅ podman-docker (verified from the package file list and the Podman repo): installs `/usr/bin/docker` (`exec podman "$@"`), tmpfiles links `%t/docker.sock -> %t/podman/podman.sock` for system and user, and `/etc/profile.d/podman-docker.sh`, which exports `DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock` (rootful socket for root). The `docker` alias does not matter to podtui (it never shells out to `docker`); the socket links and `DOCKER_HOST` do, and discovery covers them.
+- ✅ Telling Podman from Docker: `GET /libpod/_ping` is 200 on Podman and 404 on Docker, while `GET /_ping` is 200 on both (verified against Podman 5.8.4 and Docker 29.7.2).
 - ✅ Enable rootless socket: `systemctl --user enable --now podman.socket`
 - ✅ Run a throwaway service without systemd: `podman system service --time=0 unix:///path/to.sock`
 
