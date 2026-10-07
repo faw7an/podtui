@@ -30,11 +30,20 @@ export interface PrunePreview {
   networks?: { count: number; names: string[] };
 }
 
+/** What a prune actually did. `count`/`names` cover successful removals only. */
+export interface PruneOutcome {
+  count: number;
+  names: string[];
+  reclaimedBytes?: number;
+  /** Entries the server tried to remove and could not (partial failure). */
+  failed?: { name: string; error: string }[];
+}
+
 export interface PruneResult {
-  containers?: { count: number; names: string[]; reclaimedBytes?: number };
-  images?: { count: number; names: string[]; reclaimedBytes?: number };
-  volumes?: { count: number; names: string[]; reclaimedBytes?: number };
-  networks?: { count: number; names: string[]; reclaimedBytes?: number };
+  containers?: PruneOutcome;
+  images?: PruneOutcome;
+  volumes?: PruneOutcome;
+  networks?: PruneOutcome;
 }
 
 export interface ContainerActionResult {
