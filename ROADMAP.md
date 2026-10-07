@@ -256,6 +256,7 @@ Phase overview
 ## Phase 9 — Post-v1 ideas (do not start without a new PRD section)
 
 - Docker adapter implementing `ContainerEngine`.
+- macOS support: discover the `podman machine` API socket (and podman-mac-helper's `/var/run/docker.sock`), darwin release binary. ⚠️ VERIFY on a real Mac first, see UNKNOWNS #18. Development and the sandbox stay Linux-only.
 - Omarchy plugin / launcher binding (e.g. a menu entry and keybinding) — ⚠️ research Omarchy's extension points first.
 - Registry search & image pull; run-container form; `podman-compose` project grouping; healthcheck history; image vulnerability scan summary; export logs to file; multi-select for bulk delete; remote machines.
 
