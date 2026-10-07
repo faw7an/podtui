@@ -127,7 +127,10 @@ describe("request: HTTP error mapping", () => {
   const cases: [number, EngineError["kind"]][] = [
     [404, "notFound"],
     [409, "conflict"],
-    [500, "unreachable"],
+    // Was "unreachable". Wrong: Podman answers 500 for ordinary refusals
+    // (e.g. removing a running container) while perfectly reachable — see
+    // test/client-errors.test.ts and DECISIONS 2026-10-08.
+    [500, "unknown"],
     [502, "unreachable"],
     [503, "unreachable"],
     [504, "unreachable"],

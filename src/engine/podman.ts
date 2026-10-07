@@ -27,7 +27,9 @@ import type {
   Info,
   ContainerStatsUI,
 } from "../api/types.ts";
+import type { VoidResult } from "../api/client.ts";
 import type {
+  ContainerActionResult,
   ContainerEngine,
   PrunePreview,
 } from "./ContainerEngine.ts";
@@ -211,6 +213,17 @@ async function previewNetworks(socketPath: string): Promise<PrunePreview> {
   return { networks: { count: dangling.length, names: dangling.map((n) => n.name) } };
 }
 
+/**
+ * Podman answers 304 when an action is a no-op (start a running container,
+ * start a running pod, stop a stopped pod — verified live). That is success,
+ * but the UI should be able to say nothing changed.
+ */
+export function actionResult(result: VoidResult): ContainerActionResult {
+  return result.changed
+    ? { success: true }
+    : { success: true, message: "Already in that state; nothing changed" };
+}
+
 export function createPodmanEngine(): ContainerEngine {
   return {
     async findSocket(cliSocket?: string) {
@@ -296,28 +309,23 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async startContainer(socketPath: string, id: string) {
-      await postVoid(socketPath, `/containers/${id}/start`, {});
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/containers/${id}/start`, {}));
     },
 
     async stopContainer(socketPath: string, id: string, timeout = 30) {
-      await postVoid(socketPath, `/containers/${id}/stop`, {}, { query: { t: timeout.toString() }, timeout: timeout * 1000 + 5000 });
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/containers/${id}/stop`, {}, { query: { t: timeout.toString() }, timeout: timeout * 1000 + 5000 }));
     },
 
     async restartContainer(socketPath: string, id: string, timeout = 10) {
-      await postVoid(socketPath, `/containers/${id}/restart`, {}, { query: { t: timeout.toString() } });
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/containers/${id}/restart`, {}, { query: { t: timeout.toString() } }));
     },
 
     async killContainer(socketPath: string, id: string, signal = "SIGKILL") {
-      await postVoid(socketPath, `/containers/${id}/kill`, {}, { query: { signal } });
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/containers/${id}/kill`, {}, { query: { signal } }));
     },
 
     async removeContainer(socketPath: string, id: string, force = false) {
-      await delVoid(socketPath, `/containers/${id}`, { query: { force: force.toString() } });
-      return { success: true };
+      return actionResult(await delVoid(socketPath, `/containers/${id}`, { query: { force: force.toString() } }));
     },
 
     async pruneContainers(socketPath: string, dryRun = false) {
@@ -339,28 +347,23 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async startPod(socketPath: string, id: string) {
-      await postVoid(socketPath, `/pods/${id}/start`, {});
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/pods/${id}/start`, {}));
     },
 
     async stopPod(socketPath: string, id: string) {
-      await postVoid(socketPath, `/pods/${id}/stop`, {});
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/pods/${id}/stop`, {}));
     },
 
     async restartPod(socketPath: string, id: string) {
-      await postVoid(socketPath, `/pods/${id}/restart`, {});
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/pods/${id}/restart`, {}));
     },
 
     async killPod(socketPath: string, id: string) {
-      await postVoid(socketPath, `/pods/${id}/kill`, {});
-      return { success: true };
+      return actionResult(await postVoid(socketPath, `/pods/${id}/kill`, {}));
     },
 
     async removePod(socketPath: string, id: string, force = false) {
-      await delVoid(socketPath, `/pods/${id}`, { query: { force: force.toString() } });
-      return { success: true };
+      return actionResult(await delVoid(socketPath, `/pods/${id}`, { query: { force: force.toString() } }));
     },
 
     // Images
@@ -377,8 +380,7 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeImage(socketPath: string, id: string, force = false) {
-      await delVoid(socketPath, `/images/${id}`, { query: { force: force.toString() } });
-      return { success: true };
+      return actionResult(await delVoid(socketPath, `/images/${id}`, { query: { force: force.toString() } }));
     },
 
     async pruneImages(socketPath: string, dryRun = false) {
@@ -396,8 +398,7 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeVolume(socketPath: string, name: string) {
-      await delVoid(socketPath, `/volumes/${name}`);
-      return { success: true };
+      return actionResult(await delVoid(socketPath, `/volumes/${name}`));
     },
 
     async pruneVolumes(socketPath: string, dryRun = false) {
@@ -415,8 +416,7 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeNetwork(socketPath: string, id: string) {
-      await delVoid(socketPath, `/networks/${id}`);
-      return { success: true };
+      return actionResult(await delVoid(socketPath, `/networks/${id}`));
     },
 
     async pruneNetworks(socketPath: string, dryRun = false) {
