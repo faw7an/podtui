@@ -180,6 +180,9 @@ async function launch(name: string): Promise<Harness> {
     stdin: stdin as unknown as NodeJS.ReadStream,
     patchConsole: false,
     exitOnCtrlC: false,
+    // The fake stdout is a TTY; without this Ink's CI detection (CI=true on
+    // GitHub Actions) switches to non-interactive and writes no frames.
+    interactive: true,
   });
   await waitFor(() => stdout.frame().includes("Containers"), "app frame");
   return {

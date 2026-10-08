@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { render } from "ink";
 import { Screen } from "../src/ui/components/Screen.tsx";
 import { createPodmanEngine } from "../src/engine/podman.ts";
-import { PANEL_IDS } from "../src/ui/layout/types.ts";
+import { PANEL_IDS, type PanelId } from "../src/ui/layout/types.ts";
 import { defaultTheme } from "../src/theme/theme.ts";
 import { buildFrameModel, type ResourceData } from "../src/ui/view/build.ts";
 
@@ -71,6 +71,12 @@ async function fetchData(): Promise<ResourceData> {
 }
 
 const data = await fetchData();
+// The Config tab shows the inspect payload of the selected container, exactly
+// as App fetches it. With no stored selection the first row is selected.
+const firstContainer = data.containers[0]?.Id;
+const inspect = firstContainer
+  ? await createPodmanEngine().inspectContainer(SOCKET, firstContainer)
+  : null;
 const counts = data.containers.length + data.pods.length + data.images.length +
   data.volumes.length + data.networks.length;
 console.log(`sandbox: ${counts} resources`);
@@ -82,10 +88,15 @@ for (const [cols, rows] of SIZES) {
   const stdout = new FakeStdout(cols, rows);
   const model = buildFrameModel({
     data,
-    selected: Object.fromEntries(PANEL_IDS.map((id) => [id, 0])) as never,
+    // Selection is stored by item ID (R-12); "" = nothing chosen yet, which
+    // resolves to the first row. This used to pass row index 0 behind an
+    // `as never` cast, which no longer matched any item.
+    selected: Object.fromEntries(PANEL_IDS.map((id) => [id, ""])) as Record<PanelId, string>,
     focus: "containers",
     now: Date.now(),
     clock: new Date().toLocaleTimeString(),
+    activeTab: "config",
+    inspect,
   });
 
   const instance = render(
@@ -97,7 +108,7 @@ for (const [cols, rows] of SIZES) {
       detailFullscreen: false,
       color: true,
     }),
-    { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
+    { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false, interactive: true },
   );
 
   await sleep(600);

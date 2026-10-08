@@ -8,7 +8,7 @@
     "dev": "PODTUI_SOCKET=/tmp/podtui-dev/podman.sock bun run src/index.tsx",
     "check": "scripts/check.sh",
     "test": "scripts/check.sh test",
-    "build": "bun build --compile src/index.tsx --outfile dist/podtui",
+    "build": "bun build --compile --no-compile-autoload-dotenv --no-compile-autoload-bunfig src/index.tsx --outfile dist/podtui",
     "lint": "bunx eslint . --ext .ts,.tsx"
   },
   "dependencies": {

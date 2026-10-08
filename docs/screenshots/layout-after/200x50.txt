@@ -1,26 +1,26 @@
-▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets                                                                                                                12:06:10 AM
-╭─[1] Pods 1                                          ╮╭─[2] Containers 6                                    ╮╭─web · running                                                                          ╮
+▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets                                                                                                                 3:07:45 AM
+╭─[1] Pods 1                                          ╮╭─[2] Containers 7                                    ╮╭─web · running                                                                          ╮
 │  NAME                                  STATUS    CNT││  NAME                      STATUS    IMAGE      AGE ││Logs Stats Env Config Top                                                               │
-│▸ web-pod                               ● running 3  ││▸ web                       ● running nginx:alp… 5h  ││name       web                                                                          │
-│                                                     ││  chatty                    ● running alpine:la… 5h  ││state      ● running                                                                    │
-│                                                     ││  tty-box                   ● running alpine:la… 5h  ││image      nginx:alpine                                                                 │
-│                                                     ││  bd6cc3f9035d-infra        ● running            5h  ││age        5h                                                                           │
-│                                                     ││  web-pod-frontend          ● running nginx:alp… 5h  ││                                                                                        │
-│                                                     ││  web-pod-backend           ● running alpine:la… 5h  ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-└─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
-╭─[3] Images 2                                        ╮│                                                     ││                                                                                        │
-│  NAME                                   SIZE    AGE ││                                                     ││                                                                                        │
-│▸ nginx:alpine                           64.3MB  9d  ││                                                     ││                                                                                        │
-│  alpine:latest                          8.7MB   15d │└─────────────────────────────────────────────────────┘│                                                                                        │
-│                                                     │╭─[4] Volumes 1                                       ╮│                                                                                        │
-│                                                     ││  NAME                         STATUS   MOUNTPOINT   ││                                                                                        │
+│▸ web-pod                               ● running 3  ││▸ web                       ● running nginx:alp… 3m  ││# State                                                                                 │
+│                                                     ││  chatty                    ● running alpine:la… 3m  ││Name         web                                                                        │
+│                                                     ││  failing                   ✖ exited  alpine:la… 3m  ││Status       running                                                                    │
+│                                                     ││  tty-box                   ● running alpine:la… 3m  ││Running      true                                                                       │
+│                                                     ││  8983d20a0f1a-infra        ● running            3m  ││ExitCode     0                                                                          │
+│                                                     ││  web-pod-frontend          ● running nginx:alp… 3m  ││StartedAt    2026-10-08T03:04:39.174299269+03:00                                        │
+│                                                     ││  web-pod-backend           ● running alpine:la… 3m  ││# Config                                                                                │
+│                                                     ││                                                     ││Image        docker.io/library/nginx:alpine                                             │
+│                                                     ││                                                     ││Cmd          nginx -g daemon off;                                                       │
+│                                                     ││                                                     ││Entrypoint   /docker-entrypoint.sh                                                      │
+│                                                     ││                                                     ││WorkingDir   /                                                                          │
+│                                                     ││                                                     ││User                                                                                    │
+│                                                     ││                                                     ││# Host                                                                                  │
+└─────────────────────────────────────────────────────┘│                                                     ││Id           45fad0c36b1b                                                               │
+╭─[3] Images 2                                        ╮│                                                     ││Pod          (none)                                                                     │
+│  NAME                                   SIZE    AGE ││                                                     ││Created      2026-10-08T03:04:39.0926767+03:00                                          │
+│▸ nginx:alpine                           64.3MB  15d ││                                                     ││# Network                                                                               │
+│  alpine:latest                          8.7MB   20d │└─────────────────────────────────────────────────────┘│IPAddress    (none)                                                                     │
+│                                                     │╭─[4] Volumes 1                                       ╮│Gateway      (none)                                                                     │
+│                                                     ││  NAME                         STATUS   MOUNTPOINT   ││Ports        80/tcp                                                                     │
 │                                                     ││▸ test-volume                  · unused /tmp/podtui-…││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
@@ -31,10 +31,10 @@
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 └─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
-╭─[5] Networks 1                                      ╮│                                                     ││                                                                                        │
+╭─[5] Networks 2                                      ╮│                                                     ││                                                                                        │
 │  NAME                                       STATUS  │└─────────────────────────────────────────────────────┘│                                                                                        │
-│▸ podman                                     bridge  │╭─[6] Quadlets 0                                      ╮│                                                                                        │
-│                                                     ││  NAME                                      STATUS   ││                                                                                        │
+│▸ test-network                               bridge  │╭─[6] Quadlets 0                                      ╮│                                                                                        │
+│  podman                                     bridge  ││  NAME                                      STATUS   ││                                                                                        │
 │                                                     ││  not implemented yet (phase 6)                      ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │

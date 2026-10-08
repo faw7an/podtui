@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { USAGE, parseArgs } from "../src/cli.ts";
+import { USAGE, parseArgs, type CliArgs } from "../src/cli.ts";
 
 /**
  * Socket discovery wiring: the entry point parses `--socket` and hands the
@@ -13,7 +13,7 @@ import { USAGE, parseArgs } from "../src/cli.ts";
  * P8-T1.
  */
 
-function ok(argv: string[]): { socket?: string; help: boolean } {
+function ok(argv: string[]): CliArgs {
   const result = parseArgs(argv);
   if (!result.ok) throw new Error(`expected ok, got: ${result.error}`);
   return result.args;
@@ -27,13 +27,14 @@ function err(argv: string[]): string {
 
 describe("parseArgs", () => {
   test("no flags is valid and selects nothing", () => {
-    expect(ok([])).toEqual({ help: false });
+    expect(ok([])).toEqual({ help: false, version: false });
   });
 
   test("--socket takes the next token", () => {
     expect(ok(["--socket", "/run/podman/podman.sock"])).toEqual({
       socket: "/run/podman/podman.sock",
       help: false,
+      version: false,
     });
   });
 
@@ -41,12 +42,18 @@ describe("parseArgs", () => {
     expect(ok(["--socket=/tmp/custom.sock"])).toEqual({
       socket: "/tmp/custom.sock",
       help: false,
+      version: false,
     });
   });
 
   test("--help sets the flag and ignores nothing else", () => {
-    expect(ok(["--help"])).toEqual({ help: true });
-    expect(ok(["-h"])).toEqual({ help: true });
+    expect(ok(["--help"])).toEqual({ help: true, version: false });
+    expect(ok(["-h"])).toEqual({ help: true, version: false });
+  });
+
+  test("--version and -v set the version flag", () => {
+    expect(ok(["--version"])).toEqual({ help: false, version: true });
+    expect(ok(["-v"])).toEqual({ help: false, version: true });
   });
 
   test("a missing --socket value is an error, not an empty string", () => {
@@ -72,6 +79,7 @@ describe("USAGE", () => {
   test("documents the flags this parser accepts and the fallback order", () => {
     expect(USAGE).toContain("--socket");
     expect(USAGE).toContain("--help");
+    expect(USAGE).toContain("--version");
     expect(USAGE).toContain("PODTUI_SOCKET");
   });
 });

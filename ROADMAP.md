@@ -238,7 +238,7 @@ Phase overview
 - [ ] **P8-T4** Config file (optional): `~/.config/podtui/config.toml|json` for refresh interval, log buffer size, log-level rules, default tab. ⚠️ choose a format, record in DECISIONS.md.
 - [ ] **P8-T5** Performance pass: profile with 200 containers (script to create them in the sandbox) and the log flood test; fix hot spots.
 - [ ] **P8-T6** Accessibility/readability: never rely on color alone (state words accompany colors).
-- [ ] **P8-T7** CI (GitHub Actions): install Bun, `bun run check`, build binary, upload artifact. Integration tests optional/manual.
+- [x] **P8-T7** CI (GitHub Actions): install Bun, `bun run check`, build binary, upload artifact. Integration tests optional/manual.
 - [ ] **P8-T8** Packaging: GitHub Release binary; `PKGBUILD` for AUR (`podtui-bin`) ⚠️ verify AUR packaging guidelines; checksums.
 - [ ] **P8-T9** Docs: README (what, install, usage, key table, screenshots/GIF), CONTRIBUTING.md (sandbox workflow, AGENTS.md note for AI-assisted PRs), issue/PR templates, CODE_OF_CONDUCT, SECURITY.md.
 - [ ] **P8-T10** Name check: search GitHub/AUR for collisions; finalize name; rename across repo.

@@ -1,10 +1,10 @@
 /**
  * CLI flag parsing for the entry point (`src/index.tsx`).
  *
- * This is the `--socket` half of P8-T1 and nothing more: `--version` would need
- * to read package.json at runtime (absent next to a compiled binary) and
- * `--debug` needs log-file plumbing that does not exist yet, so both stay
- * future work rather than half-implemented flags.
+ * `--socket`, `--version` and `--help` from P8-T1. `--version` reads the version
+ * bundled into the binary at build time (src/version.ts). `--debug` needs
+ * log-file plumbing that does not exist yet, so it stays future work rather
+ * than a half-implemented flag.
  *
  * `parseArgs` takes an already-sliced argv — no node/bun prefix, no script
  * name — so it is a pure function and unit-testable without spawning anything.
@@ -14,6 +14,7 @@ export interface CliArgs {
   /** Explicit `--socket` value, if given. Otherwise `resolveSocket()` decides. */
   socket?: string;
   help: boolean;
+  version: boolean;
 }
 
 export type ParseResult = { ok: true; args: CliArgs } | { ok: false; error: string };
@@ -21,7 +22,8 @@ export type ParseResult = { ok: true; args: CliArgs } | { ok: false; error: stri
 export const USAGE = `podtui - terminal UI for Podman
 
 Usage:
-  podtui [--socket <path>] [--help]
+  podtui [--socket <path>]
+  podtui --version | --help
 
 Options:
   --socket <path>  Podman socket to use (a path or a unix:// URI).
@@ -31,17 +33,23 @@ Options:
                    ($XDG_RUNTIME_DIR/podman/podman.sock) and rootful
                    (/run/podman/podman.sock) sockets, and podman-docker's
                    docker.sock links. A Docker daemon is never used.
+  --version, -v    Print the version and exit.
   --help, -h       Print this message and exit.
 `;
 
 export function parseArgs(argv: string[]): ParseResult {
-  const args: CliArgs = { help: false };
+  const args: CliArgs = { help: false, version: false };
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i]!;
 
     if (token === "--help" || token === "-h") {
       args.help = true;
+      continue;
+    }
+
+    if (token === "--version" || token === "-v") {
+      args.version = true;
       continue;
     }
 

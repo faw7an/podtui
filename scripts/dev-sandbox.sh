@@ -75,7 +75,7 @@ up() {
   echo "$PID" > "$PID_FILE"
 
   # Wait for socket to be ready
-  for i in {1..50}; do
+  for _ in {1..50}; do
     if podman --url "unix://$SOCKET_PATH" version &>/dev/null; then
       break
     fi
