@@ -23,7 +23,10 @@ const BAD_SOCKET = "/nonexistent/podman.sock";
 
 /** A unix socket server that accepts connections and then never replies. */
 async function hangingSocket(name: string): Promise<{ path: string; stop: () => void }> {
-  const path = `/tmp/${name}.sock`;
+  // Under /tmp/podtui-test with a per-process name, and unlinked on stop:
+  // `server.stop()` alone left `/tmp/<name>.sock` behind after every run.
+  fs.mkdirSync("/tmp/podtui-test", { recursive: true });
+  const path = `/tmp/podtui-test/${name}-${process.pid}.sock`;
   try {
     fs.unlinkSync(path);
   } catch {
@@ -37,7 +40,17 @@ async function hangingSocket(name: string): Promise<{ path: string; stop: () => 
       },
     },
   });
-  return { path, stop: () => server.stop(true) };
+  return {
+    path,
+    stop: () => {
+      server.stop(true);
+      try {
+        fs.unlinkSync(path);
+      } catch {
+        // already gone
+      }
+    },
+  };
 }
 
 describe("request: unreachable socket", () => {
@@ -127,7 +140,10 @@ describe("request: HTTP error mapping", () => {
   const cases: [number, EngineError["kind"]][] = [
     [404, "notFound"],
     [409, "conflict"],
-    [500, "unreachable"],
+    // Was "unreachable". Wrong: Podman answers 500 for ordinary refusals
+    // (e.g. removing a running container) while perfectly reachable — see
+    // test/client-errors.test.ts and DECISIONS 2026-10-08.
+    [500, "unknown"],
     [502, "unreachable"],
     [503, "unreachable"],
     [504, "unreachable"],

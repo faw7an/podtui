@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.4.2",
   "scripts": {
     "dev": "PODTUI_SOCKET=/tmp/podtui-dev/podman.sock bun run src/index.tsx",
     "check": "scripts/check.sh",

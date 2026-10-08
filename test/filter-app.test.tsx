@@ -120,7 +120,10 @@ async function waitFor(cond: () => boolean, what: string, timeoutMs = 10000): Pr
 
 /** Fake Podman API: every GET answers an empty JSON list. */
 async function fakeApi(name: string): Promise<{ path: string; stop: () => void }> {
-  const path = `/tmp/${name}.sock`;
+  // Under /tmp/podtui-test with a per-process name, and unlinked on stop:
+  // `server.stop()` alone left `/tmp/<name>.sock` behind after every run.
+  fs.mkdirSync("/tmp/podtui-test", { recursive: true });
+  const path = `/tmp/podtui-test/${name}-${process.pid}.sock`;
   try {
     fs.unlinkSync(path);
   } catch {
@@ -138,7 +141,17 @@ async function fakeApi(name: string): Promise<{ path: string; stop: () => void }
       },
     },
   });
-  return { path, stop: () => server.stop(true) };
+  return {
+    path,
+    stop: () => {
+      server.stop(true);
+      try {
+        fs.unlinkSync(path);
+      } catch {
+        // already gone
+      }
+    },
+  };
 }
 
 const realExit = process.exit;

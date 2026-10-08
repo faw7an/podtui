@@ -18,6 +18,14 @@ step() {
   fi
 }
 
+# bun.lock is lockfileVersion 2, written by the Bun pinned in package.json
+# ("packageManager"). Older Bun cannot read it (Bun 1.3.10: "failed to parse
+# lockfile"), so say so up front instead of letting `bun install` fail oddly.
+PINNED_BUN=$(sed -n 's/.*"packageManager": *"bun@\([^"]*\)".*/\1/p' package.json)
+if [ -n "$PINNED_BUN" ] && [ "$(bun --version)" != "$PINNED_BUN" ]; then
+  echo "WARNING: Bun $(bun --version) is running, the project pins Bun $PINNED_BUN (package.json packageManager)." | tee -a "$LOG"
+fi
+
 MODE="${1:-all}"
 if [ "$MODE" = "all" ]; then
   step bunx tsc --noEmit

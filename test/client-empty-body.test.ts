@@ -27,7 +27,10 @@ async function fixedSocket(
   status: number,
   body: string
 ): Promise<{ path: string; stop: () => void }> {
-  const path = `/tmp/${name}.sock`;
+  // Under /tmp/podtui-test with a per-process name, and unlinked on stop:
+  // `server.stop()` alone left `/tmp/<name>.sock` behind after every run.
+  fs.mkdirSync("/tmp/podtui-test", { recursive: true });
+  const path = `/tmp/podtui-test/${name}-${process.pid}.sock`;
   try {
     fs.unlinkSync(path);
   } catch {
@@ -48,7 +51,17 @@ async function fixedSocket(
       },
     },
   });
-  return { path, stop: () => server.stop(true) };
+  return {
+    path,
+    stop: () => {
+      server.stop(true);
+      try {
+        fs.unlinkSync(path);
+      } catch {
+        // already gone
+      }
+    },
+  };
 }
 
 describe("request: a JSON-expecting call must not invent {}", () => {
@@ -87,7 +100,7 @@ describe("void helpers for 204 action endpoints", () => {
   test("postVoid accepts a 204 with no body", async () => {
     const server = await fixedSocket("podtui-audit-start", 204, "");
     try {
-      expect(await postVoid(server.path, "/containers/web/start", {})).toBeUndefined();
+      expect(await postVoid(server.path, "/containers/web/start", {})).toEqual({ changed: true });
     } finally {
       server.stop();
     }
@@ -96,7 +109,7 @@ describe("void helpers for 204 action endpoints", () => {
   test("delVoid accepts a 204 with no body", async () => {
     const server = await fixedSocket("podtui-audit-del-204", 204, "");
     try {
-      expect(await delVoid(server.path, "/containers/web")).toBeUndefined();
+      expect(await delVoid(server.path, "/containers/web")).toEqual({ changed: true });
     } finally {
       server.stop();
     }
@@ -107,7 +120,7 @@ describe("void helpers for 204 action endpoints", () => {
     const report = '[{"Id":"8618f5b269793542b5a37a286e3549d6b2e0e87907ab107fb202","Names":["web"]}]';
     const server = await fixedSocket("podtui-audit-del-200", 200, report);
     try {
-      expect(await delVoid(server.path, "/containers/web", { query: { force: "true" } })).toBeUndefined();
+      expect(await delVoid(server.path, "/containers/web", { query: { force: "true" } })).toEqual({ changed: true });
     } finally {
       server.stop();
     }
@@ -136,7 +149,7 @@ describe("void helpers for 204 action endpoints", () => {
     try {
       // 250ms is plenty for a local socket; the point is that the option is
       // accepted and does not silently fall back to the 10s default.
-      expect(await postVoid(server.path, "/containers/web/start", {}, { timeout: 250 })).toBeUndefined();
+      expect(await postVoid(server.path, "/containers/web/start", {}, { timeout: 250 })).toEqual({ changed: true });
     } finally {
       server.stop();
     }

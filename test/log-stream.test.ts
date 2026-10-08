@@ -1,6 +1,7 @@
 import { test, expect, describe, beforeAll } from "bun:test";
 import { createPodmanEngine } from "../src/engine/podman.ts";
-import { findAndPingSocket } from "../src/api/socket.ts";
+import { resolveSocket } from "../src/api/socket.ts";
+import { assertSandboxSocket } from "./helpers/sandboxGuard.ts";
 
 /**
  * R-05: log streams must be abortable.
@@ -13,11 +14,6 @@ import { findAndPingSocket } from "../src/api/socket.ts";
 const SOCKET_PATH = "/tmp/podtui-dev/podman.sock";
 const engine = createPodmanEngine();
 
-function assertSandboxSocket(socketPath: string): void {
-  if (!socketPath.startsWith("/tmp/podtui-dev/") && !socketPath.startsWith("/tmp/podtui-test/")) {
-    throw new Error(`Refusing to run a destructive integration test against ${socketPath}`);
-  }
-}
 
 async function podman(args: string[]): Promise<string> {
   const proc = Bun.spawn(["podman", "--url", `unix://${SOCKET_PATH}`, ...args], {
@@ -44,7 +40,7 @@ describe("R-05: abortable log streams", () => {
       return;
     }
     assertSandboxSocket(SOCKET_PATH);
-    const result = await findAndPingSocket(SOCKET_PATH);
+    const result = await resolveSocket(SOCKET_PATH);
     if (result.kind === "unreachable") throw new Error(`Sandbox not reachable: ${result.message}`);
   });
 

@@ -23,9 +23,11 @@ describe("mapHttpError", () => {
     expect(err.statusCode).toBe(409);
   });
 
-  test("maps 500 to unreachable", () => {
+  // Was "maps 500 to unreachable". Podman answers 500 for ordinary refusals
+  // while reachable, so the old expectation pinned a misleading message.
+  test("maps 500 to unknown (the daemon answered)", () => {
     const err = mapHttpError(500, "Internal Server Error");
-    expect(err.kind).toBe("unreachable");
+    expect(err.kind).toBe("unknown");
     expect(err.statusCode).toBe(500);
   });
 

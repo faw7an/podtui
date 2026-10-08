@@ -310,7 +310,8 @@ export interface PodInspect {
 export interface ImageListItem {
   Id: string;
   ParentId: string;
-  RepoTags: string[];
+  /** null for an untagged image (test/fixtures/images-list-untagged.json). */
+  RepoTags: string[] | null;
   RepoDigests: string[];
   Created: number;
   Size: number;
@@ -322,7 +323,8 @@ export interface ImageListItem {
   Digest: string;
   History: string[];
   IsManifestList: boolean;
-  Names: string[];
+  /** Absent for an untagged image (test/fixtures/images-list-untagged.json). */
+  Names?: string[];
   Os: string;
 }
 
@@ -502,7 +504,8 @@ export interface Info {
     cgroupManager: string;
     cgroupVersion: string;
     cgroupControllers: string[];
-    cdiSpecDirs: string[];
+    /** Not sent by Podman 5.8.4 (present on 6.1.1). */
+    cdiSpecDirs?: string[];
     conmon: { package: string; path: string; version: string };
     cpus: number;
     cpuUtilization: { userPercent: number; systemPercent: number; idlePercent: number };
@@ -512,7 +515,8 @@ export interface Info {
     kernel: string;
     logDriver: string;
     memFree: number;
-    memAvailable: number;
+    /** Not sent by Podman 5.8.4 (present on 6.1.1). */
+    memAvailable?: number;
     memTotal: number;
     networkBackend: string;
     ociRuntime: { name: string; package: string; path: string; version: string };

@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeAll } from "bun:test";
 import { createPodmanEngine } from "../src/engine/podman.ts";
-import { findAndPingSocket } from "../src/api/socket.ts";
+import { resolveSocket } from "../src/api/socket.ts";
 
 const SOCKET_PATH = "/tmp/podtui-dev/podman.sock";
 const engine = createPodmanEngine();
@@ -11,7 +11,7 @@ describe("P1-T8 Integration Tests (requires sandbox)", () => {
       console.log("Skipping integration tests (set PODTUI_INTEGRATION=1 to run)");
       return;
     }
-    const result = await findAndPingSocket(SOCKET_PATH);
+    const result = await resolveSocket(SOCKET_PATH);
     if (result.kind === "unreachable") {
       throw new Error(`Sandbox not reachable: ${result.message}`);
     }

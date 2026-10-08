@@ -27,13 +27,13 @@ Phase overview
 
 **Goal:** prove the toolchain works end to end before building features.
 
-- [ ] **P0-T1** Initialize repo: `package.json`, `tsconfig.json` (strict), `.gitignore`, MIT `LICENSE`, empty folder structure from PROJECT_GUIDE section 3, copy `AGENTS.md`, `PRD.md`, `ROADMAP.md`, `docs/*`.
-- [ ] **P0-T2** Install Bun-compatible deps: `ink`, `react` (version matching Ink's peerDependencies ⚠️ VERIFY), `typescript`, `@types/react`, `ink-testing-library`. Pin versions. Log them in DECISIONS.md.
-- [ ] **P0-T3** Scripts in `package.json`: `dev`, `check`, `test`, `build` (see AGENTS.md section 5).
-- [ ] **P0-T4** Hello-world Ink app: header, a box, a footer, exits cleanly on `q`.
-- [ ] **P0-T5** Compile it with `bun build --compile` and run the binary. Resolve any bundling errors (⚠️ e.g. optional devtools dependency); log the fix.
-- [ ] **P0-T6** `scripts/dev-sandbox.sh` with `up` / `down` / `status`. Seed resources listed in PROJECT_GUIDE section 9 (except quadlets).
-- [ ] **P0-T7** Socket ping spike: a tiny script that pings the sandbox socket using Bun's unix-socket fetch and prints the Podman version. ⚠️ VERIFY the fetch option and the endpoint.
+- [x] **P0-T1** Initialize repo: `package.json`, `tsconfig.json` (strict), `.gitignore`, MIT `LICENSE`, empty folder structure from PROJECT_GUIDE section 3, copy `AGENTS.md`, `PRD.md`, `ROADMAP.md`, `docs/*`.
+- [x] **P0-T2** Install Bun-compatible deps: `ink`, `react` (version matching Ink's peerDependencies ⚠️ VERIFY), `typescript`, `@types/react`, `ink-testing-library`. Pin versions. Log them in DECISIONS.md.
+- [x] **P0-T3** Scripts in `package.json`: `dev`, `check`, `test`, `build` (see AGENTS.md section 5).
+- [x] **P0-T4** Hello-world Ink app: header, a box, a footer, exits cleanly on `q`.
+- [x] **P0-T5** Compile it with `bun build --compile` and run the binary. Resolve any bundling errors (⚠️ e.g. optional devtools dependency); log the fix.
+- [x] **P0-T6** `scripts/dev-sandbox.sh` with `up` / `down` / `status`. Seed resources listed in PROJECT_GUIDE section 9 (except quadlets).
+- [x] **P0-T7** Socket ping spike: a tiny script that pings the sandbox socket using Bun's unix-socket fetch and prints the Podman version. ⚠️ VERIFY the fetch option and the endpoint.
 - [x] **P0-T8** Environment report in `docs/DECISIONS.md`: Podman version, Bun version, terminal emulator in use, truecolor and mouse-reporting support (test by printing a color gradient and logging raw mouse sequences).
 
 **Automated tests:** `bun run check` passes with one trivial test; CI-ready script exits 0.
@@ -53,13 +53,13 @@ Phase overview
 **Goal:** a typed, tested engine layer. No UI work in this phase.
 
 - [x] **P1-T1** `api/socket.ts`: discovery order per FR-1; returns path or a typed "unreachable" result containing the suggested fix command. Unit tests with env var and temp-file permutations.
-- [ ] **P1-T2** `api/client.ts`: `get`, `post`, `delete` helpers over the unix socket with JSON parsing, timeouts, and error mapping to `EngineError`. Streaming helper that yields chunks and supports abort.
-- [ ] **P1-T3** `scripts/record-fixtures.sh`: save real responses (list/inspect containers, pods, images, volumes, networks, top, a short stats sample, version) from the sandbox into `test/fixtures/`. Trim volatile fields only if documented.
-- [ ] **P1-T4** `api/types.ts`: types derived from the fixtures. Fields that can be missing/null are modeled as such. Add a test that parses every fixture through the mappers without throwing.
-- [ ] **P1-T5** `api/demux.ts`: multiplexed log frame decoder. Unit tests: single frame, multiple frames in one chunk, header split across chunks, payload split across chunks, zero-length frame, stderr vs stdout tagging. ⚠️ VERIFY framing against a real non-TTY container's log response; verify TTY containers return raw data.
-- [ ] **P1-T6** `engine/ContainerEngine.ts` interface: list/inspect for each resource, `streamLogs`, `streamStats`, `streamEvents`, `top`, actions (start/stop/restart/kill/remove), prune methods with a **dry-run/preview** function returning what would be removed. Decide stream style (AsyncIterable vs callback) and record in DECISIONS.md.
-- [ ] **P1-T7** `engine/podman.ts`: implement list/inspect/top/actions for containers and pods first; map raw API objects to UI-facing models (`Container`, `Pod`, …) in dedicated mapper functions (pure, tested against fixtures).
-- [ ] **P1-T8** Integration tests (run only with `PODTUI_INTEGRATION=1` against the sandbox): start/stop/restart `web`, stream logs from `chatty` for 3 lines then abort cleanly, confirm the stream handle is released. Destructive-call guard from AGENTS.md section 3 implemented and tested.
+- [x] **P1-T2** `api/client.ts`: `get`, `post`, `delete` helpers over the unix socket with JSON parsing, timeouts, and error mapping to `EngineError`. Streaming helper that yields chunks and supports abort.
+- [x] **P1-T3** `scripts/record-fixtures.sh`: save real responses (list/inspect containers, pods, images, volumes, networks, top, a short stats sample, version) from the sandbox into `test/fixtures/`. Trim volatile fields only if documented.
+- [x] **P1-T4** `api/types.ts`: types derived from the fixtures. Fields that can be missing/null are modeled as such. Add a test that parses every fixture through the mappers without throwing.
+- [x] **P1-T5** `api/demux.ts`: multiplexed log frame decoder. Unit tests: single frame, multiple frames in one chunk, header split across chunks, payload split across chunks, zero-length frame, stderr vs stdout tagging. ⚠️ VERIFY framing against a real non-TTY container's log response; verify TTY containers return raw data.
+- [x] **P1-T6** `engine/ContainerEngine.ts` interface: list/inspect for each resource, `streamLogs`, `streamStats`, `streamEvents`, `top`, actions (start/stop/restart/kill/remove), prune methods with a **dry-run/preview** function returning what would be removed. Decide stream style (AsyncIterable vs callback) and record in DECISIONS.md.
+- [x] **P1-T7** `engine/podman.ts`: implement list/inspect/top/actions for containers and pods first; map raw API objects to UI-facing models (`Container`, `Pod`, …) in dedicated mapper functions (pure, tested against fixtures).
+- [x] **P1-T8** Integration tests (run only with `PODTUI_INTEGRATION=1` against the sandbox): start/stop/restart `web`, stream logs from `chatty` for 3 lines then abort cleanly, confirm the stream handle is released. Destructive-call guard from AGENTS.md section 3 implemented and tested.
 
 **Automated tests:** all above unit tests green; integration tests green against sandbox.
 
@@ -256,6 +256,7 @@ Phase overview
 ## Phase 9 — Post-v1 ideas (do not start without a new PRD section)
 
 - Docker adapter implementing `ContainerEngine`.
+- macOS support: discover the `podman machine` API socket (and podman-mac-helper's `/var/run/docker.sock`), darwin release binary. ⚠️ VERIFY on a real Mac first, see UNKNOWNS #18. Development and the sandbox stay Linux-only.
 - Omarchy plugin / launcher binding (e.g. a menu entry and keybinding) — ⚠️ research Omarchy's extension points first.
 - Registry search & image pull; run-container form; `podman-compose` project grouping; healthcheck history; image vulnerability scan summary; export logs to file; multi-select for bulk delete; remote machines.
 

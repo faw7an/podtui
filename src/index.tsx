@@ -1,7 +1,7 @@
 import { render } from "ink";
 import { App } from "./ui/App.tsx";
 import { USAGE, parseArgs } from "./cli.ts";
-import { discoverSocket } from "./api/socket.ts";
+import { describeUnreachable, resolveSocket } from "./api/socket.ts";
 
 /**
  * `alternateScreen: true` keeps scrollback clean and restores the previous
@@ -21,14 +21,14 @@ if (parsed.args.help) {
   process.exit(0);
 }
 
-// The socket is resolved here, once, instead of inside the UI: `--socket`,
-// then PODTUI_SOCKET, then the standard rootless and rootful locations. The
-// old hardcoded sandbox fallback is gone — `bun run dev` sets PODTUI_SOCKET
-// via package.json, and a compiled binary on a real machine now finds the
-// real daemon instead of looking only at /tmp.
-const socket = discoverSocket(parsed.args.socket);
+// The socket is resolved here, once, instead of inside the UI. Order and
+// rules live in src/api/socket.ts: explicit `--socket`/PODTUI_SOCKET (never
+// falls back), then CONTAINER_HOST, DOCKER_HOST (podman-docker sets it), the
+// rootless and rootful Podman sockets, and podman-docker's docker.sock links.
+// Every candidate is checked to really be Podman, not a Docker daemon.
+const socket = await resolveSocket(parsed.args.socket);
 if (socket.kind === "unreachable") {
-  process.stderr.write(`${socket.message}\nLooked in:\n${socket.tried.map((p) => `  - ${p}`).join("\n")}\n${socket.fixCommand}\n`);
+  process.stderr.write(describeUnreachable(socket));
   process.exit(1);
 }
 

@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { fakeUnixServer, httpResponse, type FakeServer } from "./helpers/unixServer.ts";
 import * as path from "node:path";
 
 /**
@@ -14,6 +15,20 @@ import * as path from "node:path";
 const ROOT = path.join(import.meta.dirname, "..");
 const ENTRY = path.join(ROOT, "src", "index.tsx");
 
+/**
+ * Discovery must succeed for the entry to reach the TTY gate. A fake Podman
+ * that answers the probe keeps these tests independent of the dev sandbox
+ * (they failed whenever it was down).
+ */
+let fakePodman: FakeServer;
+beforeAll(() => {
+  fakePodman = fakeUnixServer("rawmode", (s) => {
+    s.write(httpResponse(200, "OK", "OK", "text/plain"));
+    s.end();
+  });
+});
+afterAll(() => fakePodman.stop());
+
 interface RunResult {
   code: number | null;
   stdout: string;
@@ -26,7 +41,7 @@ async function runEntry(stdin: "pipe" | "ignore"): Promise<RunResult> {
     stdin,
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, PODTUI_SOCKET: "/tmp/podtui-dev/podman.sock" },
+    env: { ...process.env, PODTUI_SOCKET: fakePodman.path },
   });
   proc.stdin?.end();
   const [code, stdout, stderr] = await Promise.all([

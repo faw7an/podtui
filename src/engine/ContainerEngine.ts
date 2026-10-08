@@ -30,11 +30,20 @@ export interface PrunePreview {
   networks?: { count: number; names: string[] };
 }
 
+/** What a prune actually did. `count`/`names` cover successful removals only. */
+export interface PruneOutcome {
+  count: number;
+  names: string[];
+  reclaimedBytes?: number;
+  /** Entries the server tried to remove and could not (partial failure). */
+  failed?: { name: string; error: string }[];
+}
+
 export interface PruneResult {
-  containers?: { count: number; names: string[]; reclaimedBytes?: number };
-  images?: { count: number; names: string[]; reclaimedBytes?: number };
-  volumes?: { count: number; names: string[]; reclaimedBytes?: number };
-  networks?: { count: number; names: string[]; reclaimedBytes?: number };
+  containers?: PruneOutcome;
+  images?: PruneOutcome;
+  volumes?: PruneOutcome;
+  networks?: PruneOutcome;
 }
 
 export interface ContainerActionResult {
@@ -59,7 +68,12 @@ export interface ContainerEngine {
   /** Multiplexed log frames. Pass `signal` to stop the stream promptly. */
   containerLogs(socketPath: string, id: string, options?: { follow?: boolean; tail?: number; timestamps?: boolean; signal?: AbortSignal }): AsyncGenerator<LogFrame>;
   startContainer(socketPath: string, id: string): Promise<ContainerActionResult>;
+  /**
+   * `timeout` is the stop grace period in seconds before SIGKILL. Omit it to
+   * use the container's own configured stop timeout (`--stop-timeout`).
+   */
   stopContainer(socketPath: string, id: string, timeout?: number): Promise<ContainerActionResult>;
+  /** Same grace-period rule as `stopContainer`. */
   restartContainer(socketPath: string, id: string, timeout?: number): Promise<ContainerActionResult>;
   killContainer(socketPath: string, id: string, signal?: string): Promise<ContainerActionResult>;
   removeContainer(socketPath: string, id: string, force?: boolean): Promise<ContainerActionResult>;

@@ -74,3 +74,39 @@ export function createVisibleFetcher(engine: ListEngine, socketPath: string) {
     return errors.length > 0 ? { data, error: errors.join("; ") } : { data };
   };
 }
+/**
+ * Run `tick` now and then every `intervalMs` AFTER the previous tick settles.
+ *
+ * `setInterval` fired regardless of whether the last refresh had finished, so
+ * with a slow or unreachable daemon (each request may take up to the 10s
+ * client timeout, twice the 5s poll) requests piled up, and a late, older
+ * response could overwrite newer data. Here at most one tick is in flight,
+ * and `isCurrent()` turns false once the loop is stopped, so a tick that was
+ * already running when the loop was replaced can drop its result.
+ *
+ * Returns `stop`. Timer functions are injectable for tests.
+ */
+export function startPollLoop(
+  tick: (isCurrent: () => boolean) => Promise<void>,
+  intervalMs: number,
+  timers: { setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout } = { setTimeout, clearTimeout },
+): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const isCurrent = () => !stopped;
+
+  const run = async (): Promise<void> => {
+    try {
+      await tick(isCurrent);
+    } catch {
+      // A tick reports its own errors; the loop must keep going regardless.
+    }
+    if (!stopped) timer = timers.setTimeout(() => void run(), intervalMs);
+  };
+
+  void run();
+  return () => {
+    stopped = true;
+    if (timer !== undefined) timers.clearTimeout(timer);
+  };
+}
