@@ -63,18 +63,20 @@ first-class citizens. It is designed so that:
 
 ## Status
 
-podtui is in **early development (v0.x)**. Today it is a **read-only viewer**: it lists and
-inspects but cannot change or delete anything. That makes it safe to point at your real
-containers.
+podtui is in **early development (v0.x)**. It lists and inspects everything, and can start,
+stop, restart, kill and remove containers and pods and remove images, volumes and networks.
+Every remove and kill asks first and names exactly what it affects; images, volumes and
+networks are never force-removed.
 
 | Works today | Coming next |
 |---|---|
-| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | Start / stop / restart / kill / remove, with confirm dialogs |
+| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | Detail views for pods, images, volumes and networks |
 | Live refresh (every 5 s by default) that keeps your cursor on the same item | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
 | Container **Config** tab: formatted inspect output, foldable sections | **Quadlets**: unit state, journal, start/stop |
 | Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | Omarchy theme colours, mouse support |
 | **Stats** (live CPU with a 1-minute sparkline, memory, net, block, PIDs), **Env** (secrets masked until `v`) and **Top** (process list, every 2 s) tabs | |
 | `/` filter in every list, `?` help overlay, `z` zoom |  |
+| Start / stop / restart / kill / remove with confirm dialogs that name every target |  |
 | Adapts to any terminal size, from 40×10 up |  |
 | Works with **podman-docker** setups, and never connects to a Docker daemon by mistake |  |
 
@@ -242,12 +244,17 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `[ ]` | detail tab |
 | `p` | pause/resume logs |
 | `g G` | logs: oldest / live end |
-| `n N` | logs: next / previous match |
+| `n N` | logs: next/prev match |
 | `e` | logs: errors only |
 | `t` | logs: timestamps |
 | `w` | logs: wrap lines |
 | `v` | env: reveal secrets |
 | `Esc` | back / close |
+| `s` | start |
+| `S` | stop |
+| `r` | restart |
+| `K` | kill (asks first) |
+| `d` | remove (asks first) |
 | `?` | help |
 | `q` | quit |
 

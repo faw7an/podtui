@@ -138,8 +138,8 @@ Phase overview
 - [ ] **P4-T2** Images panel: repo:tag, size, age, dangling marker; Config tab; layers/history view ⚠️ VERIFY the history endpoint; remove action.
 - [ ] **P4-T3** Volumes panel: name, driver, mountpoint, in-use indicator ⚠️ VERIFY how "in use" is determined; remove action.
 - [ ] **P4-T4** Networks panel: name, driver, subnet, connected containers; remove action.
-- [ ] **P4-T5** Container actions: `s` start, `S` stop, `r` restart, `K` kill, `d` remove, all via engine; busy indicator while pending; errors surface in the status bar.
-- [ ] **P4-T6** `ConfirmDialog` component: lists exactly what will be affected, default focus on Cancel, `y`/`n`/Enter/Esc (FR-6). Used by every remove action.
+- [x] **P4-T5** Container actions: `s` start, `S` stop, `r` restart, `K` kill, `d` remove, all via engine; busy indicator while pending; errors surface in the status bar.
+- [x] **P4-T6** `ConfirmDialog` component: lists exactly what will be affected, default focus on Cancel, `y`/`n`/Enter/Esc (FR-6). Used by every remove action.
 - [ ] **P4-T7** Cross-links: from a pod, jump to its containers; from a container, show its pod/image/volumes/networks as read-only info in Config.
 
 **Automated tests:** each action calls the right engine method with the right ID; confirm dialog blocks the call until confirmed; cancel does nothing; error from engine shows a message and the app stays alive; panels render fixture data.

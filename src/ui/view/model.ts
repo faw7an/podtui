@@ -90,7 +90,17 @@ export interface FrameModel {
   /** Right-hand header text, e.g. `9:40 PM`. */
   clock: string;
   error?: string;
+  /**
+   * Result of the last action (P4-T5): busy while pending, then ok/error.
+   * Shown in the footer's right slot, ahead of `error`.
+   */
+  notice?: Notice;
   detail: DetailModel;
+}
+
+export interface Notice {
+  text: string;
+  tone: "busy" | "ok" | "error";
 }
 
 export function panelMeta(

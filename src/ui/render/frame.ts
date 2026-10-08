@@ -8,6 +8,10 @@ import { computeFilterPopupRect } from "../layout/filterPopup.ts";
 import { renderDetail, renderMessage } from "./detailLines.ts";
 import { renderFilterBar, renderFilterPopup, type FilterPopupData } from "./filterPopup.ts";
 import { renderPanel } from "./panelLines.ts";
+import { dialogRect, renderConfirmDialog } from "./confirmDialog.ts";
+import type { ConfirmDialogState } from "../view/confirmDialog.ts";
+import { bold, fg, paint } from "./palette.ts";
+import { fit } from "../../util/fit.ts";
 
 export interface FrameOptions {
   theme: Theme;
@@ -23,6 +27,8 @@ export interface FrameOptions {
    * the panel model's `filter` field; this only says the popup is open.
    */
   filterPopup?: PanelId | null;
+  /** Open confirm dialog (P4-T6): drawn over everything except the header. */
+  dialog?: ConfirmDialogState | null;
 }
 
 /**
@@ -95,7 +101,23 @@ export function renderFrame(layout: Layout, model: FrameModel, opts: FrameOption
     }
   }
 
-  if (layout.footer) {
+  // Confirm dialog (P4-T6): over everything. When no box fits, a one-line
+  // question replaces the footer, so the prompt is never invisible.
+  let dialogBar: string | null = null;
+  if (opts.dialog) {
+    const rect = dialogRect(layout.cols, layout.rows, opts.dialog);
+    if (rect) {
+      buffer.excise(rect.x, rect.y, rect.w, rect.h);
+      renderConfirmDialog(rect, opts.dialog, opts.theme, on).forEach((line, i) => buffer.write(rect.x, rect.y + i, line));
+    } else {
+      const text = `${opts.dialog.content.title} ${opts.dialog.content.lines[0] ?? ""} y/n`;
+      dialogBar = paint(fit(text, layout.cols), on ? [fg(opts.theme.error), bold()] : []);
+    }
+  }
+
+  if (dialogBar !== null && layout.footer) {
+    buffer.write(0, layout.footer.y, dialogBar);
+  } else if (layout.footer) {
     buffer.write(
       0,
       layout.footer.y,

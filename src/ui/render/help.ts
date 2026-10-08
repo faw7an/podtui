@@ -70,9 +70,10 @@ export function renderHelp(
     line.startsWith("#") ? paint(line, [on ? fg(theme.accent) : "", on ? bold() : ""]) : line;
 
   // Anything that still does not fit is announced, never silently dropped.
-  const overflow = Math.max(0, Math.max(...columns.map((c) => c.length)) - (contentRoom - 1));
+  const lastCol = columns[columns.length - 1];
+  const overflow = Math.max(0, (lastCol?.length ?? 0) - (contentRoom - 1));
   if (overflow > 0 && contentRoom > 1) {
-    const col = columns[columns.length - 1];
+    const col = lastCol;
     if (col) {
       const keep = contentRoom - 2;
       const hidden = col.length - keep;
@@ -88,7 +89,9 @@ export function renderHelp(
         : columns.map((col, i) => {
             const text = col[r - 1] ?? "";
             const w = i === columns.length - 1 ? innerW - colW * (columns.length - 1) : colW;
-            return fit(paintLine(stripTrailing(text)), w);
+            // A two-cell gutter after every column but the last.
+            const gutter = i === columns.length - 1 ? 0 : 2;
+            return fit(paintLine(stripTrailing(text)), Math.max(0, w - gutter)) + " ".repeat(Math.min(gutter, w));
           }).join("");
     push(`${bc}${V}${on ? RESET : ""}${fit(body, innerW)}${bc}${V}${on ? RESET : ""}`);
   }
@@ -103,32 +106,33 @@ export function renderHelp(
 }
 
 /**
- * Split help rows into as few columns as fit `room` rows (at most two, and
- * only if each column stays wide enough to read). Breaks happen only at
- * section headings, so a section is never split across columns. If even two
- * columns overflow, the overflow is cut, but the close hint is safe in the
- * border.
+ * Flow help rows into as few columns as fit `room` rows: one column when it
+ * fits, otherwise up to two (three on wide terminals) while each column stays
+ * readable. Columns fill top to bottom; a section that continues in the next
+ * column repeats its heading as `# Name (cont.)`, and a heading is never left
+ * alone at the bottom of a column. Whatever still does not fit ends up in the
+ * last column, where the caller announces it.
  */
 function layoutColumns(lines: string[], room: number, innerW: number): string[][] {
-  if (lines.length <= room || innerW < 60) return [lines];
-  const sections: string[][] = [];
+  if (lines.length <= room || room < 2) return [lines];
+  // As many columns as the widest row allows (plus its gutter), at most 3.
+  const widest = Math.max(...lines.map((l) => l.length)) + 2;
+  const maxCols = Math.max(1, Math.min(3, Math.floor((innerW + 2) / widest)));
+  const cols: string[][] = [[]];
+  let heading = "";
   for (const line of lines) {
-    if (line.startsWith("#") || sections.length === 0) sections.push([]);
-    sections[sections.length - 1]?.push(line);
-  }
-  // Best split: the section boundary that minimises the taller column.
-  let best: [string[], string[]] = [lines, []];
-  let bestH = Infinity;
-  for (let i = 1; i < sections.length; i++) {
-    const left = sections.slice(0, i).flat();
-    const right = sections.slice(i).flat();
-    const h = Math.max(left.length, right.length);
-    if (h < bestH) {
-      bestH = h;
-      best = [left, right];
+    const isHeading = line.startsWith("#");
+    if (isHeading) heading = line;
+    let col = cols[cols.length - 1] as string[];
+    const needs = isHeading ? 2 : 1;
+    if (col.length + needs > room && cols.length < maxCols) {
+      col = [];
+      cols.push(col);
+      if (!isHeading && heading) col.push(`${heading} (cont.)`);
     }
+    col.push(line);
   }
-  return best[1].length > 0 ? best : [lines];
+  return cols;
 }
 
 function stripTrailing(text: string): string {

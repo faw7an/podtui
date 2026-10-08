@@ -8,7 +8,7 @@ export interface KeyBinding {
   key: string;
   desc: string;
   /** Grouping shown in the overlay. */
-  section: "panels" | "navigation" | "detail" | "app";
+  section: "panels" | "navigation" | "detail" | "actions" | "app";
 }
 
 export const KEYMAP: readonly KeyBinding[] = [
@@ -23,13 +23,18 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "[ ]", desc: "detail tab", section: "detail" },
   { key: "p", desc: "pause/resume logs", section: "detail" },
   { key: "g G", desc: "logs: oldest / live end", section: "detail" },
-  { key: "n N", desc: "logs: next / previous match", section: "detail" },
+  { key: "n N", desc: "logs: next/prev match", section: "detail" },
   { key: "e", desc: "logs: errors only", section: "detail" },
   { key: "t", desc: "logs: timestamps", section: "detail" },
   { key: "w", desc: "logs: wrap lines", section: "detail" },
   { key: "v", desc: "env: reveal secrets", section: "detail" },
   { key: "Esc", desc: "back / close", section: "detail" },
   { key: "z", desc: "zoom panel", section: "panels" },
+  { key: "s", desc: "start", section: "actions" },
+  { key: "S", desc: "stop", section: "actions" },
+  { key: "r", desc: "restart", section: "actions" },
+  { key: "K", desc: "kill (asks first)", section: "actions" },
+  { key: "d", desc: "remove (asks first)", section: "actions" },
   { key: "?", desc: "help", section: "app" },
   { key: "q", desc: "quit", section: "app" },
 ] as const;
@@ -49,6 +54,7 @@ export function helpLines(): string[] {
     { id: "panels", label: "Panels" },
     { id: "navigation", label: "Navigation" },
     { id: "detail", label: "Detail" },
+    { id: "actions", label: "Actions" },
     { id: "app", label: "App" },
   ];
   const out: string[] = [];

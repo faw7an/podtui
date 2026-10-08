@@ -21,6 +21,10 @@ import { useTopPoll } from "./hooks/useTopPoll.ts";
 import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
 import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
 import { errorsOnly } from "./render/detailLines.ts";
+import { dialogKey, openConfirm, type ConfirmDialogState } from "./view/confirmDialog.ts";
+import { actionFor } from "./actions/selectionAction.ts";
+import { busyText, doneText, runAction, type ActionVerb, type ResourceAction } from "./actions/resourceActions.ts";
+import type { Notice } from "./view/model.ts";
 
 // FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
 // back to the default rather than reaching setInterval.
@@ -61,6 +65,12 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const [logView, setLogView] = useState<LogViewState>(FOLLOW);
   // Env secrets (P3-T6). Never carried to another container: see below.
   const [revealSecrets, setRevealSecrets] = useState(false);
+  // Actions (P4-T5/T6): the open dialog, the footer notice, and a counter
+  // that restarts the poll loop so a finished action shows at once.
+  const [dialog, setDialog] = useState<ConfirmDialogState | null>(null);
+  const [notice, setNotice] = useState<Notice | undefined>(undefined);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const busyRef = useRef(false);
   const [logSearch, setLogSearch] = useState<LogSearchState>(NO_SEARCH);
   // Display preferences survive switching containers; they are the user's.
   const [logOpts, setLogOpts] = useState({ timestamps: false, wrap: false, errorsOnly: false });
@@ -89,8 +99,28 @@ export const App = ({ socketPath }: { socketPath: string }) => {
           if (isCurrent()) setError(e instanceof Error ? e.message : "Failed to fetch data");
         }
       }, POLL_MS),
-    [fetchVisible, state.visible],
+    [fetchVisible, state.visible, refreshKey],
   );
+
+  // A result stays readable for a while, then gets out of the way. Busy
+  // notices stay until the action settles.
+  useEffect(() => {
+    if (!notice || notice.tone === "busy") return;
+    const t = setTimeout(() => setNotice(undefined), 8000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  const perform = (action: ResourceAction): void => {
+    busyRef.current = true;
+    setNotice({ tone: "busy", text: busyText(action) });
+    void runAction(engine, socketPath, action)
+      .then((r) => setNotice({ tone: "ok", text: r.message ?? doneText(action) }))
+      .catch((e: unknown) => setNotice({ tone: "error", text: e instanceof Error ? e.message : String(e) }))
+      .finally(() => {
+        busyRef.current = false;
+        setRefreshKey((k) => k + 1);
+      });
+  };
 
   // Same layout the Screen computes, needed here for two facts: whether the
   // detail pane is on screen at all (no pane, no stream) and how many log
@@ -273,6 +303,18 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       process.exit(0);
     }
 
+    // --- Confirm dialog (P4-T6): owns every key while open. ---
+    if (dialog) {
+      const outcome = dialogKey(dialog, input, key);
+      if (outcome.type === "cancel") setDialog(null);
+      else if (outcome.type === "focus") setDialog(outcome.state);
+      else if (outcome.type === "confirm") {
+        setDialog(null);
+        perform(outcome.action);
+      }
+      return;
+    }
+
     // --- Escape: dialog > help > zoom/fullscreen > filter > nothing ---
     // Single path for the whole priority chain; the filter branch below never
     // sees an Escape that a higher-priority state should consume first. A kept
@@ -286,6 +328,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         return;
       }
       const action = resolveEscape(state, {
+        dialogOpen: dialog !== null,
         helpOpen: state.help,
         filterActive:
           state.filterFor !== null ||
@@ -403,6 +446,23 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     // Space folds/unfolds every Config section; PgUp/PgDn scroll the detail.
     // Both are inert while filtering (the filter branch above returns first),
     // where Space types a space and PgUp/PgDn have no text to append.
+    // --- Item actions (P4-T5): s start, S stop, r restart, K kill, d remove.
+    const verb: ActionVerb | undefined = (
+      { s: "start", S: "stop", r: "restart", K: "kill", d: "remove" } as Record<string, ActionVerb>
+    )[input];
+    if (verb) {
+      if (busyRef.current) {
+        setNotice({ tone: "error", text: "Another action is still running." });
+        return;
+      }
+      const name = focusModel?.items[focusModel.selected]?.cells["name"] ?? "";
+      const request = actionFor(focusId, selectedItemId, verb, data, name);
+      if (request.kind === "refuse") setNotice({ tone: "error", text: request.message });
+      else if (request.kind === "run") perform(request.action);
+      else setDialog(openConfirm(request.action, request.content));
+      return;
+    }
+
     // `v` reveals/hides masked Env values; only on the Env tab, so it can
     // never flip secrets on while they are not even on screen.
     if (input === "v" && activeTab === "env") {
@@ -444,6 +504,8 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     }
   });
 
+  const shownModel = notice ? { ...frameModel, notice } : frameModel;
+
   // The help overlay replaces the frame while open.
   if (state.help) {
     return <HelpOverlay size={{ cols: terminalCols, rows: terminalRows }} />;
@@ -451,7 +513,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
 
   return (
     <Screen
-      model={frameModel}
+      model={shownModel}
       theme={defaultTheme}
       visible={state.visible}
       zoom={state.zoom}
@@ -465,6 +527,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       }
       detailScroll={state.detailScroll}
       filterPopup={state.filterFor}
+      dialog={dialog}
     />
   );
 };
