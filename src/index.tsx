@@ -1,6 +1,7 @@
 import { render } from "ink";
 import { App } from "./ui/App.tsx";
 import { USAGE, parseArgs } from "./cli.ts";
+import { VERSION } from "./version.ts";
 import { describeUnreachable, resolveSocket } from "./api/socket.ts";
 
 /**
@@ -10,7 +11,8 @@ import { describeUnreachable, resolveSocket } from "./api/socket.ts";
  * docs/DECISIONS.md, so we do not hand-roll the escapes.
  */
 
-// Flag parsing comes first so `--help` works even when stdin is a pipe.
+// Flag parsing comes first so `--help` and `--version` work even when stdin
+// is a pipe and no Podman is running.
 const parsed = parseArgs(process.argv.slice(2));
 if (!parsed.ok) {
   process.stderr.write(`${parsed.error}\n\n${USAGE}`);
@@ -18,6 +20,10 @@ if (!parsed.ok) {
 }
 if (parsed.args.help) {
   process.stdout.write(USAGE);
+  process.exit(0);
+}
+if (parsed.args.version) {
+  process.stdout.write(`podtui ${VERSION}\n`);
   process.exit(0);
 }
 

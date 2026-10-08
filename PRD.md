@@ -79,7 +79,7 @@ IDs are referenced by the roadmap and tests.
 | FR-8 | Errors from the API are shown in a status bar or dialog with a readable message; the app does not crash. |
 | FR-9 | Colors derive from a theme object; no hard-coded color values in components. |
 | FR-10 | Quit with `q` or Ctrl+C restores the terminal (cursor, raw mode, mouse reporting off) in every exit path, including crashes. |
-| FR-11 | `--version`, `--help`, `--socket`, `--debug` CLI flags. |
+| FR-11 | `--version`, `--help`, `--socket`, `--debug` CLI flags. (`--version`/`-v`, `--help`/`-h` and `--socket` done 2026-10-08; `--debug` pending.) |
 
 ## 6. Non-functional requirements
 

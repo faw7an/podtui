@@ -1,30 +1,30 @@
-▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets            12:06:12 AM
-╭─[1] Pods 1                    ╮╭─[2] Containers 6              ╮╭─[3] Images 2                   ╮
+▲ podtui   1 Pods  2 Containers  3 Images  4 Volumes  5 Networks  6 Quadlets             3:07:48 AM
+╭─[1] Pods 1                    ╮╭─[2] Containers 7              ╮╭─[3] Images 2                   ╮
 │  NAME            STATUS    CNT││  NAME       STATUS    IMAGE   ││  NAME              SIZE    AGE │
-│▸ web-pod         ● running 3  ││▸ web        ● running nginx:a…││▸ nginx:alpine      64.3MB  9d  │
-│                               ││  chatty     ● running alpine:…││  alpine:latest     8.7MB   15d │
+│▸ web-pod         ● running 3  ││▸ web        ● running nginx:a…││▸ nginx:alpine      64.3MB  15d │
+│                               ││  chatty     ● running alpine:…││  alpine:latest     8.7MB   20d │
+│                               ││  failing    ✖ exited  alpine:…││                                │
 │                               ││  tty-box    ● running alpine:…││                                │
-│                               ││  bd6cc3f90… ● running         ││                                │
-└───────────────────────────────┘│  web-pod-f… ● running nginx:a…│└────────────────────────────────┘
-╭─[4] Volumes 1                 ╮└────────────────────── ↓1 more ┘╭─[6] Quadlets 0                 ╮
-│  NAME                 STATUS  │╭─[5] Networks 1                ╮│  NAME                 STATUS   │
+└───────────────────────────────┘│  8983d20a0… ● running         │└────────────────────────────────┘
+╭─[4] Volumes 1                 ╮└────────────────────── ↓2 more ┘╭─[6] Quadlets 0                 ╮
+│  NAME                 STATUS  │╭─[5] Networks 2                ╮│  NAME                 STATUS   │
 │▸ test-volume          · unused││  NAME                 STATUS  ││  not implemented yet (phase 6) │
-│                               ││▸ podman               bridge  ││                                │
-│                               ││                               ││                                │
+│                               ││▸ test-network         bridge  ││                                │
+│                               ││  podman               bridge  ││                                │
 │                               ││                               ││                                │
 └───────────────────────────────┘└───────────────────────────────┘└────────────────────────────────┘
 ╭─web · running                                                                                    ╮
 │Logs Stats Env Config Top                                                                         │
-│name       web                                                                                    │
-│state      ● running                                                                              │
-│image      nginx:alpine                                                                           │
-│age        5h                                                                                     │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+│# State                                                                                           │
+│Name         web                                                                                  │
+│Status       running                                                                              │
+│Running      true                                                                                 │
+│ExitCode     0                                                                                    │
+│StartedAt    2026-10-08T03:04:39.174299269+03:00                                                  │
+│# Config                                                                                          │
+│Image        docker.io/library/nginx:alpine                                                       │
+│Cmd          nginx -g daemon off;                                                                 │
+│Entrypoint   /docker-entrypoint.sh                                                                │
+│WorkingDir   /                                                                                    │
+└───────────────────────────────────────────────────────────────────────────────────────── ↓9 more ┘
 1-6 panel  Tab focus  ↑↓jk move  Enter inspect  z zoom  ? help  q quit

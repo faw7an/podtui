@@ -130,3 +130,14 @@ describe("entry point: socket discovery", () => {
     expect(result.stderr).toContain("not a TTY");
   });
 });
+describe("entry point: --version", () => {
+  test("prints `podtui <package.json version>` and exits 0 with no TTY and no socket", async () => {
+    const pkg = (await Bun.file(path.join(ROOT, "package.json")).json()) as { version: string };
+    for (const flag of ["--version", "-v"]) {
+      const result = await runEntry([flag], NO_SOCKET_ENV);
+      expect(result.code).toBe(0);
+      expect(result.stdout).toBe(`podtui ${pkg.version}\n`);
+      expect(result.stderr).toBe("");
+    }
+  });
+});
