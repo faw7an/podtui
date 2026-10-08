@@ -93,15 +93,17 @@ describe("Stats tab render", () => {
     for (const line of out) expect(displayWidth(line)).toBe(rect.w);
   });
 
-  test("rows, sparklines sized to the pane, exact widths", () => {
+  // Changed 2026-10-08 (maintainer): small panes keep the charts instead of
+  // falling back to the old sparkline rows.
+  test("a small pane still draws the CPU chart, exact widths, live hint", () => {
     let h = EMPTY_HISTORY;
     for (let i = 0; i < 60; i++) h = pushSample(h, sample(i * 1000, { cpuPercent: i === 59 ? 100 : 0 }));
     const out = render({ history: h, status: { kind: "live" }, state: "running", name: "chatty" });
     for (const line of out) expect(displayWidth(line)).toBe(rect.w);
     const rows = content(out);
-    expect(rows[0]).toMatch(/^CPU +100\.0% \(avg 0\.0%\)$/);
-    // 48 inner cells - 11 label = 37 sparkline cells, newest (the spike) last.
-    expect(rows[1]?.trim()).toBe("▁".repeat(36) + "█");
+    expect(rows.join("\n")).toContain("CPU (%): 100.00 (59s)");
+    expect(rows.some((r) => /┤|┼/.test(r))).toBe(true);
+    expect(rows.join("\n")).not.toContain("▁"); // no sparkline fallback
     expect(stripAnsi(out.at(-1) ?? "")).toContain("live · 1 s");
   });
 

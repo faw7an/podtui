@@ -3,7 +3,7 @@ import { innerWidth } from "../layout/panelView.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit, padRight, truncate } from "../../util/fit.ts";
 import type { DetailLogModel, DetailModel, DetailStatsModel } from "../view/model.ts";
-import { STATS_HISTORY, sparkline, statsRows, type StatsHistory } from "../view/statsView.ts";
+import { statsRows, type StatsHistory } from "../view/statsView.ts";
 import { chartRows, paintChart } from "./lineChart.ts";
 import { formatBytes } from "../../util/format.ts";
 import { logWindow } from "../view/logView.ts";
@@ -58,7 +58,6 @@ function paintEnvRow(line: string, keyWidth: number, theme: Theme, on: boolean):
   return key + paint(value, [value === MASK ? dim() : fg(theme.accent)]);
 }
 
-const STATS_LABEL_W = 11;
 
 /**
  * The Stats tab (P3-T7): one row per measure, sparklines under CPU and
@@ -77,36 +76,30 @@ function statsContent(stats: DetailStatsModel, budget: number, width: number, th
   if (rows.length === 0) {
     return [messageRow(status.kind === "ended" ? "The stats stream ended." : "Waiting for the first sample…", on)];
   }
-  const charts = statsCharts(history, budget, width, theme, on);
-  if (charts) return charts;
-
-  // Too little room for real charts: the compact rows with sparklines.
-  const sparkW = Math.max(0, Math.min(STATS_HISTORY, width - STATS_LABEL_W));
-  const out: string[] = [];
-  for (const row of rows) {
-    out.push(`${paint(row.label.padEnd(STATS_LABEL_W), on ? [fg(theme.accent)] : [])}${row.value}`);
-    if (row.spark && sparkW > 0) {
-      out.push(" ".repeat(STATS_LABEL_W) + paint(sparkline(row.spark.values, sparkW, row.spark.max), on ? [fg(theme.ok)] : []));
-    }
-  }
-  return out.slice(0, budget);
+  return statsCharts(history, budget, width, theme, on) ?? [];
 }
 
-/** Smallest chart (rows of plot) worth drawing; below it the compact view is used. */
-export const MIN_CHART_ROWS = 4;
+/** Smallest plot that still reads as a chart (rows). */
+export const MIN_CHART_ROWS = 2;
 
 /**
  * The Stats tab as in docs/design/stats-reference-*.png: a CPU (%) chart and
  * a Memory (%) chart sharing the height, each with a caption giving the
- * current value and the time span shown, then PIDs and traffic. Null when
- * the pane is too short for charts of at least MIN_CHART_ROWS.
+ * current value and the time span shown, then PIDs and traffic.
+ *
+ * Charts are kept at every size (maintainer request: small screens used to
+ * fall back to the old one-line view). When room runs short, things are
+ * given up in this order: spacer lines and the memory/block text, then PIDs
+ * and traffic, then the memory chart (CPU alone fills the pane), and only in
+ * a pane too small for any chart, the two caption lines. Null only before
+ * the first sample.
  */
 export function statsCharts(history: StatsHistory, budget: number, width: number, theme: Theme, on: boolean): string[] | null {
   const last = history.samples.at(-1);
   const first = history.samples[0];
-  if (!last || !first) return null;
+  if (!last || !first || budget <= 0) return null;
   const span = `${Math.round((last.at - first.at) / 1000)}s`;
-  const text = [
+  const full = [
     "",
     `PIDs: ${last.pids}`,
     "",
@@ -116,20 +109,38 @@ export function statsCharts(history: StatsHistory, budget: number, width: number
     `Memory: ${formatBytes(last.memUsage)} / ${last.memLimit > 0 ? formatBytes(last.memLimit) : "no limit"}`,
     `Block I/O: ${formatBytes(last.blockRead)} read / ${formatBytes(last.blockWrite)} written`,
   ];
-  // Each chart: a blank line above, the plot, its caption.
-  const plotRows = Math.floor((budget - text.length) / 2) - 2;
-  if (plotRows < MIN_CHART_ROWS || width < 24) return null;
+  const brief = [`PIDs: ${last.pids}`, `Traffic received: ${formatBytes(last.netRx)}`, `Traffic sent: ${formatBytes(last.netTx)}`];
 
-  const chart = (values: number[], color: string, title: string, current: number): string[] => {
-    const c = chartRows(values, width, plotRows);
-    const caption = " ".repeat(c.axisWidth + 2) + `${title}: ${current.toFixed(2)} (${span})`;
-    return ["", ...paintChart(c, color, on), on ? paint(caption, [fg(color)]) : caption];
+  const cpu = { values: history.samples.map((x) => x.cpuPercent), color: theme.accent, title: "CPU (%)", now: last.cpuPercent };
+  const mem = { values: history.samples.map((x) => x.memPercent), color: theme.ok, title: "Memory (%)", now: last.memPercent };
+  const caption = (c: typeof cpu, indent: number): string => {
+    // Two decimals, more for a value that would otherwise read 0.00 (like the axis).
+    const value = c.now !== 0 && Math.abs(c.now) < 0.01 ? c.now.toFixed(4) : c.now.toFixed(2);
+    const text = " ".repeat(indent) + `${c.title}: ${value} (${span})`;
+    return on ? paint(text, [fg(c.color)]) : text;
   };
-  return [
-    ...chart(history.samples.map((s) => s.cpuPercent), theme.accent, "CPU (%)", last.cpuPercent),
-    ...chart(history.samples.map((s) => s.memPercent), theme.ok, "Memory (%)", last.memPercent),
-    ...text,
-  ].slice(0, budget);
+  const draw = (c: typeof cpu, rows: number, spaced: boolean): string[] => {
+    const chart = chartRows(c.values, width, rows);
+    return [...(spaced ? [""] : []), ...paintChart(chart, c.color, on), caption(c, chart.axisWidth + 2)];
+  };
+
+  // [charts, spacer lines, text], best first; the first that fits wins.
+  const layouts: { charts: (typeof cpu)[]; spaced: boolean; text: string[] }[] = [
+    { charts: [cpu, mem], spaced: true, text: full },
+    { charts: [cpu, mem], spaced: false, text: brief },
+    { charts: [cpu, mem], spaced: false, text: [] },
+    { charts: [cpu], spaced: false, text: [] },
+  ];
+  for (const l of layouts) {
+    const perChart = l.spaced ? 2 : 1; // spacer (if any) + caption
+    const rows = Math.floor((budget - l.text.length) / l.charts.length) - perChart;
+    const minRows = l === layouts[0] ? 4 : MIN_CHART_ROWS;
+    if (rows >= minRows) {
+      return [...l.charts.flatMap((c) => draw(c, rows, l.spaced)), ...l.text].slice(0, budget);
+    }
+  }
+  // Too small for any chart: the current values.
+  return [caption(cpu, 0), caption(mem, 0)].slice(0, budget);
 }
 
 /**

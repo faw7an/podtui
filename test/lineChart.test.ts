@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { chartRows, resample } from "../src/ui/render/lineChart.ts";
-import { statsCharts, MIN_CHART_ROWS } from "../src/ui/render/detailLines.ts";
+import { statsCharts } from "../src/ui/render/detailLines.ts";
 import { EMPTY_HISTORY, pushSample, type StatsHistory } from "../src/ui/view/statsView.ts";
 import { stripAnsi } from "../src/ui/render/palette.ts";
 import { displayWidth } from "../src/util/fit.ts";
@@ -70,8 +70,27 @@ describe("Stats tab layout", () => {
     for (const r of statsCharts(h, 40, 80, defaultTheme, true)!) expect(displayWidth(stripAnsi(r))).toBeLessThanOrEqual(80);
   });
 
-  test("too short for charts: null (the compact view is used)", () => {
-    expect(statsCharts(h, 8 + 2 * (MIN_CHART_ROWS + 2) - 1, 80, defaultTheme, false)).toBeNull();
+  test("small panes keep charts, giving up text first, then the memory chart", () => {
+    const at = (b: number) => statsCharts(h, b, 80, defaultTheme, false)!.join("\n");
+    expect(at(11)).toContain("Memory (%)");
+    expect(at(11)).toContain("PIDs: 56");
+    expect(at(8)).toContain("Memory (%)");
+    expect(at(8)).not.toContain("PIDs");
+    expect(at(5)).toContain("CPU (%)");
+    expect(at(5)).not.toContain("Memory (%)");
+    expect(at(5)).toMatch(/┤|┼/);
+    // Too small for any chart: just the two current values.
+    expect(statsCharts(h, 2, 80, defaultTheme, false)).toEqual(["CPU (%): 19.25 (30s)", "Memory (%): 1.58 (30s)"]);
+    for (const b of [2, 5, 8, 11, 40]) expect(statsCharts(h, b, 80, defaultTheme, false)!.length).toBeLessThanOrEqual(b);
     expect(statsCharts(EMPTY_HISTORY, 40, 80, defaultTheme, false)).toBeNull();
   });
+
+});
+
+test("a tiny current value is not shown as 0.00 in the caption", () => {
+  let tiny = EMPTY_HISTORY;
+  for (let i = 0; i < 5; i++) tiny = pushSample(tiny, { cpuPercent: 0.5, avgCpuPercent: 0, memUsage: 1, memLimit: 1e9, memPercent: 0.004, netRx: 0, netTx: 0, blockRead: 0, blockWrite: 0, pids: 1, at: i * 1000 });
+  const text = statsCharts(tiny, 30, 80, defaultTheme, false)!.join("\n");
+  expect(text).toContain("Memory (%): 0.0040 (4s)");
+  expect(text).toContain("CPU (%): 0.50 (4s)");
 });
