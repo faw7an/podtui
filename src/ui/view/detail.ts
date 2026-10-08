@@ -24,7 +24,7 @@ export const DETAIL_TABS: readonly DetailTabMeta[] = [
   { id: "stats", label: "Stats" },
   { id: "env", label: "Env" },
   { id: "config", label: "Config" },
-  { id: "top", label: "Top", phase: "phase 3" },
+  { id: "top", label: "Top" },
 ] as const;
 
 export interface DetailView {
@@ -40,6 +40,8 @@ export interface DetailView {
   env?: { keyWidth: number };
   /** Stats tab; set by `buildFrameModel`, never by `buildDetail`. */
   stats?: DetailStatsModel;
+  /** `lines[0]` is a sticky column header (Top tab). */
+  table?: boolean;
   /** Extra bottom-border text, e.g. `v reveal secrets`. */
   hint?: string;
 }

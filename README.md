@@ -69,11 +69,11 @@ containers.
 
 | Works today | Coming next |
 |---|---|
-| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | **Top** tab |
-| Live refresh (every 5 s by default) that keeps your cursor on the same item | Start / stop / restart / kill / remove, with confirm dialogs |
-| Container **Config** tab: formatted inspect output, foldable sections | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
-| Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | **Quadlets**: unit state, journal, start/stop |
-| **Stats** tab (live CPU with a 1-minute sparkline, memory, net, block, PIDs) and **Env** tab (secrets masked until `v`) | Omarchy theme colours, mouse support |
+| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | Start / stop / restart / kill / remove, with confirm dialogs |
+| Live refresh (every 5 s by default) that keeps your cursor on the same item | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
+| Container **Config** tab: formatted inspect output, foldable sections | **Quadlets**: unit state, journal, start/stop |
+| Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | Omarchy theme colours, mouse support |
+| **Stats** (live CPU with a 1-minute sparkline, memory, net, block, PIDs), **Env** (secrets masked until `v`) and **Top** (process list, every 2 s) tabs | |
 | `/` filter in every list, `?` help overlay, `z` zoom |  |
 | Adapts to any terminal size, from 40×10 up |  |
 | Works with **podman-docker** setups, and never connects to a Docker daemon by mistake |  |

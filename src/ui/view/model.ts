@@ -55,6 +55,8 @@ export interface DetailModel {
   env?: { keyWidth: number };
   /** Stats tab (P3-T7); the renderer sizes the sparklines to the pane. */
   stats?: DetailStatsModel;
+  /** `lines[0]` is a column header: painted, and kept on screen while scrolling (Top tab). */
+  table?: boolean;
   /** Extra bottom-border text, e.g. `v reveal`. */
   hint?: string;
 }

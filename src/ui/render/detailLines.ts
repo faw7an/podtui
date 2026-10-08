@@ -63,7 +63,10 @@ const STATS_LABEL_W = 11;
 function statsContent(stats: DetailStatsModel, budget: number, width: number, theme: Theme, on: boolean): string[] {
   const { status, history } = stats;
   if (stats.state !== "running") {
-    return [messageRow(`${stats.name} is not running (${stats.state || "unknown"}). Stats are shown for running containers.`, on)];
+    return [
+      messageRow(`${stats.name} is not running (${stats.state || "unknown"}).`, on),
+      messageRow("Stats are shown for running containers.", on),
+    ];
   }
   if (status.kind === "error") return [messageRow(`Stats unavailable: ${status.message}`, on, theme.error)];
   const rows = statsRows(history);
@@ -201,13 +204,20 @@ export function renderDetail(
   } else if (detail.log) {
     ({ rows, hint } = logContent(detail.log, contentBudget, iw, theme, on));
   } else {
-    const lastTop = Math.max(0, detail.lines.length - contentBudget);
-    const top = Math.min(Math.max(0, opts.scroll ?? 0), lastTop);
     const env = detail.env;
-    rows = detail.lines
-      .slice(top, top + contentBudget)
-      .map((line) => (env ? paintEnvRow(line, env.keyWidth, theme, on) : paintContent(line, theme, on)));
-    const hiddenBelow = detail.lines.length - top - rows.length;
+    // A table keeps its header row on screen and scrolls only the body.
+    const header = detail.table ? detail.lines[0] : undefined;
+    const body = header !== undefined ? detail.lines.slice(1) : detail.lines;
+    const room = Math.max(0, contentBudget - (header !== undefined ? 1 : 0));
+    const bodyTop = Math.min(Math.max(0, opts.scroll ?? 0), Math.max(0, body.length - room));
+    const shown = body.slice(bodyTop, bodyTop + room);
+    rows = [
+      ...(header !== undefined && contentBudget > 0 ? [paint(header, on ? [fg(theme.accent), bold()] : [])] : []),
+      ...shown.map((line) =>
+        detail.table ? line : env ? paintEnvRow(line, env.keyWidth, theme, on) : paintContent(line, theme, on),
+      ),
+    ];
+    const hiddenBelow = body.length - bodyTop - shown.length;
     const parts = [detail.hint, hiddenBelow > 0 ? `↓${hiddenBelow} more` : undefined].filter(
       (p): p is string => p !== undefined,
     );

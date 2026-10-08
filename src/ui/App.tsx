@@ -17,6 +17,7 @@ import { routeFilterKey } from "../input/filterKeys.ts";
 import { computeLayout } from "./layout/computeLayout.ts";
 import { useLogStream } from "./hooks/useLogStream.ts";
 import { useStatsStream } from "./hooks/useStatsStream.ts";
+import { useTopPoll } from "./hooks/useTopPoll.ts";
 import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
 import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
 import { errorsOnly } from "./render/detailLines.ts";
@@ -163,6 +164,9 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const statsContainerId =
     activeTab === "stats" && layout.detail && selectedContainer?.State === "running" ? selectedItemId : null;
   const stats = useStatsStream(engine, socketPath, statsContainerId, statsContainerId !== null);
+  const topContainerId =
+    activeTab === "top" && layout.detail && selectedContainer?.State === "running" ? selectedItemId : null;
+  const top = useTopPoll(engine, socketPath, topContainerId, topContainerId !== null);
 
   // A new container or leaving the tab starts back at the live end.
   useEffect(() => {
@@ -174,7 +178,26 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   // the model resolved (filtering included) without a cycle.
   const frameModel = useMemo(
     () =>
-      activeTab === "stats" && selectedContainer && model.detail.lines.length === 0
+      activeTab === "top" && selectedContainer
+        ? buildFrameModel({
+            data,
+            selected: state.selected,
+            focus: state.focus,
+            now: Date.now(),
+            clock: new Date(lastRefresh).toLocaleTimeString(),
+            error,
+            activeTab,
+            inspect,
+            filter: state.filterQuery,
+            collapsedSections: state.collapsed,
+            revealSecrets,
+            top: {
+              status: top,
+              state: selectedContainer.State ?? "",
+              name: selectedContainer.Names?.[0] ?? selectedItemId.slice(0, 12),
+            },
+          })
+        : activeTab === "stats" && selectedContainer && model.detail.lines.length === 0
         ? {
             ...model,
             detail: {
@@ -211,6 +234,16 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       selectedItemId,
       stats.history,
       stats.status,
+      top,
+      data,
+      state.selected,
+      state.focus,
+      lastRefresh,
+      error,
+      inspect,
+      state.filterQuery,
+      state.collapsed,
+      revealSecrets,
     ],
   );
 

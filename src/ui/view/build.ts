@@ -10,6 +10,8 @@ import { PANEL_IDS, type PaneId, type PanelId } from "../layout/types.ts";
 import { selectedIndex } from "../layout/layoutReducer.ts";
 import { PANEL_COLUMNS, panelMeta, type DetailLogModel, type DetailStatsModel, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
 import { buildDetail, type DetailTabId } from "./detail.ts";
+import { TOP_POLL_MS, topTable } from "./topView.ts";
+import type { TopStatus } from "../hooks/useTopPoll.ts";
 import type { ContainerInspect } from "../../api/types.ts";
 
 export interface ResourceData {
@@ -197,6 +199,8 @@ export interface BuildFrameArgs {
   log?: DetailLogModel;
   /** Stats tab stream for the selected container (P3-T7). */
   stats?: DetailStatsModel;
+  /** Top tab snapshot for the selected container (P3-T8). */
+  top?: { status: TopStatus; state: string; name: string };
 }
 
 export function buildFrameModel(args: BuildFrameArgs): FrameModel {
@@ -219,6 +223,28 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
         revealSecrets: args.revealSecrets,
       })
     : buildDetail({ inspect: null, activeTab: args.activeTab ?? "config", hasSelection: false });
+
+  // Top: a polled process table for a running container (P3-T8).
+  if ((args.activeTab ?? "config") === "top") {
+    if (focusId === "containers" && item) {
+      if (!inspect) detail.title = `${item.cells["name"] ?? ""} · ${(item.cells["state"] ?? "").slice(2)}`;
+      const top = args.top;
+      if (!top) detail.lines = ["Loading processes…"];
+      else if (top.state !== "running") {
+        detail.lines = [`${top.name} is not running (${top.state || "unknown"}).`, "Processes are shown for running containers."];
+      } else if (top.status.kind === "error") detail.lines = [`Processes unavailable: ${top.status.message}`];
+      else if (top.status.kind !== "ok") detail.lines = ["Loading processes…"];
+      else {
+        const table = topTable(top.status.top);
+        detail.lines = table.lines;
+        detail.table = true;
+        detail.hint = `${table.processes} process${table.processes === 1 ? "" : "es"} · every ${TOP_POLL_MS / 1000} s`;
+      }
+    } else if (item) {
+      detail.lines = ["Processes are shown for containers. Select one in the Containers panel (2)."];
+    }
+    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+  }
 
   // Stats, like logs, belong to containers.
   if ((args.activeTab ?? "config") === "stats") {
