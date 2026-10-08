@@ -4,7 +4,9 @@ import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit, padRight, truncate } from "../../util/fit.ts";
 import type { DetailLogModel, DetailModel } from "../view/model.ts";
 import { logWindow } from "../view/logView.ts";
+import type { LogLine } from "../../util/logBuffer.ts";
 import { sanitizeLogText } from "../../util/logText.ts";
+import { formatLogTimestamp } from "../../util/format.ts";
 import { LABEL_W } from "../view/detail.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 
@@ -52,13 +54,36 @@ function messageRow(text: string, on: boolean, color?: string): string {
 }
 
 /**
+ * One log row (P3-T3, FR-5): the whole line takes its level's colour — error
+ * red, warn yellow, debug dim, everything else the terminal default. The
+ * container's own ANSI was stripped by `sanitizeLogText`, so this is the only
+ * colour on the row and it can never leak past the border.
+ */
+export function paintLogLine(line: LogLine, theme: Theme, on: boolean, timestamps = false): string {
+  const text = sanitizeLogText(line.text);
+  const stamp = timestamps ? `${formatLogTimestamp(line.timestamp)} ` : "";
+  if (!on) return stamp + text;
+  const dimStamp = stamp ? paint(stamp, [dim()]) : "";
+  switch (line.level) {
+    case "error":
+      return dimStamp + paint(text, [fg(theme.error)]);
+    case "warn":
+      return dimStamp + paint(text, [fg(theme.warn)]);
+    case "debug":
+      return dimStamp + paint(text, [dim()]);
+    default:
+      return dimStamp + text;
+  }
+}
+
+/**
  * The Logs tab: only the lines inside the window are sanitized and formatted,
  * so a 5,000-line buffer costs no more to draw than a screenful.
  */
 function logContent(log: DetailLogModel, budget: number, theme: Theme, on: boolean): ContentWindow {
   const win = logWindow(log.view, log.source, budget);
   const { status } = log;
-  const rows = win.lines.map((line) => sanitizeLogText(line.text));
+  const rows = win.lines.map((line) => paintLogLine(line, theme, on, log.timestamps));
 
   if (rows.length === 0 && budget > 0) {
     if (status.kind === "error") rows.push(messageRow(`Logs unavailable: ${status.message}`, on, theme.error));

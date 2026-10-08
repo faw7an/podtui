@@ -54,6 +54,8 @@ export interface DetailLogModel {
   source: LogSource;
   view: LogViewState;
   status: LogStreamStatus;
+  /** Prefix each line with its timestamp (P3-T5 `t`). */
+  timestamps?: boolean;
 }
 
 export interface FrameModel {

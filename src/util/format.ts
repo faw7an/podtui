@@ -120,3 +120,15 @@ export function statusText(state: string): { text: string; tone: Tone } {
         : state.length > 0 ? state : "unknown";
   return { text: `${statusGlyph(tone)} ${label}`, tone };
 }
+
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+/**
+ * Log line timestamp in local time, `2026-10-08 09:46:07`: second precision
+ * and a date, because a follow buffer can span days. Podman's own value
+ * carries nanoseconds; they would cost 10 cells for no reading benefit.
+ */
+export function formatLogTimestamp(d: Date): string {
+  if (Number.isNaN(d.getTime())) return "????-??-?? ??:??:??";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}

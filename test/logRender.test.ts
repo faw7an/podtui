@@ -6,7 +6,8 @@
 
 import { describe, expect, test } from "bun:test";
 import stringWidth from "string-width";
-import { renderDetail } from "../src/ui/render/detailLines.ts";
+import { paintLogLine, renderDetail } from "../src/ui/render/detailLines.ts";
+import { dim, fg, RESET } from "../src/ui/render/palette.ts";
 import { buildFooter } from "../src/ui/render/chrome.ts";
 import { computeLayout } from "../src/ui/layout/computeLayout.ts";
 import { PANEL_IDS, type PanelId } from "../src/ui/layout/types.ts";
@@ -14,9 +15,10 @@ import { PANEL_COLUMNS, panelMeta, type DetailLogModel, type FrameModel } from "
 import { KEYMAP } from "../src/ui/view/help.ts";
 import { FOLLOW, type LogViewState } from "../src/ui/view/logView.ts";
 import type { LogStreamStatus } from "../src/ui/view/logSession.ts";
-import { LogBuffer } from "../src/util/logBuffer.ts";
+import { LogBuffer, type LogLine } from "../src/util/logBuffer.ts";
 import { sanitizeLogText } from "../src/util/logText.ts";
 import { displayWidth } from "../src/util/fit.ts";
+import { formatLogTimestamp } from "../src/util/format.ts";
 import { stripAnsi } from "../src/ui/render/palette.ts";
 import { defaultTheme } from "../src/theme/theme.ts";
 
@@ -157,5 +159,71 @@ describe("string-width patch (patches/string-width@8.3.0.patch)", () => {
     for (let i = 0; i < 36 * 50; i++) stringWidth(line);
     // 50 frames of 36 lines. Unpatched this took seconds.
     expect(performance.now() - start).toBeLessThan(200);
+  });
+});
+
+describe("log colouring (P3-T3)", () => {
+  const RED = fg(defaultTheme.error);
+  const YELLOW = fg(defaultTheme.warn);
+  const line = (text: string): LogLine => {
+    const b = buffer([text]);
+    return b.at(0) as LogLine;
+  };
+
+  test("the sandbox `failing` lines: ERROR red, WARN yellow", () => {
+    expect(paintLogLine(line("ERROR something broke"), defaultTheme, true)).toBe(`${RED}ERROR something broke${RESET}`);
+    expect(paintLogLine(line("WARN low disk"), defaultTheme, true)).toBe(`${YELLOW}WARN low disk${RESET}`);
+  });
+
+  test("debug is dim, info and unknown keep the terminal default", () => {
+    expect(paintLogLine(line("DEBUG x"), defaultTheme, true)).toBe(`${dim()}DEBUG x${RESET}`);
+    expect(paintLogLine(line("INFO ready"), defaultTheme, true)).toBe("INFO ready");
+    expect(paintLogLine(line("hello"), defaultTheme, true)).toBe("hello");
+  });
+
+  test("the container's own colour is replaced by the level colour", () => {
+    expect(paintLogLine(line("\x1b[32mERROR\x1b[0m green?"), defaultTheme, true)).toBe(`${RED}ERROR green?${RESET}`);
+  });
+
+  test("NO_COLOR frames carry no escapes", () => {
+    expect(paintLogLine(line("ERROR x"), defaultTheme, false)).toBe("ERROR x");
+  });
+
+  test("a red line cut at the border still resets before the border", () => {
+    const b = buffer(["ERROR " + "x".repeat(100)]);
+    const out = render(model(b), true);
+    const row = out[2] ?? "";
+    expect(displayWidth(row)).toBe(RECT.w);
+    expect(row).toContain(RED);
+    // The reset must come before the right border glyph.
+    expect(row.lastIndexOf(RESET)).toBeGreaterThan(row.indexOf(RED));
+    expect(row.indexOf("…")).toBeLessThan(row.lastIndexOf("│"));
+    const beforeBorder = row.slice(0, row.lastIndexOf("│"));
+    expect(beforeBorder.lastIndexOf(RESET)).toBeGreaterThan(beforeBorder.lastIndexOf(RED));
+  });
+});
+
+describe("log timestamps (rendered dim; toggled by `t` in P3-T5)", () => {
+  const at = new Date(2026, 9, 8, 9, 46, 7, 599);
+  const line = (text: string): LogLine => {
+    const b = new LogBuffer();
+    b.push({ stream: "stdout", timestamp: at, message: `${text}\n` });
+    return b.at(0) as LogLine;
+  };
+
+  test("formatLogTimestamp is local, second precision", () => {
+    expect(formatLogTimestamp(at)).toBe("2026-10-08 09:46:07");
+    expect(formatLogTimestamp(new Date(Number.NaN))).toBe("????-??-?? ??:??:??");
+  });
+
+  test("off by default", () => {
+    expect(paintLogLine(line("hello"), defaultTheme, false)).toBe("hello");
+  });
+
+  test("dim prefix, then the level colour on the text only", () => {
+    expect(paintLogLine(line("ERROR x"), defaultTheme, true, true)).toBe(
+      `${dim()}2026-10-08 09:46:07 ${RESET}${fg(defaultTheme.error)}ERROR x${RESET}`,
+    );
+    expect(paintLogLine(line("plain"), defaultTheme, false, true)).toBe("2026-10-08 09:46:07 plain");
   });
 });
