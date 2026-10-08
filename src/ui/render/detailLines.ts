@@ -3,7 +3,9 @@ import { innerWidth } from "../layout/panelView.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit, padRight, truncate } from "../../util/fit.ts";
 import type { DetailLogModel, DetailModel, DetailStatsModel } from "../view/model.ts";
-import { STATS_HISTORY, sparkline, statsRows } from "../view/statsView.ts";
+import { STATS_HISTORY, sparkline, statsRows, type StatsHistory } from "../view/statsView.ts";
+import { chartRows, paintChart } from "./lineChart.ts";
+import { formatBytes } from "../../util/format.ts";
 import { logWindow } from "../view/logView.ts";
 import type { LogLine } from "../../util/logBuffer.ts";
 import { renderLogRows } from "./logRows.ts";
@@ -75,6 +77,10 @@ function statsContent(stats: DetailStatsModel, budget: number, width: number, th
   if (rows.length === 0) {
     return [messageRow(status.kind === "ended" ? "The stats stream ended." : "Waiting for the first sample…", on)];
   }
+  const charts = statsCharts(history, budget, width, theme, on);
+  if (charts) return charts;
+
+  // Too little room for real charts: the compact rows with sparklines.
   const sparkW = Math.max(0, Math.min(STATS_HISTORY, width - STATS_LABEL_W));
   const out: string[] = [];
   for (const row of rows) {
@@ -84,6 +90,46 @@ function statsContent(stats: DetailStatsModel, budget: number, width: number, th
     }
   }
   return out.slice(0, budget);
+}
+
+/** Smallest chart (rows of plot) worth drawing; below it the compact view is used. */
+export const MIN_CHART_ROWS = 4;
+
+/**
+ * The Stats tab as in docs/design/stats-reference-*.png: a CPU (%) chart and
+ * a Memory (%) chart sharing the height, each with a caption giving the
+ * current value and the time span shown, then PIDs and traffic. Null when
+ * the pane is too short for charts of at least MIN_CHART_ROWS.
+ */
+export function statsCharts(history: StatsHistory, budget: number, width: number, theme: Theme, on: boolean): string[] | null {
+  const last = history.samples.at(-1);
+  const first = history.samples[0];
+  if (!last || !first) return null;
+  const span = `${Math.round((last.at - first.at) / 1000)}s`;
+  const text = [
+    "",
+    `PIDs: ${last.pids}`,
+    "",
+    `Traffic received: ${formatBytes(last.netRx)}`,
+    `Traffic sent: ${formatBytes(last.netTx)}`,
+    "",
+    `Memory: ${formatBytes(last.memUsage)} / ${last.memLimit > 0 ? formatBytes(last.memLimit) : "no limit"}`,
+    `Block I/O: ${formatBytes(last.blockRead)} read / ${formatBytes(last.blockWrite)} written`,
+  ];
+  // Each chart: a blank line above, the plot, its caption.
+  const plotRows = Math.floor((budget - text.length) / 2) - 2;
+  if (plotRows < MIN_CHART_ROWS || width < 24) return null;
+
+  const chart = (values: number[], color: string, title: string, current: number): string[] => {
+    const c = chartRows(values, width, plotRows);
+    const caption = " ".repeat(c.axisWidth + 2) + `${title}: ${current.toFixed(2)} (${span})`;
+    return ["", ...paintChart(c, color, on), on ? paint(caption, [fg(color)]) : caption];
+  };
+  return [
+    ...chart(history.samples.map((s) => s.cpuPercent), theme.accent, "CPU (%)", last.cpuPercent),
+    ...chart(history.samples.map((s) => s.memPercent), theme.ok, "Memory (%)", last.memPercent),
+    ...text,
+  ].slice(0, budget);
 }
 
 /**

@@ -244,7 +244,8 @@ describe("Logs tab in the App", () => {
       await new Promise((r) => setTimeout(r, 50));
       h.stdin.type("["); // Config → Env
       h.stdin.type("["); // Env → Stats
-      await waitFor(() => h.stdout.frame().includes("1.5% (avg 0.5%)"), "stats row");
+      // The pane is tall enough for the charts (docs/design/stats-reference).
+      await waitFor(() => h.stdout.frame().includes("CPU (%): 1.50"), "stats chart caption");
       expect(h.api.statsOpened).toEqual(["web"]);
       expect(h.api.statsOpen()).toBe(1);
       h.stdin.type("[");
