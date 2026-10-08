@@ -1,0 +1,11 @@
+{
+  "_comment": "Recorded 2026-10-08, Podman 5.8.4 sandbox: DELETE responses (status + body) per kind.",
+  "imageUntagOnly": { "status": 200, "body": "{\"Untagged\":[\"localhost/probe-tag:1\"],\"ExitCode\":0,\"Errors\":[]}" },
+  "networkRemoved": { "status": 200, "body": "[{\"Name\":\"probe-netx\",\"Err\":null}]" },
+  "networkDefaultRefused": { "status": 200, "body": "[{\"Name\":\"podman\",\"Err\":\"default network podman cannot be removed\"}]" },
+  "volumeRemoved": { "status": 204, "body": "" },
+  "containerRemoved": { "status": 200, "body": "[{\"Id\":\"1c4871a7f70b763c18ccc00425b09c203590ca0a90a0ae9b71cd8c58a899aab0\"}]" },
+  "podRemoved": { "status": 200, "body": "{\"RemovedCtrs\":{\"1884f8ba40396029c0e6daffb8b22b3cf179550707abd5e085be706c77735ca5\":null},\"Err\":null,\"Id\":\"e110e395df36aeb9639313dea39799bab54b500cf45248497353956e17c1d006\"}" },
+  "volumeInUse409": { "status": 409, "body": "{\"cause\":\"volume is being used\",\"message\":\"volume probe-vol-run is being used by the following container(s): 4a9a786d2077da742de949d312a1250c88420fcc052ddced580d8dbffd867407: volume is being used\",\"response\":409}" },
+  "imageInUse409": { "status": 409, "body": "{\"cause\":\"image is in use by a container\",\"message\":\"image used by 9120580aa0dd6a425a08329f0651381edde3a47075b80a75b54e62c559ab6806: image is in use by a container: consider listing external containers and force-removing image\",\"response\":409}" }
+}

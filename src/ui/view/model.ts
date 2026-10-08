@@ -1,4 +1,9 @@
 import { PANEL_IDS, type ColumnDef, type PaneId, type PanelId } from "../layout/types.ts";
+import type { LogSource, LogViewState } from "./logView.ts";
+import type { LogStreamStatus } from "./logSession.ts";
+import type { LogSearchState } from "./logSearch.ts";
+import type { StatsHistory } from "./statsView.ts";
+import type { StatsStreamStatus } from "./statsSession.ts";
 
 /**
  * One row of a panel table. `cells` is keyed by column id so that
@@ -40,6 +45,44 @@ export interface DetailModel {
   tabs: string[];
   activeTab: number;
   lines: string[];
+  /**
+   * Logs tab content (P3-T2). Present only when the Logs tab shows a selected
+   * container; the renderer windows it to the pane height, so only visible
+   * lines are ever formatted.
+   */
+  log?: DetailLogModel;
+  /** Env tab: key column width, so the renderer paints values (P3-T6). */
+  env?: { keyWidth: number };
+  /** Stats tab (P3-T7); the renderer sizes the sparklines to the pane. */
+  stats?: DetailStatsModel;
+  /** `lines[0]` is a column header: painted, and kept on screen while scrolling (Top tab). */
+  table?: boolean;
+  /** Lines are a systemd-style file: colour sections, keys, comments (P6). */
+  ini?: boolean;
+  /** Extra bottom-border text, e.g. `v reveal`. */
+  hint?: string;
+}
+
+export interface DetailStatsModel {
+  history: StatsHistory;
+  status: StatsStreamStatus;
+  /** Lifecycle state from the list (`running`, `exited`, ...). */
+  state: string;
+  name: string;
+}
+
+export interface DetailLogModel {
+  source: LogSource;
+  view: LogViewState;
+  status: LogStreamStatus;
+  /** Prefix each line with its timestamp (P3-T5 `t`). */
+  timestamps?: boolean;
+  /** Wrap long lines instead of truncating (P3-T5 `w`). */
+  wrap?: boolean;
+  /** Show error lines only (P3-T4 `e`). */
+  errorsOnly?: boolean;
+  /** `/` search (P3-T4). */
+  search?: LogSearchState;
 }
 
 export interface FrameModel {
@@ -49,7 +92,17 @@ export interface FrameModel {
   /** Right-hand header text, e.g. `9:40 PM`. */
   clock: string;
   error?: string;
+  /**
+   * Result of the last action (P4-T5): busy while pending, then ok/error.
+   * Shown in the footer's right slot, ahead of `error`.
+   */
+  notice?: Notice;
   detail: DetailModel;
+}
+
+export interface Notice {
+  text: string;
+  tone: "busy" | "ok" | "error";
 }
 
 export function panelMeta(
@@ -87,6 +140,7 @@ export const PANEL_COLUMNS: Record<PanelId, ColumnDef[]> = {
   ],
   images: [
     { id: "name", minW: 10, flex: 3, priority: 100 },
+    { id: "state", minW: 8, priority: 60 },
     { id: "size", minW: 7, priority: 80 },
     { id: "age", minW: 4, priority: 20 },
   ],
@@ -98,10 +152,14 @@ export const PANEL_COLUMNS: Record<PanelId, ColumnDef[]> = {
   networks: [
     { id: "name", minW: 10, flex: 3, priority: 100 },
     { id: "state", minW: 8, priority: 70 },
+    { id: "subnet", minW: 10, flex: 1, priority: 40 },
+    { id: "count", minW: 3, priority: 30 },
   ],
   quadlets: [
     { id: "name", minW: 10, flex: 3, priority: 100 },
-    { id: "state", minW: 9, priority: 80 },
+    { id: "type", minW: 4, priority: 40 },
+    // "● active (running)" is 18 cells; anything narrower hid the state.
+    { id: "state", minW: 18, priority: 80 },
   ],
 };
 
@@ -114,4 +172,6 @@ export const COLUMN_HEADERS: Record<string, string> = {
   size: "SIZE",
   count: "CNT",
   mountpoint: "MOUNTPOINT",
+  subnet: "SUBNET",
+  type: "TYPE",
 };

@@ -311,7 +311,9 @@ describe("renderPanel (LAYOUT_SPEC §6)", () => {
 
   test("quadlets keeps its placeholder only while it has no rows", () => {
     const withRows = { ...panel("quadlets", items(2)), emptyLabel: "not implemented yet (phase 6)" };
-    const text = stripAnsi(renderPanel(rect(8, 40), withRows, PLAIN).join("\n"));
+    // 52 wide: the quadlet state column is 18 cells since Phase 6, and this
+    // test is about the placeholder, not about name truncation.
+    const text = stripAnsi(renderPanel(rect(8, 52), withRows, PLAIN).join("\n"));
     expect(text).not.toContain("not implemented");
     expect(text).toContain("container-number-0");
   });
@@ -474,7 +476,9 @@ describe("renderFrame: LAYOUT_SPEC §9 invariants", () => {
           for (const line of lines) expect(visibleWidth(line)).toBe(cols);
         }
       }
-    });
+      // ~2,000 full frames: 1.6 s alone, but past Bun's 5 s default when the
+      // whole suite runs concurrently. The assertions are unchanged.
+    }, 30_000);
   }
 
   test("every visible panel appears in the output", () => {
@@ -703,5 +707,26 @@ describe("zero-match filter state", () => {
     const lines = renderPanel(rrect(8, 50), panel("containers", []), PLAIN);
     expect(stripAnsi(lines.join("\n"))).toContain("(empty)");
     expect(stripAnsi(lines.join("\n"))).not.toContain("No matches");
+  });
+});
+
+describe("empty-panel explanations wrap (P6-T6)", () => {
+  const rect = (h: number, w: number) => ({
+    id: "quadlets" as PanelId, x: 0, y: 0, w, h, collapsed: h < 4, showHeader: h >= 6, focused: true,
+  });
+  test("the quadlet hint is readable in full when there is room", () => {
+    const p = { ...panel("quadlets", []), emptyLabel: "No quadlets. Rootless ones live in ~/.config/containers/systemd/, rootful ones in /etc/containers/systemd/." };
+    const out = renderPanel(rect(8, 40), p, PLAIN);
+    for (const line of out) expect(visibleWidth(line)).toBe(40);
+    const text = stripAnsi(out.join(" ")).replace(/[│ ]+/g, " ");
+    expect(text).toContain("~/.config/containers/systemd/");
+    expect(text).toContain("/etc/containers/systemd/");
+  });
+
+  test("too little room: the last row ends with …, never overflows", () => {
+    const p = { ...panel("quadlets", []), emptyLabel: "word ".repeat(40).trim() };
+    const out = renderPanel(rect(4, 30), p, PLAIN);
+    for (const line of out) expect(visibleWidth(line)).toBe(30);
+    expect(stripAnsi(out.join("\n"))).toContain("…");
   });
 });

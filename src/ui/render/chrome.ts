@@ -1,5 +1,5 @@
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
-import { fit, displayWidth } from "../../util/fit.ts";
+import { fit, displayWidth, truncate } from "../../util/fit.ts";
 import type { Layout } from "../layout/types.ts";
 import { PANEL_IDS, type PanelId } from "../layout/types.ts";
 import { panelMeta, type FrameModel } from "../view/model.ts";
@@ -105,7 +105,7 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
 }
 
 /** Which UI state the footer advertises keys for. */
-export type FooterHintContext = "base" | "detail" | "filter" | "filterKept";
+export type FooterHintContext = "base" | "detail" | "filter" | "filterKept" | "logs";
 
 export interface FooterOptions {
   theme: Theme;
@@ -138,6 +138,20 @@ const HINTS: { key: string; desc: string }[] = [
  * the query itself is echoed in the panel title, and `q`/`?` must NOT appear —
  * they type characters in this mode, so advertising them as quit/help would lie.
  */
+/** Detail focused on the Logs tab (P3-T2): the arrows scroll the log. */
+const LOG_HINTS: { key: string; desc: string }[] = [
+  { key: "↑↓jk", desc: "scroll" },
+  { key: "/", desc: "search" },
+  { key: "n N", desc: "match" },
+  { key: "e", desc: "errors" },
+  { key: "p", desc: "pause" },
+  { key: "g G", desc: "top/live" },
+  { key: "[ ]", desc: "tab" },
+  { key: "Esc", desc: "back" },
+  { key: "?", desc: "help" },
+  { key: "q", desc: "quit" },
+];
+
 const FILTER_HINTS: { key: string; desc: string }[] = [
   { key: "Esc", desc: "clear" },
   { key: "Enter", desc: "keep" },
@@ -182,7 +196,15 @@ export function buildFooter(
   const cols = layout.cols;
   if (cols <= 0) return "";
 
-  const error = model.error ? `! ${model.error}` : undefined;
+  // An action's notice outranks the refresh error: it answers what the user
+  // just did. Busy/ok/error each carry a glyph, never colour alone.
+  const notice = model.notice;
+  const error = notice
+    ? `${notice.tone === "busy" ? "◌" : notice.tone === "ok" ? "✓" : "!"} ${notice.text}`
+    : model.error
+      ? `! ${model.error}`
+      : undefined;
+  const errorTone = notice ? (notice.tone === "error" ? theme.error : notice.tone === "ok" ? theme.ok : theme.accent) : theme.error;
 
   const render = (hints: typeof HINTS): string =>
     hints
@@ -190,9 +212,11 @@ export function buildFooter(
       .join("  ");
 
   const context: FooterHintContext =
-    opts.context ?? (model.focus === "detail" ? "detail" : "base");
+    opts.context ?? (model.focus === "detail" ? (model.detail.log ? "logs" : "detail") : "base");
   let hints =
-    context === "detail"
+    context === "logs"
+      ? LOG_HINTS
+      : context === "detail"
       ? DETAIL_HINTS
       : context === "filter"
         ? FILTER_HINTS
@@ -206,9 +230,13 @@ export function buildFooter(
   }
 
   const body = render(hints);
-  const errorText = error ? paint(` ${error}`, [on ? fg(theme.error) : ""]) : "";
   const room = cols - displayWidth(body);
-  if (displayWidth(errorText) > room) return fit(body, cols);
+  // A notice is never dropped for lack of room: it is cut to what fits, and
+  // if even that is too little, it replaces the hints entirely.
+  if (error && room - 1 < Math.min(displayWidth(error), 20)) {
+    return fit(paint(truncate(error, cols), [on ? fg(errorTone) : ""]), cols);
+  }
+  const errorText = error ? paint(` ${truncate(error, Math.max(0, room - 1))}`, [on ? fg(errorTone) : ""]) : "";
   const gap = Math.max(0, room - displayWidth(errorText));
   return fit(body + " ".repeat(gap) + errorText, cols);
 }

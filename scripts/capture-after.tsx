@@ -67,7 +67,7 @@ async function fetchData(): Promise<ResourceData> {
     engine.listVolumes(SOCKET),
     engine.listNetworks(SOCKET),
   ]);
-  return { containers, pods, images, volumes, networks, quadlets: [] };
+  return { containers, pods, images, volumes, networks, danglingVolumes: null, quadlets: [] };
 }
 
 const data = await fetchData();

@@ -1,0 +1,22 @@
+diff --git a/index.js b/index.js
+index dd2a7cd83783dd1bc209832f99a3299fc7dc2174..34cb308d4e75672f2ccf1c75c3d652de03fbbcf6 100644
+--- a/index.js
++++ b/index.js
+@@ -148,6 +148,17 @@ export default function stringWidth(input, options = {}) {
+ 		return 0;
+ 	}
+ 
++	// podtui patch: under Bun, use the native measurer. The pure-JS path runs
++	// an RGI_Emoji regex per grapheme, which made every Ink frame cost ~250ms
++	// (profiled 2026-10-08); podtui itself measures with Bun.stringWidth, so
++	// Ink and podtui now agree on every width by construction.
++	if (typeof Bun !== 'undefined' && typeof Bun.stringWidth === 'function') {
++		return Bun.stringWidth(input, {
++			ambiguousIsNarrow: options.ambiguousIsNarrow ?? true,
++			countAnsiEscapeCodes: options.countAnsiEscapeCodes ?? false,
++		});
++	}
++
+ 	const {
+ 		ambiguousIsNarrow = true,
+ 		countAnsiEscapeCodes = false,

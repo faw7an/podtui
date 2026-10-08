@@ -217,7 +217,7 @@ describe("P1-T8 Integration Tests (requires sandbox)", () => {
       
       const inspect = await engine.inspectPod(SOCKET_PATH, webPod.Id);
       expect(inspect.Id).toBe(webPod.Id);
-      expect(inspect.Containers.length).toBe(3); // infra + frontend + backend
+      expect(inspect.Containers?.length).toBe(3); // infra + frontend + backend
     }, 10000);
   });
 

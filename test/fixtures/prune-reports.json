@@ -1,0 +1,7 @@
+{
+  "_comment": "Recorded 2026-10-08 on a throwaway Podman 5.8.4: POST /libpod/{kind}/prune bodies. A 2,000,000-byte volume reported Size 2000000; networks carry no Size.",
+  "containers": [{ "Id": "200f7250de70e6afac3d78a7a98cce23e1fd3b6f30ec7d2ec9153079bdc8a764", "Size": 0 }],
+  "volumes": [{ "Id": "fat", "Size": 2000000 }],
+  "networks": [{ "Name": "spare", "Error": null }],
+  "images": []
+}

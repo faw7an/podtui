@@ -14,7 +14,13 @@ export interface ContainerListItem {
   Labels: Record<string, string>;
   Size: { SizeRw: number; SizeRootFs: number } | null;
   NetworkSettings: ContainerNetworkSettings;
-  Mounts: MountPoint[];
+  /**
+   * Mount DESTINATIONS only (e.g. `["/data"]`), not volume names — verified
+   * live on Podman 5.8.4. Use `containersUsingVolume` to map volumes.
+   */
+  Mounts: string[] | null;
+  /** Network names (verified live: `["test-network"]`; `[]` on the default). */
+  Networks?: string[] | null;
   IsInfra: boolean;
   Pod: string;
   PodName: string;
@@ -35,6 +41,8 @@ export interface PortMapping {
 
 export interface MountPoint {
   Type: string;
+  /** Volume name for `Type: "volume"` (verified live: `probe-vol-stop`). */
+  Name?: string;
   Source: string;
   Destination: string;
   Driver: string;
@@ -47,13 +55,14 @@ export interface ContainerNetworkSettings {
   Networks: Record<string, EndpointSettings>;
 }
 
+/**
+ * One entry of a network inspect's `containers` map, keyed by container id.
+ * From fixture `network-inspect-connected.json` (Podman 5.8.4): the libpod
+ * shape, not Docker's `EndpointSettings` with `IPAddress`/`Gateway`.
+ */
 export interface EndpointSettings {
-  IPAddress: string;
-  Gateway: string;
-  GlobalIPv6Address: string;
-  GlobalIPv6Gateway: string;
-  MacAddress: string;
-  DriverOpts: Record<string, string>;
+  name: string;
+  interfaces?: Record<string, { subnets?: { ipnet: string; gateway?: string }[] | null; mac_address?: string }> | null;
 }
 
 export interface ContainerInspect {
@@ -144,6 +153,8 @@ export interface NetworkSettings {
   LinkLocalIPv6PrefixLen: number;
   Ports: Record<string, PortBinding[] | null>;
   SandboxKey: string;
+  /** Per-network endpoints, keyed by network name; present for bridged containers (verified live). */
+  Networks?: Record<string, unknown> | null;
 }
 
 export interface PortBinding {
@@ -294,17 +305,32 @@ export interface PodContainer {
   RestartCount: number;
 }
 
+/**
+ * `GET /pods/{id}/json`, from fixture `pod-inspect.json` (Podman 5.8.4).
+ * Not the list shape: the state is `State` (not `Status`), the infra
+ * container is `InfraContainerID`, and members are `{Id, Name, State}`.
+ */
 export interface PodInspect {
   Id: string;
   Name: string;
-  Status: string;
   Created: string;
-  InfraId: string;
-  Containers: PodContainer[];
-  Labels: Record<string, string>;
-  Networks: string[];
-  Namespace: string;
-  Cgroup: string;
+  CreateCommand?: string[];
+  ExitPolicy?: string;
+  State: string;
+  Hostname?: string;
+  Labels?: Record<string, string> | null;
+  CgroupParent?: string;
+  CreateInfra?: boolean;
+  InfraContainerID?: string;
+  SharedNamespaces?: string[] | null;
+  NumContainers: number;
+  Containers: PodInspectContainer[] | null;
+}
+
+export interface PodInspectContainer {
+  Id: string;
+  Name: string;
+  State: string;
 }
 
 export interface ImageListItem {
@@ -600,7 +626,10 @@ export interface Network {
 }
 
 export interface ContainerStatsUI {
+  /** Live: CPU % over the last sample interval (`CPU`). */
   cpuPercent: number;
+  /** Average CPU % since the container started (`AvgCPU`). */
+  avgCpuPercent: number;
   memUsage: number;
   memLimit: number;
   memPercent: number;
@@ -615,4 +644,29 @@ export interface LogEntry {
   timestamp: Date;
   stream: "stdout" | "stderr";
   message: string;
+}
+
+/** One layer from `GET /images/{id}/history` (fixture `image-history.json`). */
+export interface ImageHistoryEntry {
+  Id: string;
+  /** Unix SECONDS. */
+  Created: number;
+  CreatedBy: string;
+  Tags: string[] | null;
+  Size: number;
+  Comment: string;
+}
+
+/**
+ * One entry of `GET /libpod/quadlets/json` (fixture `quadlets-list.json`,
+ * Podman 5.8.4). `UnitName` is Podman's own mapping, honouring overrides
+ * such as `ServiceName=`; `Status` is "Not loaded" when systemd does not know
+ * the unit.
+ */
+export interface QuadletListItem {
+  Name: string;
+  UnitName: string;
+  Path: string;
+  Status: string;
+  App: string;
 }

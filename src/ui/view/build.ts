@@ -8,8 +8,12 @@ import type {
 import { formatAge, formatBytes, healthSuffix, parsePodmanTime, shortenImageName, statusText, statusGlyph } from "../../util/format.ts";
 import { PANEL_IDS, type PaneId, type PanelId } from "../layout/types.ts";
 import { selectedIndex } from "../layout/layoutReducer.ts";
-import { PANEL_COLUMNS, panelMeta, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
+import { PANEL_COLUMNS, panelMeta, type DetailLogModel, type DetailStatsModel, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
 import { buildDetail, type DetailTabId } from "./detail.ts";
+import { TOP_POLL_MS, topTable } from "./topView.ts";
+import { QUADLET_LABEL, type QuadletType } from "../../engine/quadlet.ts";
+import { TABS_BY_PANEL, resourceView, type ResourceDetailData } from "./resourceDetail.ts";
+import type { TopStatus } from "../hooks/useTopPoll.ts";
 import type { ContainerInspect } from "../../api/types.ts";
 
 export interface ResourceData {
@@ -18,8 +22,18 @@ export interface ResourceData {
   images: ImageListItem[];
   volumes: VolumeListItem[];
   networks: NetworkListItem[];
-  /** No quadlet source is wired yet; the panel stays empty rather than guessing. */
-  quadlets: { id: string; name: string; status: string }[];
+  /**
+   * Names of volumes nothing references (server `dangling` filter), or null
+   * before the first fetch. "In use" = not in this list (P4-T3).
+   */
+  danglingVolumes: string[] | null;
+  /** Quadlets (P6): Podman's list plus the unit state systemd reports. */
+  quadlets: QuadletData[];
+  /**
+   * Why the quadlet list is empty or partial (no quadlet API, no systemd user
+   * session…), shown in place of an empty box (P6-T6). Null when fine.
+   */
+  quadletNote?: string | null;
 }
 
 export const EMPTY_DATA: ResourceData = {
@@ -28,6 +42,7 @@ export const EMPTY_DATA: ResourceData = {
   images: [],
   volumes: [],
   networks: [],
+  danglingVolumes: null,
   quadlets: [],
 };
 
@@ -37,7 +52,8 @@ function imageName(image: ImageListItem): string {
   if (tag) return shortenImageName(tag);
   const name = image.Names?.[0];
   if (name) return shortenImageName(name);
-  return image.Id.slice(0, 12);
+  // Untagged (RepoTags null, no Names — fixture images-list-untagged.json).
+  return `<none> ${image.Id.slice(0, 12)}`;
 }
 
 function containerRows(items: ContainerListItem[], now: number): RowModel[] {
@@ -73,50 +89,107 @@ function podRows(items: PodListItem[], now: number): RowModel[] {
   });
 }
 
+/**
+ * Image state (P4-T2): `Containers` is the list's own count of containers
+ * using the image; an image without tags is marked `untagged`, the case
+ * `image prune` targets. A glyph accompanies every word.
+ */
 function imageRows(items: ImageListItem[], now: number): RowModel[] {
-  return items.map((i) => ({
-    id: i.Id,
-    tone: "dim" as const,
-    cells: {
-      name: imageName(i),
-      size: formatBytes(i.Size ?? 0),
-      age: formatAge(parsePodmanTime(i.Created) ?? NaN, now),
-    },
-  }));
+  return items.map((i) => {
+    const used = (i.Containers ?? 0) > 0;
+    const untagged = (i.RepoTags ?? []).length === 0 && (i.Names ?? []).length === 0;
+    const tone = used ? ("ok" as const) : untagged ? ("warn" as const) : ("dim" as const);
+    const word = used ? "in use" : untagged ? "untagged" : "unused";
+    return {
+      id: i.Id,
+      tone,
+      cells: {
+        name: imageName(i),
+        state: `${statusGlyph(tone)} ${word}`,
+        size: formatBytes(i.Size ?? 0),
+        age: formatAge(parsePodmanTime(i.Created) ?? NaN, now),
+      },
+    };
+  });
 }
 
-function volumeRows(items: VolumeListItem[]): RowModel[] {
+/**
+ * "In use" means some container (running or stopped) references the volume:
+ * NOT in the server's dangling list, the same rule `volume prune` uses.
+ * `MountCount` is not usable — it read 0 for a volume mounted by a running
+ * container (verified live, Podman 5.8.4). Unknown until fetched: `…`.
+ */
+function volumeRows(items: VolumeListItem[], dangling: string[] | null): RowModel[] {
+  const unused = dangling ? new Set(dangling) : null;
   return items.map((v) => {
-    const inUse = (v.MountCount ?? 0) > 0;
+    const inUse = unused ? !unused.has(v.Name) : null;
     return {
       id: v.Name,
       tone: inUse ? ("ok" as const) : ("dim" as const),
       cells: {
         name: v.Name,
-        state: `${statusGlyph(inUse ? "ok" : "dim")} ${inUse ? "in use" : "unused"}`,
+        state: inUse === null ? `${statusGlyph("dim")} …` : `${statusGlyph(inUse ? "ok" : "dim")} ${inUse ? "in use" : "unused"}`,
         mountpoint: v.Mountpoint ?? "",
       },
     };
   });
 }
 
-function networkRows(items: NetworkListItem[]): RowModel[] {
-  return items.map((n) => ({
-    id: n.id || n.name,
-    tone: "info" as const,
-    cells: { name: n.name, state: n.driver || "bridge" },
-  }));
-}
-
-function quadletRows(items: { id: string; name: string; status: string }[]): RowModel[] {
-  return items.map((q) => {
-    const st = statusText(q.status);
+/**
+ * Network rows (P4-T4): driver, first subnet, and how many containers (any
+ * state) list this network — the containers list's `Networks` names it.
+ */
+function networkRows(items: NetworkListItem[], containers: ContainerListItem[]): RowModel[] {
+  return items.map((n) => {
+    const count = containers.filter((c) => (c.Networks ?? []).includes(n.name)).length;
     return {
-      id: q.id,
-      tone: st.tone,
-      cells: { name: q.name, state: st.text },
+      id: n.id || n.name,
+      tone: "info" as const,
+      cells: {
+        name: n.name,
+        state: n.driver || "bridge",
+        subnet: n.subnets?.[0]?.subnet ?? "",
+        count: String(count),
+      },
     };
   });
+}
+
+/** Shown when there are no quadlets: where they would live (P6-T6). */
+export const QUADLETS_EMPTY =
+  "No quadlets. Rootless ones live in ~/.config/containers/systemd/, rootful ones in /etc/containers/systemd/; run systemctl --user daemon-reload after adding one.";
+
+/**
+ * Quadlet rows: file name, type label, and the unit state from systemd with
+ * a glyph (never colour alone). `not loaded` means systemd has not generated
+ * the unit yet — usually a daemon-reload is due.
+ */
+function quadletRows(items: QuadletData[]): RowModel[] {
+  return items.map((q) => {
+    const tone =
+      q.active === "active" ? ("ok" as const)
+      : q.active === "failed" ? ("error" as const)
+      : q.load === "not-found" ? ("warn" as const)
+      : ("dim" as const);
+    return {
+      id: q.id,
+      tone,
+      cells: { name: q.name, type: QUADLET_LABEL[q.type], state: `${statusGlyph(tone)} ${q.state}` },
+    };
+  });
+}
+
+export interface QuadletData {
+  /** The quadlet file name, e.g. `hello.container` (unique in the list). */
+  id: string;
+  name: string;
+  unit: string;
+  type: QuadletType;
+  path: string;
+  /** Display state, e.g. "active (running)", "not loaded", "unknown". */
+  state: string;
+  active: string;
+  load: string;
 }
 
 /**
@@ -146,8 +219,8 @@ export function buildPanelModels(
     containers: containerRows(data.containers, now),
     pods: podRows(data.pods, now),
     images: imageRows(data.images, now),
-    volumes: volumeRows(data.volumes),
-    networks: networkRows(data.networks),
+    volumes: volumeRows(data.volumes, data.danglingVolumes),
+    networks: networkRows(data.networks, data.containers),
     quadlets: quadletRows(data.quadlets),
   };
 
@@ -172,7 +245,7 @@ export function buildPanelModels(
     // Quadlets has no data source until Phase 6. Say so explicitly instead of
     // showing an empty box that looks like a bug; no fake data is invented.
     ...(id === "quadlets" && rows.quadlets.length === 0
-      ? { emptyLabel: "not implemented yet (phase 6)" }
+      ? { emptyLabel: data.quadletNote ?? QUADLETS_EMPTY }
       : {}),
   };
   });
@@ -193,13 +266,25 @@ export interface BuildFrameArgs {
   filter?: Partial<Record<PanelId, string>>;
   collapsedSections?: ReadonlySet<string>;
   revealSecrets?: boolean;
+  /** Logs tab stream for the selected container (P3-T2). */
+  log?: DetailLogModel;
+  /** Stats tab stream for the selected container (P3-T7). */
+  stats?: DetailStatsModel;
+  /** Top tab snapshot for the selected container (P3-T8). */
+  top?: { status: TopStatus; state: string; name: string };
+  /** Inspect data for a selected pod/image/volume/network (P4-T1..T4). */
+  resource?: ResourceDetailData | null;
+  /** The list whose selection the detail shows (defaults: focus, else containers). */
+  detailPanel?: PanelId;
 }
 
 export function buildFrameModel(args: BuildFrameArgs): FrameModel {
   const panels = buildPanelModels(args.data, args.selected, args.now, args.filter);
 
   // Detail shows whatever is selected in the focused list panel.
-  const focusId: PanelId = args.focus === "detail" ? "containers" : args.focus;
+  // Detail shows the selection of `detailPanel` (the list the user came from
+  // when the detail pane has focus); older callers fall back to containers.
+  const focusId: PanelId = args.detailPanel ?? (args.focus === "detail" ? "containers" : args.focus);
   const panel = panels.find((p) => p.id === focusId);
   const item = panel?.items[panel.selected];
 
@@ -213,8 +298,101 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
         hasSelection: true,
         collapsed: args.collapsedSections,
         revealSecrets: args.revealSecrets,
+        links: {
+          podName: args.data.pods.find((p) => p.Id === inspect?.Pod)?.Name,
+          // Null until the network list is loaded: then trust inspect as-is.
+          networkNames: args.data.networks.length > 0 ? args.data.networks.map((n) => n.name) : undefined,
+        },
       })
     : buildDetail({ inspect: null, activeTab: args.activeTab ?? "config", hasSelection: false });
+
+  // Pods, images, volumes, networks (P4-T1..T4): their own tabs, built from
+  // inspect data fetched for exactly this item.
+  if (focusId !== "containers" && item) {
+    const tabs = TABS_BY_PANEL[focusId];
+    const wanted = args.activeTab ?? "config";
+    const idx = Math.max(0, tabs.findIndex((t) => t.id === wanted));
+    const tab = tabs[idx]?.id ?? "config";
+    const resource = args.resource && args.resource.panel === focusId && args.resource.id === item.id ? args.resource : null;
+    // The quadlet Journal tab is a log stream the App attaches (P6-T3).
+    const view =
+      focusId === "quadlets" && tab === "journal"
+        ? { lines: [] as string[] }
+        : resource
+          ? resourceView(tab, resource, args.data, args.now)
+          : { lines: ["Loading…"] };
+    const state = (item.cells["state"] ?? "").replace(/^\S+ /, "");
+    return {
+      panels,
+      focus: args.focus,
+      clock: args.clock,
+      error: args.error,
+      detail: {
+        title: `${item.cells["name"] ?? item.id.slice(0, 12)}${state ? ` · ${state}` : ""}`,
+        tabs: tabs.map((t) => t.label),
+        activeTab: idx,
+        lines: view.lines,
+        ...(view.table ? { table: true } : {}),
+        ...("ini" in view && view.ini ? { ini: true } : {}),
+        ...(view.hint ? { hint: view.hint } : {}),
+      },
+    };
+  }
+
+  // The list is re-polled; inspect is fetched once per selection. So the
+  // title takes the name from inspect but the state from the list: a
+  // container stopped while selected must not keep saying "running".
+  if (item && inspect && focusId === "containers") {
+    const state = (item.cells["state"] ?? "").slice(2);
+    if (state) detail.title = `${inspect.Name || inspect.Id.slice(0, 12)} · ${state}`;
+  }
+
+  // Top: a polled process table for a running container (P3-T8).
+  if ((args.activeTab ?? "config") === "top") {
+    if (focusId === "containers" && item) {
+      if (!inspect) detail.title = `${item.cells["name"] ?? ""} · ${(item.cells["state"] ?? "").slice(2)}`;
+      const top = args.top;
+      if (!top) detail.lines = ["Loading processes…"];
+      else if (top.state !== "running") {
+        detail.lines = [`${top.name} is not running (${top.state || "unknown"}).`, "Processes are shown for running containers."];
+      } else if (top.status.kind === "error") detail.lines = [`Processes unavailable: ${top.status.message}`];
+      else if (top.status.kind !== "ok") detail.lines = ["Loading processes…"];
+      else {
+        const table = topTable(top.status.top);
+        detail.lines = table.lines;
+        detail.table = true;
+        detail.hint = `${table.processes} process${table.processes === 1 ? "" : "es"} · every ${TOP_POLL_MS / 1000} s`;
+      }
+    } else if (item) {
+      detail.lines = ["Processes are shown for containers. Select one in the Containers panel (2)."];
+    }
+    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+  }
+
+  // Stats, like logs, belong to containers.
+  if ((args.activeTab ?? "config") === "stats") {
+    if (focusId === "containers" && item) {
+      detail.lines = [];
+      if (args.stats) detail.stats = args.stats;
+      if (!inspect) detail.title = `${item.cells["name"] ?? ""} · ${(item.cells["state"] ?? "").slice(2)}`;
+    } else if (item) {
+      detail.lines = ["Stats are shown for containers. Select one in the Containers panel (2)."];
+    }
+    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+  }
+
+  // Logs belong to containers; other panels say so instead of looking empty.
+  // The title still names the selection; the content is the stream.
+  if ((args.activeTab ?? "config") === "logs") {
+    if (focusId === "containers" && item) {
+      detail.lines = [];
+      if (args.log) detail.log = args.log;
+      if (!inspect) detail.title = `${item.cells["name"] ?? ""} · ${(item.cells["state"] ?? "").slice(2)}`;
+    } else if (item) {
+      detail.lines = ["Logs are shown for containers. Select one in the Containers panel (2)."];
+    }
+    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+  }
 
   if (item && !inspect) {
     for (const [key, value] of Object.entries(item.cells)) {

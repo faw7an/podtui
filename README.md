@@ -63,18 +63,27 @@ first-class citizens. It is designed so that:
 
 ## Status
 
-podtui is in **early development (v0.x)**. Today it is a **read-only viewer**: it lists and
-inspects but cannot change or delete anything. That makes it safe to point at your real
-containers.
+podtui is in **early development (v0.x)**. It lists and inspects everything, and can start,
+stop, restart, kill and remove containers and pods and remove images, volumes and networks.
+Every remove and kill asks first and names exactly what it affects; images, volumes and
+networks are never force-removed.
 
 | Works today | Coming next |
 |---|---|
-| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | **Logs** tab: live follow, search, errors in red, warnings in yellow |
-| Live refresh (every 5 s by default) that keeps your cursor on the same item | **Stats**, **Env** (secrets masked) and **Top** tabs |
-| Container **Config** tab: formatted inspect output, foldable sections | Start / stop / restart / kill / remove, with confirm dialogs |
-| `/` filter in every list, `?` help overlay, `z` zoom | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
-| Adapts to any terminal size, from 40×10 up | **Quadlets**: unit state, journal, start/stop |
-| Works with **podman-docker** setups, and never connects to a Docker daemon by mistake | Omarchy theme colours, mouse support |
+| Six numbered panels (pods, containers, images, volumes, networks, quadlets), each can be shown or hidden | |
+| **Quadlets**: unit state from systemd, the file, the generated unit, live journal; start / stop / restart, reload systemd | |
+| Live refresh (every 5 s by default) that keeps your cursor on the same item | |
+| Follows your **Omarchy theme** live (`T` reloads); readable status colours on light and dark themes; 256-colour fallback | |
+| Container **Config** tab: formatted inspect output, foldable sections | |
+| **Mouse**: click rows, panel numbers, header and detail tabs; wheel scrolls (`--no-mouse` to turn off) | |
+| Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | |
+| Pod (members), image (history, users), volume (users) and network (subnets, members) detail views | |
+| **Stats** (live CPU with a 1-minute sparkline, memory, net, block, PIDs), **Env** (secrets masked until `v`) and **Top** (process list, every 2 s) tabs | |
+| `/` filter in every list, `?` help overlay, `z` zoom |  |
+| Start / stop / restart / kill / remove with confirm dialogs that name every target |  |
+| Bulk menu (`x`): stop all, prune containers/images/volumes/networks, remove all — each previews exactly what it touches |  |
+| Adapts to any terminal size, from 40×10 up |  |
+| Works with **podman-docker** setups, and never connects to a Docker daemon by mistake |  |
 
 The full plan is in [ROADMAP.md](ROADMAP.md).
 
@@ -224,6 +233,11 @@ podtui --version | --help
 podtui uses the terminal's alternate screen, so your scrollback is untouched. Quitting with `q`,
 Ctrl+C or a `SIGTERM` restores the terminal.
 
+The mouse works too: click a row to select it, a panel's `[N]` to hide it, a
+header tab to bring a panel back, a detail tab to switch; the wheel scrolls
+lists and logs. Run `podtui --no-mouse` to keep your terminal's own text
+selection instead.
+
 ### Keys
 
 | Key | Action |
@@ -232,13 +246,29 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `Tab` | focus next panel |
 | `z` | zoom panel |
 | `↑↓jk` | move selection |
-| `/` | filter list |
+| `/` | filter list / search logs |
 | `Ctrl+U` | clear filter line |
+| `c` | jump to container |
 | `Space` | fold sections |
-| `PgUp/PgDn` | scroll detail |
+| `PgUp/PgDn` | scroll detail/logs |
 | `Enter` | open detail |
 | `[ ]` | detail tab |
+| `p` | pause/resume logs |
+| `g G` | logs: oldest / live end |
+| `n N` | logs: next/prev match |
+| `e` | logs: errors only |
+| `t` | logs: timestamps |
+| `w` | logs: wrap lines |
+| `v` | env: reveal secrets |
 | `Esc` | back / close |
+| `s` | start |
+| `S` | stop |
+| `r` | restart |
+| `K` | kill (asks first) |
+| `d` | remove (asks first) |
+| `x` | bulk: prune, stop, remove |
+| `R` | quadlets: reload systemd |
+| `T` | reload Omarchy theme |
 | `?` | help |
 | `q` | quit |
 

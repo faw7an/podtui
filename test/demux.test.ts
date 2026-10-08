@@ -279,3 +279,69 @@ describe("real fixture test", () => {
     }
   });
 });
+describe("UTF-8 split across frames (recorded live, Podman 5.8.4)", () => {
+  // `printf "caf\303"; sleep 1; printf "\251 ok\n"` in a container: conmon
+  // emits one frame per write, so `é` (C3 A9) straddles two frames. Decoding
+  // each frame on its own turned it into two U+FFFD characters.
+  test("the decoder joins the character instead of emitting U+FFFD", async () => {
+    const bytes = new Uint8Array(await Bun.file("test/fixtures/container-logs-utf8-split.bin").arrayBuffer());
+    const decoder = new MultiplexedLogDecoder();
+    decoder.append(bytes);
+    const text = decoder.decode().map((f) => f.message).join("");
+    expect(text).not.toContain("�");
+    expect(text).toBe("café ok\n");
+  });
+
+  test("also when the split frames arrive in separate chunks", async () => {
+    const bytes = new Uint8Array(await Bun.file("test/fixtures/container-logs-utf8-split.bin").arrayBuffer());
+    const decoder = new MultiplexedLogDecoder();
+    let text = "";
+    for (let i = 0; i < bytes.length; i += 7) {
+      decoder.append(bytes.subarray(i, i + 7));
+      text += decoder.decode().map((f) => f.message).join("");
+    }
+    expect(text).toBe("café ok\n");
+  });
+
+  test("stdout and stderr keep separate partial characters", () => {
+    const enc = (stream: 1 | 2, payload: number[]): Uint8Array => {
+      const f = new Uint8Array(8 + payload.length);
+      f[0] = stream;
+      f[7] = payload.length;
+      f.set(payload, 8);
+      return f;
+    };
+    const decoder = new MultiplexedLogDecoder();
+    decoder.append(enc(1, [0x61, 0xc3])); // stdout: "a" + first byte of é
+    decoder.append(enc(2, [0x62, 0x0a])); // stderr: "b\n"
+    decoder.append(enc(1, [0xa9, 0x0a])); // stdout: second byte of é + "\n"
+    const frames = decoder.decode();
+    expect(frames.map((f) => [f.stream, f.message])).toEqual([
+      ["stdout", "a"],
+      ["stderr", "b\n"],
+      ["stdout", "é\n"],
+    ]);
+  });
+});
+
+describe("timestamp prefix", () => {
+  test("an empty line keeps its newline (recorded frame `<ts> \\n`)", () => {
+    const decoder = new MultiplexedLogDecoder();
+    const payload = new TextEncoder().encode("2026-10-08T09:46:08.604609938+03:00 \n");
+    const frame = new Uint8Array(8 + payload.length);
+    frame[0] = 1;
+    frame[7] = payload.length;
+    frame.set(payload, 8);
+    decoder.append(frame);
+    expect(decoder.decode().map((f) => f.message)).toEqual(["\n"]);
+  });
+
+  test("leading spaces in the message survive", () => {
+    const payload = new TextEncoder().encode("2026-10-08T09:46:08Z    indented\n");
+    const frame = new Uint8Array(8 + payload.length);
+    frame[0] = 1;
+    frame[7] = payload.length;
+    frame.set(payload, 8);
+    expect(decodeMultiplexedFrame(frame).frame?.message).toBe("   indented\n");
+  });
+});

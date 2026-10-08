@@ -1,8 +1,10 @@
 import {
   get,
+  getText,
   post,
   postVoid,
-  delVoid,
+  delReport,
+  EngineError,
   streamChunks,
   streamJson,
   streamLines,
@@ -11,6 +13,8 @@ import {
   MultiplexedLogDecoder,
 } from "../api/demux.ts";
 import type {
+  QuadletListItem,
+  ImageHistoryEntry,
   ContainerListItem,
   ContainerInspect,
   ContainerStats,
@@ -36,7 +40,15 @@ import type {
 } from "./ContainerEngine.ts";
 
 /**
- * `AvgCPU`/`CPU` and `MemPerc` are already PERCENTAGES, not fractions.
+ * `CPU` is the LIVE value: CPU % over the last sample interval. `AvgCPU` is
+ * the average since the container started. Measured on Podman 5.8.4 with a
+ * container that idled, busy-looped 6 s, then idled, streamed at 5 s:
+ * CPU 23 → 96 → 0.00 → 0.00 while AvgCPU went 23 → 59 → 40 → 30 (decaying
+ * slowly). The Stats tab shows `cpuPercent` (live) and keeps the average as
+ * `avgCpuPercent`. The mapper used AvgCPU before, which a live tab would have
+ * shown as a slowly fading number long after a spike ended.
+ *
+ * Both, and `MemPerc`, are already PERCENTAGES, not fractions.
  * Verified live 2026-10-08 against `podman stats --no-stream` on Podman 5.8.4:
  * CLI "123.80%" ↔ API AvgCPU 123.78; CLI "0.11%" ↔ API MemPerc 0.105
  * (= MemUsage/MemLimit × 100). The earlier `× 100` turned a busy container's
@@ -44,7 +56,8 @@ import type {
  */
 export function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
   return stats.map((s) => ({
-    cpuPercent: s.AvgCPU,
+    cpuPercent: s.CPU,
+    avgCpuPercent: s.AvgCPU,
     memUsage: s.MemUsage,
     memLimit: s.MemLimit,
     memPercent: s.MemPerc,
@@ -268,6 +281,48 @@ export function actionResult(result: VoidResult): ContainerActionResult {
     : { success: true, message: "Already in that state; nothing changed" };
 }
 
+export type RemovedKind = "container" | "pod" | "image" | "network" | "volume";
+
+/**
+ * Read a DELETE answer. Bodies recorded live on Podman 5.8.4
+ * (`test/fixtures/remove-reports.json`):
+ * - container `[{Id, Err?}]` · network `[{Name, Err}]`
+ * - pod `{Id, Err, RemovedCtrs: {id: err|null}}`
+ * - image `{Untagged?, Deleted?, Errors, ExitCode}` · volume 204, empty
+ * A failure reported inside a 200 (e.g. the default network) is thrown as a
+ * conflict with Podman's own text. An image delete that only removed a TAG
+ * (other tags keep the image) says so instead of claiming removal.
+ */
+export function removeOutcome(kind: RemovedKind, status: number, text: string): ContainerActionResult {
+  if (status === 304) return actionResult({ changed: false });
+  if (text.trim() === "") return { success: true };
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return { success: true };
+  }
+  const errs: string[] = [];
+  const add = (e: unknown): void => {
+    const t = errorText(e);
+    if (t) errs.push(t);
+  };
+  if (Array.isArray(body)) {
+    for (const r of body as { Err?: unknown }[]) add(r?.Err);
+  } else if (body && typeof body === "object") {
+    const o = body as { Err?: unknown; RemovedCtrs?: Record<string, unknown> | null; Errors?: unknown[] | null; ExitCode?: number; Deleted?: string[] | null; Untagged?: string[] | null };
+    add(o.Err);
+    for (const e of Object.values(o.RemovedCtrs ?? {})) add(e);
+    for (const e of o.Errors ?? []) add(e);
+    if (errs.length === 0 && typeof o.ExitCode === "number" && o.ExitCode !== 0) errs.push(`exit code ${o.ExitCode}`);
+    if (errs.length === 0 && kind === "image" && (o.Deleted ?? []).length === 0 && (o.Untagged ?? []).length > 0) {
+      return { success: true, message: `Untagged ${(o.Untagged ?? []).join(", ")}; the image stays (it has other tags)` };
+    }
+  }
+  if (errs.length > 0) throw new EngineError("conflict", errs.join("; "));
+  return { success: true };
+}
+
 export function createPodmanEngine(): ContainerEngine {
   return {
     async findSocket(cliSocket?: string) {
@@ -299,6 +354,22 @@ export function createPodmanEngine(): ContainerEngine {
 
     async containerTop(socketPath: string, id: string) {
       return get<ContainerTop>(socketPath, `/containers/${id}/top`);
+    },
+
+    async *streamStats(socketPath: string, id: string, options: { interval?: number; signal?: AbortSignal } = {}) {
+      // `interval` (seconds) verified on Podman 5.8.4: interval=1 → one
+      // sample per second; omitted → every 5 s.
+      const interval = Math.max(1, Math.round(options.interval ?? 1));
+      const path = `/containers/stats?containers=${encodeURIComponent(id)}&stream=true&interval=${interval}`;
+      for await (const line of streamLines(socketPath, path, { signal: options.signal })) {
+        if (line.trim() === "") continue;
+        const response = JSON.parse(line) as { Error?: unknown; Stats?: ContainerStats[] | null };
+        if (response.Error) {
+          throw new Error(typeof response.Error === "string" ? response.Error : JSON.stringify(response.Error));
+        }
+        const mapped = mapContainerStats(response.Stats ?? [])[0];
+        if (mapped) yield mapped;
+      }
     },
 
     async containerStats(socketPath: string, ids: string[], stream = false): Promise<ContainerStats[] | AsyncGenerator<ContainerStatsUI>> {
@@ -376,14 +447,16 @@ export function createPodmanEngine(): ContainerEngine {
 
     async removeContainer(socketPath: string, id: string, force = false) {
       if (!force) {
-        return actionResult(await delVoid(socketPath, `/containers/${id}`, { query: { force: "false" } }));
+        const r = await delReport(socketPath, `/containers/${id}`, { query: { force: "false" } });
+        return removeOutcome("container", r.status, r.text);
       }
       // A forced remove stops a running container first, with its grace period.
       const grace = await graceSeconds(socketPath, id);
-      return actionResult(await delVoid(socketPath, `/containers/${id}`, {
+      const r = await delReport(socketPath, `/containers/${id}`, {
         query: { force: "true", timeout: String(grace) },
         timeout: graceDeadlineMs(grace),
-      }));
+      });
+      return removeOutcome("container", r.status, r.text);
     },
 
     async pruneContainers(socketPath: string, dryRun = false) {
@@ -421,7 +494,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removePod(socketPath: string, id: string, force = false) {
-      return actionResult(await delVoid(socketPath, `/pods/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS }));
+      const r = await delReport(socketPath, `/pods/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS });
+      return removeOutcome("pod", r.status, r.text);
     },
 
     // Images
@@ -434,11 +508,12 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async imageHistory(socketPath: string, id: string) {
-      return get<unknown[]>(socketPath, `/images/${id}/history`);
+      return get<ImageHistoryEntry[]>(socketPath, `/images/${id}/history`);
     },
 
     async removeImage(socketPath: string, id: string, force = false) {
-      return actionResult(await delVoid(socketPath, `/images/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS }));
+      const r = await delReport(socketPath, `/images/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS });
+      return removeOutcome("image", r.status, r.text);
     },
 
     async pruneImages(socketPath: string, dryRun = false) {
@@ -451,12 +526,31 @@ export function createPodmanEngine(): ContainerEngine {
       return get<VolumeListItem[]>(socketPath, "/volumes/json");
     },
 
+    /**
+     * Names of volumes no container references, by the server's own
+     * `dangling` filter — the same rule `volume prune` applies. `MountCount`
+     * cannot tell "in use": it read 0 even for a volume mounted by a RUNNING
+     * container (verified live, Podman 5.8.4).
+     */
+    async danglingVolumeNames(socketPath: string) {
+      const vols = await get<VolumeListItem[]>(socketPath, "/volumes/json", { query: DANGLING_FILTER });
+      return vols.map((v) => v.Name);
+    },
+
+    /** Containers (stopped ones included) that mount volume `name`. Verified live. */
+    async containersUsingVolume(socketPath: string, name: string) {
+      return get<ContainerListItem[]>(socketPath, "/containers/json", {
+        query: { all: "true", filters: JSON.stringify({ volume: [name] }) },
+      });
+    },
+
     async inspectVolume(socketPath: string, name: string) {
       return get<VolumeInspect>(socketPath, `/volumes/${name}/json`);
     },
 
     async removeVolume(socketPath: string, name: string) {
-      return actionResult(await delVoid(socketPath, `/volumes/${name}`));
+      const r = await delReport(socketPath, `/volumes/${name}`);
+      return removeOutcome("volume", r.status, r.text);
     },
 
     async pruneVolumes(socketPath: string, dryRun = false) {
@@ -474,7 +568,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeNetwork(socketPath: string, id: string) {
-      return actionResult(await delVoid(socketPath, `/networks/${id}`));
+      const r = await delReport(socketPath, `/networks/${id}`);
+      return removeOutcome("network", r.status, r.text);
     },
 
     async pruneNetworks(socketPath: string, dryRun = false) {
@@ -495,6 +590,16 @@ export function createPodmanEngine(): ContainerEngine {
       for await (const event of streamJson(socketPath, `/events?${queryParams.toString()}`)) {
         yield event;
       }
+    },
+
+    // Quadlets (P6). Podman lists them and computes unit names; verified on
+    // 5.8.4 against a throwaway service with a scratch XDG_CONFIG_HOME.
+    async listQuadlets(socketPath: string) {
+      return get<QuadletListItem[]>(socketPath, "/quadlets/json");
+    },
+
+    async quadletFile(socketPath: string, name: string) {
+      return getText(socketPath, `/quadlets/${encodeURIComponent(name)}/file`);
     },
 
     isSandboxSocket(socketPath: string) {

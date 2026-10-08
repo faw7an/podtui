@@ -5,6 +5,7 @@ import type { PanelLayout } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { center, displayWidth, fit, padRight } from "../../util/fit.ts";
 import { COLUMN_HEADERS, type PanelModel, type RowModel } from "../view/model.ts";
+import { wrapText } from "./confirmDialog.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 
 /** Box-drawing characters, emitted directly for exact control. */
@@ -204,11 +205,20 @@ export function renderPanel(
                 ? `No matches for '${panel.filter.query}'  (Esc to clear)`
                 : (panel.emptyLabel ?? "(empty)"))
             : undefined;
-        const empty = slot === 0 && label !== undefined && contentW >= 3;
-        const placed = filtered && label !== undefined ? center(label, contentW) : label !== undefined ? fit(label, contentW) : "";
-        inner =
-          " ".repeat(markerW) +
-          (empty && label !== undefined ? paint(placed, [on ? dim() : ""]) : padRight("", contentW));
+        // An explanation (e.g. where quadlets live) wraps over the empty rows
+        // rather than being cut after one line; the last row that fits ends
+        // with … if it still does not fit. A no-match filter stays one line.
+        const wrapped = label !== undefined && !filtered && contentW >= 3 ? wrapText(label, contentW) : [];
+        const room = m.innerRows - (header ? 1 : 0);
+        const labelRow =
+          filtered && slot === 0 && label !== undefined && contentW >= 3
+            ? center(label, contentW)
+            : slot >= 0 && slot < wrapped.length && slot < room
+              ? slot === room - 1 && wrapped.length > room
+                ? fit(`${wrapped[slot]} ${wrapped.slice(slot + 1).join(" ")}`, contentW)
+                : fit(wrapped[slot] ?? "", contentW)
+              : undefined;
+        inner = " ".repeat(markerW) + (labelRow !== undefined ? paint(labelRow, [on ? dim() : ""]) : padRight("", contentW));
       } else {
         const isSelected = shown.offset + slot === panel.selected;
         if (isSelected && focused) {

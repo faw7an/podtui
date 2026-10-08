@@ -14,6 +14,8 @@ import type {
   VersionInfo,
   Info,
   ContainerStatsUI,
+  ImageHistoryEntry,
+  QuadletListItem,
 } from "../api/types.ts";
 import type { LogFrame } from "../api/demux.ts";
 import type { SocketResult } from "../api/socket.ts";
@@ -65,6 +67,11 @@ export interface ContainerEngine {
   inspectContainer(socketPath: string, id: string): Promise<ContainerInspect>;
   containerTop(socketPath: string, id: string): Promise<ContainerTop>;
   containerStats(socketPath: string, ids: string[], stream?: boolean): Promise<ContainerStats[] | AsyncGenerator<ContainerStatsUI>>;
+  /**
+   * Live stats for one container, one sample per `interval` seconds
+   * (default 1). Pass `signal` to stop the stream.
+   */
+  streamStats(socketPath: string, id: string, options?: { interval?: number; signal?: AbortSignal }): AsyncGenerator<ContainerStatsUI>;
   /** Multiplexed log frames. Pass `signal` to stop the stream promptly. */
   containerLogs(socketPath: string, id: string, options?: { follow?: boolean; tail?: number; timestamps?: boolean; signal?: AbortSignal }): AsyncGenerator<LogFrame>;
   startContainer(socketPath: string, id: string): Promise<ContainerActionResult>;
@@ -91,12 +98,16 @@ export interface ContainerEngine {
   // Images
   listImages(socketPath: string, all?: boolean): Promise<ImageListItem[]>;
   inspectImage(socketPath: string, id: string): Promise<ImageInspect>;
-  imageHistory(socketPath: string, id: string): Promise<unknown[]>;
+  imageHistory(socketPath: string, id: string): Promise<ImageHistoryEntry[]>;
   removeImage(socketPath: string, id: string, force?: boolean): Promise<ContainerActionResult>;
   pruneImages(socketPath: string, dryRun?: boolean): Promise<PrunePreview | PruneResult>;
 
   // Volumes
   listVolumes(socketPath: string): Promise<VolumeListItem[]>;
+  /** Volumes nothing references (server `dangling` filter; the prune rule). */
+  danglingVolumeNames(socketPath: string): Promise<string[]>;
+  /** Containers, stopped included, that mount volume `name`. */
+  containersUsingVolume(socketPath: string, name: string): Promise<ContainerListItem[]>;
   inspectVolume(socketPath: string, name: string): Promise<VolumeInspect>;
   removeVolume(socketPath: string, name: string): Promise<ContainerActionResult>;
   pruneVolumes(socketPath: string, dryRun?: boolean): Promise<PrunePreview | PruneResult>;
@@ -109,6 +120,11 @@ export interface ContainerEngine {
 
   // Events
   streamEvents(socketPath: string, filters?: Record<string, string[]>): AsyncGenerator<unknown>;
+
+  // Quadlets (P6)
+  listQuadlets(socketPath: string): Promise<QuadletListItem[]>;
+  /** Raw quadlet file text. */
+  quadletFile(socketPath: string, name: string): Promise<string>;
 
   // Destructive guard
   isSandboxSocket(socketPath: string): boolean;

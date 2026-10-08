@@ -234,6 +234,15 @@ export async function request<T>(
   return parseJsonText<T>(text, status, `${options.method ?? "GET"} ${path}`);
 }
 
+/** GET returning the raw body (e.g. a quadlet file, served as plain text). */
+export async function getText(
+  socketPath: string,
+  path: string,
+  options?: Omit<RequestOptions, "method" | "body">
+): Promise<string> {
+  return (await send(socketPath, path, { ...options, method: "GET" })).text;
+}
+
 export const get = <T>(socketPath: string, path: string, options?: Omit<RequestOptions, "method" | "body">) =>
   request<T>(socketPath, path, { ...options, method: "GET" });
 
@@ -266,6 +275,20 @@ export async function postVoid(
 ): Promise<VoidResult> {
   const { status } = await send(socketPath, path, { ...options, method: "POST", body });
   return { changed: status !== 304 };
+}
+
+/**
+ * DELETE that returns the raw status and body. Several libpod removals answer
+ * `200` and report a per-item failure INSIDE the body (verified live: removing
+ * the default network answers 200 `[{"Name":"podman","Err":"default network
+ * podman cannot be removed"}]`), so the caller must read it.
+ */
+export async function delReport(
+  socketPath: string,
+  path: string,
+  options?: Omit<RequestOptions, "method" | "body">
+): Promise<{ status: number; text: string }> {
+  return send(socketPath, path, { ...options, method: "DELETE" });
 }
 
 export async function delVoid(

@@ -103,16 +103,16 @@ Phase overview
 
 **Goal:** the features you actually open the tool for.
 
-- [ ] **P3-T1** `util/logLevel.ts`: pure function classifying a line as `error | warn | info | debug | unknown` (rules documented in the file, e.g. keywords `ERROR`, `FATAL`, `panic`, `Exception`, `level=error`, JSON `"level":"error"`). Table-driven unit tests, including false-positive cases (e.g. a word like "terror").
-- [ ] **P3-T2** Logs tab: follow mode, ring buffer (default 5,000 lines), windowed rendering, throttled updates (≤ ~20 fps), pause/resume key, scroll with `↑↓`/`PgUp`/`PgDn`/`g`/`G`, "new lines below" indicator when scrolled up.
-- [ ] **P3-T3** Log coloring: error lines red, warn lines yellow, timestamps dim; stderr vs stdout indicator optional. Decide and record how raw ANSI codes in logs are handled (strip vs pass-through) (FR-5).
-- [ ] **P3-T4** Log search: `/` search with highlight, `n`/`N` next/previous match; level filter toggle (`e` = errors only).
-- [ ] **P3-T5** Timestamps toggle (`t`) and line wrap toggle (`w`).
-- [ ] **P3-T6** Env tab: sorted key/value; names plain, values colored; masks values whose key matches secret-like patterns (`TOKEN`, `SECRET`, `PASSWORD`, `KEY`) until `v` reveals; unit-tested masker.
-- [ ] **P3-T7** Stats tab: live CPU %, memory used/limit, network rx/tx, block I/O, PIDs; small sparkline history (last ~60 samples). ⚠️ VERIFY field names and how CPU % must be computed from the stats samples; unit-test the calculation with fixture samples.
-- [ ] **P3-T8** Top tab: process table from `top`; column alignment; refresh interval.
-- [ ] **P3-T9** Stream lifecycle: switching tab, selection, hiding the panel, or quitting aborts the stream. Test with a mock engine that tracks open/close counts.
-- [ ] **P3-T10** Empty/error states: no logs yet, container not running (stats/top show a friendly message), stream disconnected.
+- [x] **P3-T1** `util/logLevel.ts`: pure function classifying a line as `error | warn | info | debug | unknown` (rules documented in the file, e.g. keywords `ERROR`, `FATAL`, `panic`, `Exception`, `level=error`, JSON `"level":"error"`). Table-driven unit tests, including false-positive cases (e.g. a word like "terror").
+- [x] **P3-T2** Logs tab: follow mode, ring buffer (default 5,000 lines), windowed rendering, throttled updates (≤ ~20 fps), pause/resume key, scroll with `↑↓`/`PgUp`/`PgDn`/`g`/`G`, "new lines below" indicator when scrolled up.
+- [x] **P3-T3** Log coloring: error lines red, warn lines yellow, timestamps dim; stderr vs stdout indicator optional. Decide and record how raw ANSI codes in logs are handled (strip vs pass-through) (FR-5).
+- [x] **P3-T4** Log search: `/` search with highlight, `n`/`N` next/previous match; level filter toggle (`e` = errors only).
+- [x] **P3-T5** Timestamps toggle (`t`) and line wrap toggle (`w`).
+- [x] **P3-T6** Env tab: sorted key/value; names plain, values colored; masks values whose key matches secret-like patterns (`TOKEN`, `SECRET`, `PASSWORD`, `KEY`) until `v` reveals; unit-tested masker.
+- [x] **P3-T7** Stats tab: live CPU %, memory used/limit, network rx/tx, block I/O, PIDs; small sparkline history (last ~60 samples). ⚠️ VERIFY field names and how CPU % must be computed from the stats samples; unit-test the calculation with fixture samples.
+- [x] **P3-T8** Top tab: process table from `top`; column alignment; refresh interval.
+- [x] **P3-T9** Stream lifecycle: switching tab, selection, hiding the panel, or quitting aborts the stream. Test with a mock engine that tracks open/close counts.
+- [x] **P3-T10** Empty/error states: no logs yet, container not running (stats/top show a friendly message), stream disconnected.
 
 **Automated tests:** logLevel table tests; masker tests; stats math tests; log buffer ring tests (overflow drops oldest, memory bounded); stream open/close counter test; Logs tab snapshot with red line present.
 
@@ -134,13 +134,13 @@ Phase overview
 
 **Goal:** panels 1, 3, 4, 5 and per-item actions.
 
-- [ ] **P4-T1** Pods panel: name, status, container count, infra info. Selecting a pod shows Config and a member-container list; pod actions start/stop/restart/kill/remove.
-- [ ] **P4-T2** Images panel: repo:tag, size, age, dangling marker; Config tab; layers/history view ⚠️ VERIFY the history endpoint; remove action.
-- [ ] **P4-T3** Volumes panel: name, driver, mountpoint, in-use indicator ⚠️ VERIFY how "in use" is determined; remove action.
-- [ ] **P4-T4** Networks panel: name, driver, subnet, connected containers; remove action.
-- [ ] **P4-T5** Container actions: `s` start, `S` stop, `r` restart, `K` kill, `d` remove, all via engine; busy indicator while pending; errors surface in the status bar.
-- [ ] **P4-T6** `ConfirmDialog` component: lists exactly what will be affected, default focus on Cancel, `y`/`n`/Enter/Esc (FR-6). Used by every remove action.
-- [ ] **P4-T7** Cross-links: from a pod, jump to its containers; from a container, show its pod/image/volumes/networks as read-only info in Config.
+- [x] **P4-T1** Pods panel: name, status, container count, infra info. Selecting a pod shows Config and a member-container list; pod actions start/stop/restart/kill/remove.
+- [x] **P4-T2** Images panel: repo:tag, size, age, dangling marker; Config tab; layers/history view ⚠️ VERIFY the history endpoint; remove action.
+- [x] **P4-T3** Volumes panel: name, driver, mountpoint, in-use indicator ⚠️ VERIFY how "in use" is determined; remove action.
+- [x] **P4-T4** Networks panel: name, driver, subnet, connected containers; remove action.
+- [x] **P4-T5** Container actions: `s` start, `S` stop, `r` restart, `K` kill, `d` remove, all via engine; busy indicator while pending; errors surface in the status bar.
+- [x] **P4-T6** `ConfirmDialog` component: lists exactly what will be affected, default focus on Cancel, `y`/`n`/Enter/Esc (FR-6). Used by every remove action.
+- [x] **P4-T7** Cross-links: from a pod, jump to its containers; from a container, show its pod/image/volumes/networks as read-only info in Config.
 
 **Automated tests:** each action calls the right engine method with the right ID; confirm dialog blocks the call until confirmed; cancel does nothing; error from engine shows a message and the app stays alive; panels render fixture data.
 
@@ -159,17 +159,17 @@ Phase overview
 
 **Goal:** the `x` menu from the original mock.
 
-- [ ] **P5-T1** `BulkMenu` component: modal list navigated with arrows, `Enter` to select, `Esc` to close; footer shows keys.
-- [ ] **P5-T2** Commands: stop all containers; remove stopped containers; prune dangling images; prune unused volumes; prune unused networks; remove all containers (forced). Each is defined in a data table (id, label, risk level, preview function, execute function).
-- [ ] **P5-T3** Preview step: before executing, call the engine's preview function and show "This will remove N items: …" (first 10 names + "and M more"). If N = 0 show "Nothing to do".
-- [ ] **P5-T4** Risk levels: low = single confirm; high ("remove all containers", forced) = type the word `delete` to confirm.
-- [ ] **P5-T5** Progress and result summary: "Removed 3 containers, reclaimed 120 MB" (⚠️ VERIFY what the prune responses actually return); partial failures listed.
-- [ ] **P5-T6** Context-aware entries: the menu can show panel-specific commands first (e.g. on the Volumes panel, "prune volumes" first).
+- [x] **P5-T1** `BulkMenu` component: modal list navigated with arrows, `Enter` to select, `Esc` to close; footer shows keys.
+- [x] **P5-T2** Commands: stop all containers; remove stopped containers; prune dangling images; prune unused volumes; prune unused networks; remove all containers (forced). Each is defined in a data table (id, label, risk level, preview function, execute function).
+- [x] **P5-T3** Preview step: before executing, call the engine's preview function and show "This will remove N items: …" (first 10 names + "and M more"). If N = 0 show "Nothing to do".
+- [x] **P5-T4** Risk levels: low = single confirm; high ("remove all containers", forced) = type the word `delete` to confirm.
+- [x] **P5-T5** Progress and result summary: "Removed 3 containers, reclaimed 120 MB" (⚠️ VERIFY what the prune responses actually return); partial failures listed.
+- [x] **P5-T6** Context-aware entries: the menu can show panel-specific commands first (e.g. on the Volumes panel, "prune volumes" first).
 
 **Automated tests:** preview counts match mock engine data; high-risk flow requires the typed word; Esc at any stage aborts without calling execute; partial-failure rendering.
 
 **Manual tests for the human** (sandbox only!)
-1. `x` → "remove stopped containers": preview lists exactly the exited ones (compare with `podman --url ... ps -a --filter status=exited`). Confirm; they disappear.
+1. BEFORE confirming anything: run `podman --url ... ps -a --filter status=exited --filter status=created --format '{{.Names}} {{.State}} pod={{.PodName}}'` and note the containers with an empty `pod=`. Then `x` → "remove stopped containers": the preview lists exactly those, each with its state (containers in pods are kept, Podman's prune rule). Confirm with `y`; they disappear from the panel and from the same CLI command.
 2. Re-seed with `scripts/dev-sandbox.sh seed`; run prune images/volumes/networks and compare counts with the CLI equivalents.
 3. "Remove all (forced)": typing anything but `delete` does nothing.
 4. Confirm your **real** Podman resources are untouched.
@@ -182,12 +182,12 @@ Phase overview
 
 **Goal:** panel 6.
 
-- [ ] **P6-T1** `engine/quadlet.ts`: read quadlet directory (rootless default; rootful path ⚠️ VERIFY), parse file type and name; list with type icon/label.
-- [ ] **P6-T2** Unit mapping: determine each quadlet's systemd unit name and state via `systemctl --user` ⚠️ VERIFY naming rules by testing each file type; unit-test the mapping with real examples.
-- [ ] **P6-T3** Detail tabs: **File** (raw quadlet content, syntax-colored sections), **Unit** (`systemctl --user cat/status`), **Journal** (`journalctl --user -u <unit> -f`, streamed, same coloring as Logs).
-- [ ] **P6-T4** Actions: start/stop/restart unit; "reload systemd" (daemon-reload) with a clear label. Confirm for stop/restart of running units.
-- [ ] **P6-T5** Link quadlet → container (if the container is running, offer to jump to it).
-- [ ] **P6-T6** Graceful behavior when systemd user session or the quadlet dir does not exist (friendly empty state, explains where quadlets live).
+- [x] **P6-T1** `engine/quadlet.ts`: read quadlet directory (rootless default; rootful path ⚠️ VERIFY), parse file type and name; list with type icon/label.
+- [x] **P6-T2** Unit mapping: determine each quadlet's systemd unit name and state via `systemctl --user` ⚠️ VERIFY naming rules by testing each file type; unit-test the mapping with real examples.
+- [x] **P6-T3** Detail tabs: **File** (raw quadlet content, syntax-colored sections), **Unit** (`systemctl --user cat/status`), **Journal** (`journalctl --user -u <unit> -f`, streamed, same coloring as Logs).
+- [x] **P6-T4** Actions: start/stop/restart unit; "reload systemd" (daemon-reload) with a clear label. Confirm for stop/restart of running units.
+- [x] **P6-T5** Link quadlet → container (if the container is running, offer to jump to it).
+- [x] **P6-T6** Graceful behavior when systemd user session or the quadlet dir does not exist (friendly empty state, explains where quadlets live).
 
 **Automated tests:** parser tests on sample quadlet files of each type; mapping tests; mock `Bun.spawn` for systemctl/journalctl; empty-state rendering.
 
@@ -206,17 +206,17 @@ Phase overview
 **Goal:** make it feel native; make clicking work.
 
 ### Theme
-- [ ] **P7-T1** Inspect `~/.config/omarchy/current/theme/` on a real install; write the findings (file names, formats, sample content) into DECISIONS.md. ⚠️ Do not write the loader before this is done.
-- [ ] **P7-T2** `theme/omarchy.ts`: parse the discovered palette format into `Theme`; unit tests using copies of real theme files saved as fixtures (at least 2 different Omarchy themes).
-- [ ] **P7-T3** Map palette colors to semantic roles (error→red, ok→green, warn→yellow, accent, border, selection) with sensible contrast; fallback to default if any role is missing.
-- [ ] **P7-T4** Reload on `T` (and on startup). Stretch: watch the theme path for changes.
-- [ ] **P7-T5** Truecolor vs 256-color degradation.
+- [x] **P7-T1** Inspect `~/.config/omarchy/current/theme/` (current Omarchy: `~/.local/state/omarchy/current/theme/`, see DECISIONS phase-7) on a real install; write the findings (file names, formats, sample content) into DECISIONS.md. ⚠️ Do not write the loader before this is done.
+- [x] **P7-T2** `theme/omarchy.ts`: parse the discovered palette format into `Theme`; unit tests using copies of real theme files saved as fixtures (at least 2 different Omarchy themes).
+- [x] **P7-T3** Map palette colors to semantic roles (error→red, ok→green, warn→yellow, accent, border, selection) with sensible contrast; fallback to default if any role is missing.
+- [x] **P7-T4** Reload on `T` (and on startup). Stretch: watch the theme path for changes.
+- [x] **P7-T5** Truecolor vs 256-color degradation.
 
 ### Mouse
-- [ ] **P7-T6** `input/mouse.ts`: enable SGR mouse reporting, parse press/release/wheel/motion events into typed events, disable on all exit paths (normal quit, Ctrl+C, uncaught exception, SIGTERM). Unit tests with raw sequence samples. ⚠️ VERIFY sequences in xterm control docs and against your terminal's real output.
-- [ ] **P7-T7** Hit-testing: components register their screen rectangles; clicks resolve to `{panelId, rowIndex}` / tab / title-number. Handle terminal resize.
-- [ ] **P7-T8** Click actions: panel title number toggles; row click selects; tab click switches; wheel scrolls logs/lists; click outside a modal does nothing.
-- [ ] **P7-T9** `--no-mouse` flag and graceful behavior if stdin sequences are not supported.
+- [x] **P7-T6** `input/mouse.ts`: enable SGR mouse reporting, parse press/release/wheel/motion events into typed events, disable on all exit paths (normal quit, Ctrl+C, uncaught exception, SIGTERM). Unit tests with raw sequence samples. ⚠️ VERIFY sequences in xterm control docs and against your terminal's real output.
+- [x] **P7-T7** Hit-testing: components register their screen rectangles; clicks resolve to `{panelId, rowIndex}` / tab / title-number. Handle terminal resize.
+- [x] **P7-T8** Click actions: panel title number toggles; row click selects; tab click switches; wheel scrolls logs/lists; click outside a modal does nothing.
+- [x] **P7-T9** `--no-mouse` flag and graceful behavior if stdin sequences are not supported.
 
 **Automated tests:** theme parsing fixtures; semantic mapping tests; mouse parser table tests; hit-test geometry tests; cleanup-on-exit test (mock stdout records the disable sequence).
 

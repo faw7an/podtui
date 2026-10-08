@@ -4,6 +4,8 @@ import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
 import { renderFrame } from "../render/frame.ts";
 import type { FooterHintContext } from "../render/chrome.ts";
+import type { DialogState } from "../view/confirmDialog.ts";
+import type { BulkFlow } from "../bulk/bulkFlow.ts";
 
 export interface FrameProps {
   layout: Layout;
@@ -13,6 +15,8 @@ export interface FrameProps {
   hintContext?: FooterHintContext;
   detailScroll?: number;
   filterPopup?: PanelId | null;
+  dialog?: DialogState | null;
+  bulk?: BulkFlow | null;
 }
 
 /**
@@ -23,8 +27,8 @@ export interface FrameProps {
  * measure or wrap anything, because it does not clip (verified). See
  * `src/ui/render/frame.ts` and the LAYOUT_SPEC §8 decision in DECISIONS.md.
  */
-export function Frame({ layout, model, theme, color = true, hintContext, detailScroll, filterPopup }: FrameProps) {
-  const lines = renderFrame(layout, model, { theme, color, hintContext, detailScroll, filterPopup });
+export function Frame({ layout, model, theme, color = true, hintContext, detailScroll, filterPopup, dialog, bulk }: FrameProps) {
+  const lines = renderFrame(layout, model, { theme, color, hintContext, detailScroll, filterPopup, dialog, bulk });
   return (
     <>
       {lines.map((line, i) => (

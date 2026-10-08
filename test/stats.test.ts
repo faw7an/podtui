@@ -22,9 +22,24 @@ describe("mapContainerStats against the recorded fixture", () => {
     }
   });
 
-  test("CPU percent passes through unchanged", () => {
+  test("CPU percents pass through unchanged: live from CPU, average from AvgCPU", () => {
+    // Changed 2026-10-08: cpuPercent was AvgCPU (the since-start average);
+    // measured live, CPU is the per-interval value a Stats tab must show.
     for (const raw of fixture.Stats) {
-      expect(mapContainerStats([raw])[0]!.cpuPercent).toBe(raw.AvgCPU);
+      expect(mapContainerStats([raw])[0]!.cpuPercent).toBe(raw.CPU);
+      expect(mapContainerStats([raw])[0]!.avgCpuPercent).toBe(raw.AvgCPU);
+    }
+  });
+
+  test("live CPU and the average differ once a burst is over (recorded stream)", () => {
+    const lines = readFileSync(join(import.meta.dirname, "fixtures", "containers-stats-stream.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as { Stats: ContainerStats[] });
+    for (const { Stats } of lines) {
+      const ui = mapContainerStats(Stats)[0]!;
+      expect(ui.cpuPercent).toBe(Stats[0]!.CPU);
+      expect(ui.avgCpuPercent).toBe(Stats[0]!.AvgCPU);
     }
   });
 
@@ -72,4 +87,25 @@ describe.skipIf(!enabled)("stats agree with `podman stats` (live)", () => {
     expect(ui!.memPercent).toBeLessThan(5);
     expect(Math.abs(ui!.memPercent - cliMem!)).toBeLessThan(1);
   }, 60_000);
+
+  test("streamStats: ~1 s samples, live CPU of the busy loop, abort ends it promptly", async () => {
+    const engine = createPodmanEngine();
+    const controller = new AbortController();
+    const at: number[] = [];
+    const cpu: number[] = [];
+    for await (const s of engine.streamStats(t.socket, "busy", { interval: 1, signal: controller.signal })) {
+      at.push(Date.now());
+      cpu.push(s.cpuPercent);
+      if (at.length === 3) {
+        const t0 = Date.now();
+        controller.abort();
+        // The loop must end now, not at the next sample.
+        expect(Date.now() - t0).toBeLessThan(500);
+        break;
+      }
+    }
+    expect(at[2]! - at[1]!).toBeGreaterThan(500);
+    expect(at[2]! - at[1]!).toBeLessThan(2500);
+    expect(cpu[2]).toBeGreaterThan(20);
+  }, 30_000);
 });

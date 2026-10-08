@@ -1,4 +1,5 @@
 import type { ContainerInspect } from "../../api/types.ts";
+import type { DetailLogModel, DetailStatsModel } from "./model.ts";
 
 /**
  * Detail pane content (ROADMAP P2-T7: a TabBar plus a Config tab rendering
@@ -9,7 +10,7 @@ import type { ContainerInspect } from "../../api/types.ts";
  * lines come out of here.
  */
 
-export type DetailTabId = "logs" | "stats" | "env" | "config" | "top";
+export type DetailTabId = "logs" | "stats" | "env" | "config" | "top" | "members" | "history" | "file" | "unit" | "journal";
 
 export interface DetailTabMeta {
   id: DetailTabId;
@@ -19,11 +20,11 @@ export interface DetailTabMeta {
 }
 
 export const DETAIL_TABS: readonly DetailTabMeta[] = [
-  { id: "logs", label: "Logs", phase: "phase 3" },
-  { id: "stats", label: "Stats", phase: "phase 3" },
-  { id: "env", label: "Env", phase: "phase 3" },
+  { id: "logs", label: "Logs" },
+  { id: "stats", label: "Stats" },
+  { id: "env", label: "Env" },
   { id: "config", label: "Config" },
-  { id: "top", label: "Top", phase: "phase 3" },
+  { id: "top", label: "Top" },
 ] as const;
 
 export interface DetailView {
@@ -33,17 +34,41 @@ export interface DetailView {
   activeTabId: DetailTabId;
   /** Flat, pre-formatted rows; `#` starts a collapsible section heading. */
   lines: string[];
+  /** Logs tab stream; set by `buildFrameModel`, never by `buildDetail`. */
+  log?: DetailLogModel;
+  /** Env tab layout: key column width, so values can be painted (P3-T6). */
+  env?: { keyWidth: number };
+  /** Stats tab; set by `buildFrameModel`, never by `buildDetail`. */
+  stats?: DetailStatsModel;
+  /** `lines[0]` is a sticky column header (Top tab). */
+  table?: boolean;
+  /** Lines are a systemd-style file: colour sections, keys, comments (P6). */
+  ini?: boolean;
+  /** Extra bottom-border text, e.g. `v reveal secrets`. */
+  hint?: string;
 }
 
 /** Section keys that can be collapsed in the Config tab. */
-export const CONFIG_SECTIONS = ["state", "config", "network", "host"] as const;
+export const CONFIG_SECTIONS = ["state", "config", "links", "network", "host"] as const;
 export type ConfigSection = (typeof CONFIG_SECTIONS)[number];
 
-/** Keys whose values are masked until explicitly revealed (P3-T6). */
-const SECRET_PATTERN = /(TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL)/i;
+/**
+ * Keys whose values are masked until `v` reveals them (P3-T6). Substring and
+ * case-insensitive on purpose: over-masking (`KEYBOARD_LAYOUT`) costs one
+ * keypress, under-masking leaks a secret on screen.
+ */
+export const SECRET_PATTERN = /(TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL)/i;
+
+/** Fixed width, so the mask never tells the secret's length. */
+export const MASK = "********";
+
+export function isSecretKey(key: string): boolean {
+  return SECRET_PATTERN.test(key);
+}
 
 export function maskValue(key: string, value: string): string {
-  return SECRET_PATTERN.test(key) ? "*".repeat(Math.min(8, Math.max(3, value.length))) : value;
+  if (!isSecretKey(key) || value === "") return value;
+  return MASK;
 }
 
 export interface BuildDetailArgs {
@@ -52,6 +77,8 @@ export interface BuildDetailArgs {
   hasSelection: boolean;
   collapsed?: ReadonlySet<string>;
   revealSecrets?: boolean;
+  /** Names for the Links section (P4-T7), resolved from the lists. */
+  links?: { podName?: string; networkNames?: readonly string[] };
 }
 
 /**
@@ -72,7 +99,36 @@ function section(name: string, collapsed: boolean): string {
  * Flatten the inspect object into a small, readable set of sections. Only
  * fields verified present in test/fixtures/container-inspect.json are used.
  */
-function configLines(inspect: ContainerInspect, collapsed: ReadonlySet<string>): string[] {
+/**
+ * Links (P4-T7): what this container belongs to and uses, as read-only
+ * names with the panel number that lists them. Volumes and bind mounts come
+ * from inspect `Mounts`; networks from `NetworkSettings.Networks`, else the
+ * network mode (rootless default `pasta` joins no podman network).
+ */
+function linkLines(inspect: ContainerInspect, podName: string | undefined, networkNames?: readonly string[]): string[] {
+  const out: string[] = [];
+  out.push(row("Pod", inspect.Pod ? `${podName ?? inspect.Pod.slice(0, 12)}  (1 Pods)` : "(none)"));
+  out.push(row("Image", `${inspect.ImageName || inspect.Image.slice(0, 12)}  (3 Images)`));
+  const mounts = inspect.Mounts ?? [];
+  const volumes = mounts.filter((m) => m.Type === "volume");
+  const binds = mounts.filter((m) => m.Type !== "volume");
+  if (volumes.length === 0) out.push(row("Volumes", "(none)"));
+  volumes.forEach((m, i) => out.push(row(i === 0 ? "Volumes" : "", `${m.Name ?? "?"} → ${m.Destination}  (4 Volumes)`)));
+  binds.forEach((m, i) => out.push(row(i === 0 ? "Mounts" : "", `${m.Type} ${m.Source} → ${m.Destination}`)));
+  // Live, a running pasta container sometimes reports a `pasta` key here
+  // (and sometimes none). Only names in the network list are networks.
+  const known = networkNames ? new Set(networkNames) : null;
+  const nets = Object.keys(inspect.NetworkSettings?.Networks ?? {}).filter((n) => !known || known.has(n));
+  if (nets.length > 0) nets.forEach((n, i) => out.push(row(i === 0 ? "Networks" : "", `${n}  (5 Networks)`)));
+  else out.push(row("Networks", `(none: ${inspect.HostConfig?.NetworkMode || "unknown"} mode)`));
+  return out;
+}
+
+function configLines(
+  inspect: ContainerInspect,
+  collapsed: ReadonlySet<string>,
+  links: BuildDetailArgs["links"] = {},
+): string[] {
   const isCollapsed = (s: string): boolean => collapsed.has(s);
   const out: string[] = [];
 
@@ -96,6 +152,13 @@ function configLines(inspect: ContainerInspect, collapsed: ReadonlySet<string>):
     out.push(row("User", inspect.Config?.User ?? ""));
   } else {
     out.push(section("Config", true));
+  }
+
+  if (!isCollapsed("links")) {
+    out.push(section("Links", false));
+    out.push(...linkLines(inspect, links.podName, links.networkNames));
+  } else {
+    out.push(section("Links", true));
   }
 
   if (!isCollapsed("host")) {
@@ -129,15 +192,35 @@ function configLines(inspect: ContainerInspect, collapsed: ReadonlySet<string>):
   return out;
 }
 
-function envLines(inspect: ContainerInspect, reveal: boolean): string[] {
-  const env = inspect.Config?.Env ?? [];
-  if (env.length === 0) return [row("Env", "(empty)")];
-  return env.map((entry) => {
-    const eq = entry.indexOf("=");
-    const key = eq >= 0 ? entry.slice(0, eq) : entry;
-    const value = eq >= 0 ? entry.slice(eq + 1) : "";
-    return row(key, reveal ? value : maskValue(key, value));
-  });
+/** Widest key shown in full; longer keys are cut by the renderer's `fit`. */
+const ENV_KEY_MAX = 32;
+
+export interface EnvEntry {
+  key: string;
+  value: string;
+  secret: boolean;
+}
+
+/** `KEY=value` strings → entries sorted by key. A bare `KEY` has value "". */
+export function parseEnv(env: readonly string[]): EnvEntry[] {
+  return env
+    .map((entry) => {
+      const eq = entry.indexOf("=");
+      const key = eq >= 0 ? entry.slice(0, eq) : entry;
+      const value = eq >= 0 ? entry.slice(eq + 1) : "";
+      return { key, value, secret: isSecretKey(key) && value !== "" };
+    })
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+}
+
+function envView(inspect: ContainerInspect, reveal: boolean): { lines: string[]; keyWidth: number; hint?: string } {
+  const entries = parseEnv(inspect.Config?.Env ?? []);
+  if (entries.length === 0) return { lines: ["No environment variables."], keyWidth: 0 };
+  const keyWidth = Math.min(ENV_KEY_MAX, Math.max(...entries.map((e) => e.key.length))) + 2;
+  const lines = entries.map((e) => `${e.key.padEnd(keyWidth)}${reveal ? e.value : maskValue(e.key, e.value)}`);
+  const secrets = entries.filter((e) => e.secret).length;
+  const hint = secrets === 0 ? undefined : reveal ? "secrets shown · v hide" : `${secrets} masked · v reveal`;
+  return { lines, keyWidth, hint };
 }
 
 function placeholderLine(meta: DetailTabMeta): string {
@@ -163,13 +246,19 @@ export function buildDetail(args: BuildDetailArgs): DetailView {
   const title = `${inspect.Name || inspect.Id.slice(0, 12)} · ${inspect.State?.Status ?? "unknown"}`;
 
   let lines: string[];
+  let env: DetailView["env"];
+  let hint: string | undefined;
   switch (meta?.id) {
     case "config":
-      lines = configLines(inspect, args.collapsed ?? new Set());
+      lines = configLines(inspect, args.collapsed ?? new Set(), args.links);
       break;
-    case "env":
-      lines = envLines(inspect, args.revealSecrets ?? false);
+    case "env": {
+      const view = envView(inspect, args.revealSecrets ?? false);
+      lines = view.lines;
+      env = view.keyWidth > 0 ? { keyWidth: view.keyWidth } : undefined;
+      hint = view.hint;
       break;
+    }
     default:
       // Logs/Stats/Top have no data source until Phase 3; say so rather than
       // rendering an empty pane that looks broken.
@@ -183,6 +272,8 @@ export function buildDetail(args: BuildDetailArgs): DetailView {
     activeTab: activeTab < 0 ? 0 : activeTab,
     activeTabId: meta?.id ?? "config",
     lines,
+    ...(env ? { env } : {}),
+    ...(hint ? { hint } : {}),
   };
 }
 

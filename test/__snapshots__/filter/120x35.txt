@@ -28,8 +28,8 @@
 │                                                    ││                                                                │
 └────────────────────────────────────────────────────┘│                                                                │
 ╭─[6] Quadlets 0                                     ╮│                                                                │
-│  not implemented yet (phase 6)                     ││                                                                │
-│                                                    ││                                                                │
-│                                                    ││                                                                │
+│  No quadlets. Rootless ones live in                ││                                                                │
+│  ~/.config/containers/systemd/, rootful ones in    ││                                                                │
+│  /etc/containers/systemd/; run systemctl --user da…││                                                                │
 └────────────────────────────────────────────────────┘└────────────────────────────────────────────────────────────────┘
 Esc clear  Enter keep                                                                                                   

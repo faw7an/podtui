@@ -58,7 +58,11 @@ export function podmanAvailable(): boolean {
   return Bun.which("podman") !== null;
 }
 
-export async function startThrowawayPodman(): Promise<ThrowawayPodman> {
+/**
+ * `env` is merged into the service's environment — e.g. `XDG_CONFIG_HOME`
+ * pointing at a scratch dir, so quadlet tests never read the real one.
+ */
+export async function startThrowawayPodman(opts: { env?: Record<string, string> } = {}): Promise<ThrowawayPodman> {
   const id = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const dir = `/tmp/podtui-test/${id}`;
   const socket = `${dir}/podman.sock`;
@@ -79,7 +83,7 @@ export async function startThrowawayPodman(): Promise<ThrowawayPodman> {
 
   const service = Bun.spawn(
     ["podman", ...storageFlags, "system", "service", "--time=0", `unix://${socket}`],
-    { stdout: "ignore", stderr: "ignore", env: { ...process.env, CONTAINERS_CONF_OVERRIDE: confFile } },
+    { stdout: "ignore", stderr: "ignore", env: { ...process.env, CONTAINERS_CONF_OVERRIDE: confFile, ...opts.env } },
   );
 
   const deadline = Date.now() + 15_000;

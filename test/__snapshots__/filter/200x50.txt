@@ -16,7 +16,7 @@
 │                                                     ││                                                     ││                                                                                        │
 └─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
 ╭─[3] Images 0                                        ╮│                                                     ││                                                                                        │
-│  NAME                                   SIZE    AGE ││                                                     ││                                                                                        │
+│  NAME                          STATUS   SIZE    AGE ││                                                     ││                                                                                        │
 │  (empty)                                            ││                                                     ││                                                                                        │
 │                                                     │└⌕ web (3/7)                                          ┘│                                                                                        │
 │                                                     │╭─[4] Volumes 0                                       ╮│                                                                                        │
@@ -32,13 +32,13 @@
 │                                                     ││                                                     ││                                                                                        │
 └─────────────────────────────────────────────────────┘│                                                     ││                                                                                        │
 ╭─[5] Networks 0                                      ╮│                                                     ││                                                                                        │
-│  NAME                                       STATUS  │└─────────────────────────────────────────────────────┘│                                                                                        │
+│  NAME                       STATUS   SUBNET      CNT│└─────────────────────────────────────────────────────┘│                                                                                        │
 │  (empty)                                            │╭─[6] Quadlets 0                                      ╮│                                                                                        │
-│                                                     ││  NAME                                      STATUS   ││                                                                                        │
-│                                                     ││  not implemented yet (phase 6)                      ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
-│                                                     ││                                                     ││                                                                                        │
+│                                                     ││  NAME                        TYPE STATUS            ││                                                                                        │
+│                                                     ││  No quadlets. Rootless ones live in                 ││                                                                                        │
+│                                                     ││  ~/.config/containers/systemd/, rootful ones in     ││                                                                                        │
+│                                                     ││  /etc/containers/systemd/; run systemctl --user     ││                                                                                        │
+│                                                     ││  daemon-reload after adding one.                    ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │
 │                                                     ││                                                     ││                                                                                        │

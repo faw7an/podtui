@@ -26,5 +26,8 @@
     "ink-testing-library": "4.0.0",
     "react-devtools-core": "6.1.2",
     "typescript-eslint": "8.71.0"
+  },
+  "patchedDependencies": {
+    "string-width@8.3.0": "patches/string-width@8.3.0.patch"
   }
 }

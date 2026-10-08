@@ -8,6 +8,12 @@ import { computeFilterPopupRect } from "../layout/filterPopup.ts";
 import { renderDetail, renderMessage } from "./detailLines.ts";
 import { renderFilterBar, renderFilterPopup, type FilterPopupData } from "./filterPopup.ts";
 import { renderPanel } from "./panelLines.ts";
+import { dialogRect, renderConfirmDialog } from "./confirmDialog.ts";
+import type { DialogState } from "../view/confirmDialog.ts";
+import type { BulkFlow } from "../bulk/bulkFlow.ts";
+import { bulkContent, bulkRect, renderBulk } from "./bulkMenu.ts";
+import { bold, fg, paint } from "./palette.ts";
+import { fit } from "../../util/fit.ts";
 
 export interface FrameOptions {
   theme: Theme;
@@ -23,6 +29,10 @@ export interface FrameOptions {
    * the panel model's `filter` field; this only says the popup is open.
    */
   filterPopup?: PanelId | null;
+  /** Open confirm dialog (P4-T6): drawn over everything except the header. */
+  dialog?: DialogState | null;
+  /** Open `x` bulk menu (P5). */
+  bulk?: BulkFlow | null;
 }
 
 /**
@@ -95,7 +105,37 @@ export function renderFrame(layout: Layout, model: FrameModel, opts: FrameOption
     }
   }
 
-  if (layout.footer) {
+  // Bulk menu (P5): a box over the frame; a dialog, if any, goes above it.
+  let bulkBar: string | null = null;
+  if (opts.bulk) {
+    const content = bulkContent(opts.bulk);
+    const rect = bulkRect(layout.cols, layout.rows, content);
+    if (rect) {
+      buffer.excise(rect.x, rect.y, rect.w, rect.h);
+      renderBulk(rect, content, opts.theme, on).forEach((line, i) => buffer.write(rect.x, rect.y + i, line));
+    } else {
+      bulkBar = paint(fit(`${content.title}: ${content.rows[0]?.text ?? ""}`, layout.cols), on ? [fg(opts.theme.error), bold()] : []);
+    }
+  }
+
+  // Confirm dialog (P4-T6): over everything. When no box fits, a one-line
+  // question replaces the footer, so the prompt is never invisible.
+  let dialogBar: string | null = null;
+  if (opts.dialog) {
+    const rect = dialogRect(layout.cols, layout.rows, opts.dialog);
+    if (rect) {
+      buffer.excise(rect.x, rect.y, rect.w, rect.h);
+      renderConfirmDialog(rect, opts.dialog, opts.theme, on).forEach((line, i) => buffer.write(rect.x, rect.y + i, line));
+    } else {
+      const keys = opts.dialog.kind === "message" ? "Enter" : "y/n";
+      const text = `${opts.dialog.content.title} ${opts.dialog.content.lines[0] ?? ""} ${keys}`;
+      dialogBar = paint(fit(text, layout.cols), on ? [fg(opts.theme.error), bold()] : []);
+    }
+  }
+
+  if ((dialogBar ?? bulkBar) !== null && layout.footer) {
+    buffer.write(0, layout.footer.y, dialogBar ?? bulkBar ?? "");
+  } else if (layout.footer) {
     buffer.write(
       0,
       layout.footer.y,

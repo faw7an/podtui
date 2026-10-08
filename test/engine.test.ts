@@ -1,3 +1,4 @@
+import { createVisibleFetcher } from "../src/ui/view/refresh.ts";
 import { test, expect, describe } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -88,7 +89,7 @@ describe("engine: fixture-driven resource mapping", () => {
   const volumes = readFixture<VolumeListItem[]>("volumes-list.json");
   const networks = readFixture<NetworkListItem[]>("networks-list.json");
 
-  const data: ResourceData = { containers, pods, images, volumes, networks, quadlets: [] };
+  const data: ResourceData = { containers, pods, images, volumes, networks, danglingVolumes: null, quadlets: [] };
   const now = Date.parse("2026-10-03T00:00:00Z");
 
   test("every panel is produced, in canonical order", () => {
@@ -150,17 +151,35 @@ describe("engine: fixture-driven resource mapping", () => {
     expect(p?.items[0]?.cells["count"]).toBe(String(pods[0]?.Containers.length ?? 0));
   });
 
-  test("a volume with MountCount 0 is 'unused', above 0 is 'in use'", () => {
-    const unused = buildPanelModels(data, noSelection(), now).find((m) => m.id === "volumes");
-    expect(unused?.items[0]?.cells["state"]).toContain("unused");
+  // Replaced 2026-10-08 (P4-T3). The old test pinned "MountCount > 0 means
+  // in use", which is wrong on Podman 5.8.4: MountCount read 0 for a volume
+  // mounted by a RUNNING container. "In use" now comes from the server's
+  // dangling list, the rule `volume prune` follows (DECISIONS phase-4/P4-T3).
+  test("a volume is 'in use' unless the server lists it as dangling; MountCount is ignored", () => {
+    const name = volumes[0]!.Name;
+    const rows = (d: ResourceData) => buildPanelModels(d, noSelection(), now).find((m) => m.id === "volumes")!;
+    const unused = rows({ ...data, danglingVolumes: [name] });
+    expect(unused.items[0]?.cells["state"]).toContain("unused");
+    const inUse = rows({ ...data, danglingVolumes: [], volumes: [{ ...volumes[0], MountCount: 0 } as VolumeListItem] });
+    expect(inUse.items[0]?.cells["state"]).toContain("in use");
+    expect(inUse.items[0]?.tone).toBe("ok");
+    // Before the dangling list arrives, the state is unknown, not "unused".
+    expect(rows({ ...data, danglingVolumes: null }).items[0]?.cells["state"]).toContain("…");
+  });
 
-    const used: ResourceData = {
-      ...data,
-      volumes: [{ ...volumes[0], MountCount: 2 } as VolumeListItem],
+  test("refresh fetches the dangling list together with the volumes", async () => {
+    const calls: string[] = [];
+    const engine = {
+      listContainers: async () => [],
+      listPods: async () => [],
+      listImages: async () => [],
+      listVolumes: async () => (calls.push("list"), volumes),
+      listNetworks: async () => [],
+      danglingVolumeNames: async () => (calls.push("dangling"), [volumes[0]!.Name]),
     };
-    const inUse = buildPanelModels(used, noSelection(), now).find((m) => m.id === "volumes");
-    expect(inUse?.items[0]?.cells["state"]).toContain("in use");
-    expect(inUse?.items[0]?.tone).toBe("ok");
+    const out = await createVisibleFetcher(engine, "/tmp/podtui-test/x.sock")(new Set(["volumes"]), EMPTY_DATA);
+    expect(calls.sort()).toEqual(["dangling", "list"]);
+    expect(out.data.danglingVolumes).toEqual([volumes[0]!.Name]);
   });
 
   test("network rows use the lowercase fields the API actually returns", () => {
@@ -169,20 +188,30 @@ describe("engine: fixture-driven resource mapping", () => {
     expect(n?.items[0]?.cells["state"]).toBe(networks[0]?.driver);
   });
 
-  test("quadlets declares an explicit placeholder while it has no source", () => {
+  // Rewritten in Phase 6: the "not implemented (phase 6)" placeholder these
+  // tests pinned is replaced by the real empty state (P6-T6).
+  test("no quadlets: the panel says where they live", () => {
     const q = buildPanelModels(data, noSelection(), now).find((m) => m.id === "quadlets");
     expect(q?.items).toHaveLength(0);
-    expect(q?.emptyLabel).toContain("not implemented");
+    expect(q?.emptyLabel).toContain("~/.config/containers/systemd/");
+    expect(q?.emptyLabel).toContain("/etc/containers/systemd/");
   });
 
-  test("a populated quadlet list drops the placeholder", () => {
+  test("a reason for an empty list replaces the generic text", () => {
+    const q = buildPanelModels({ ...data, quadletNote: "This Podman has no quadlet API" }, noSelection(), now).find((m) => m.id === "quadlets");
+    expect(q?.emptyLabel).toBe("This Podman has no quadlet API");
+  });
+
+  test("a populated quadlet list drops the empty label and shows type and state", () => {
     const withQuadlets: ResourceData = {
       ...data,
-      quadlets: [{ id: "hello", name: "hello.container", status: "running" }],
+      quadlets: [{ id: "hello.container", name: "hello.container", unit: "hello.service", type: "container", path: "/x", state: "active (running)", active: "active", load: "loaded" }],
     };
     const q = buildPanelModels(withQuadlets, noSelection(), now).find((m) => m.id === "quadlets");
     expect(q?.items).toHaveLength(1);
     expect(q?.emptyLabel).toBeUndefined();
+    expect(q?.items[0]?.cells).toMatchObject({ type: "ctr", state: "● active (running)" });
+    expect(q?.items[0]?.tone).toBe("ok");
   });
 
   test("selection is resolved from a stored item id", () => {
@@ -211,6 +240,7 @@ describe("engine -> frame model", () => {
     images: readFixture("images-list.json"),
     volumes: readFixture("volumes-list.json"),
     networks: readFixture("networks-list.json"),
+    danglingVolumes: null,
     quadlets: [],
   };
 

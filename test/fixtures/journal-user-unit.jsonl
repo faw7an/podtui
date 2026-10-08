@@ -1,0 +1,3 @@
+{"__REALTIME_TIMESTAMP":"1791314014767061","PRIORITY":"6","MESSAGE":"Stopped pipewire.service - PipeWire Multimedia Service.","_SYSTEMD_USER_UNIT":"init.scope","USER_UNIT":"pipewire.service"}
+{"__REALTIME_TIMESTAMP":"1791314014767214","PRIORITY":"6","MESSAGE":"pipewire.service: Consumed 21.055s CPU time over 10h 40min 490ms wall clock time, 20.8M memory peak.","_SYSTEMD_USER_UNIT":"init.scope","USER_UNIT":"pipewire.service"}
+{"__REALTIME_TIMESTAMP":"1791314079970445","PRIORITY":"6","MESSAGE":"Started pipewire.service - PipeWire Multimedia Service.","_SYSTEMD_USER_UNIT":"init.scope","USER_UNIT":"pipewire.service"}

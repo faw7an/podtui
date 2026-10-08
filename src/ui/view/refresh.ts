@@ -1,5 +1,8 @@
 import type { PanelId } from "../layout/types.ts";
 import type { ResourceData } from "./build.ts";
+import type { QuadletListItem } from "../../api/types.ts";
+import { describeState, type UnitState } from "../../engine/systemd.ts";
+import { quadletType } from "../../engine/quadlet.ts";
 
 /**
  * The slice of the engine the refresh loop needs. Declared structurally so a
@@ -10,7 +13,58 @@ export interface ListEngine {
   listPods(socketPath: string): Promise<unknown[]>;
   listImages(socketPath: string, all?: boolean): Promise<unknown[]>;
   listVolumes(socketPath: string): Promise<unknown[]>;
+  danglingVolumeNames(socketPath: string): Promise<string[]>;
+  listQuadlets?(socketPath: string): Promise<QuadletListItem[]>;
   listNetworks(socketPath: string): Promise<unknown[]>;
+}
+
+/** Unit states for the quadlet panel; absent = state unknown. */
+export type QuadletStates = (units: string[]) => Promise<Map<string, UnitState>>;
+
+/**
+ * Quadlets: Podman's list (it computes unit names), then ONE batched
+ * `systemctl show` for their states. Each side can fail on its own; the
+ * panel then says why instead of looking empty (P6-T6).
+ */
+async function fetchQuadlets(engine: ListEngine, socketPath: string, states?: QuadletStates): Promise<Partial<ResourceData>> {
+  if (!engine.listQuadlets) return { quadlets: [], quadletNote: "This engine cannot list quadlets." };
+  let items: QuadletListItem[];
+  try {
+    items = await engine.listQuadlets(socketPath);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      quadlets: [],
+      quadletNote: /404|not found/i.test(msg)
+        ? "This Podman has no quadlet API (GET /libpod/quadlets/json); a newer Podman is needed for this panel."
+        : `Could not list quadlets: ${msg}`,
+    };
+  }
+  let map = new Map<string, UnitState>();
+  let note: string | null = null;
+  if (states && items.length > 0) {
+    try {
+      map = await states(items.map((q) => q.UnitName));
+    } catch (e) {
+      note = `systemd did not answer (${e instanceof Error ? e.message : String(e)}); unit states are unknown.`;
+    }
+  }
+  return {
+    quadletNote: note,
+    quadlets: items.map((q) => {
+      const s = map.get(q.UnitName);
+      return {
+        id: q.Name,
+        name: q.Name,
+        unit: q.UnitName,
+        type: quadletType(q.Name),
+        path: q.Path,
+        state: s ? describeState(s) : q.Status ? q.Status.toLowerCase() : "unknown",
+        active: s?.active ?? "",
+        load: s?.load ?? (q.Status === "Not loaded" ? "not-found" : ""),
+      };
+    }),
+  };
 }
 
 export interface RefreshOutcome {
@@ -22,21 +76,17 @@ export interface RefreshOutcome {
 /** Which list call feeds which panel. Quadlets has no source until Phase 6. */
 const FETCHERS: Record<
   Exclude<PanelId, "quadlets">,
-  (engine: ListEngine, socketPath: string) => Promise<unknown>
+  (engine: ListEngine, socketPath: string) => Promise<Partial<ResourceData>>
 > = {
-  containers: (e, s) => e.listContainers(s, true),
-  pods: (e, s) => e.listPods(s),
-  images: (e, s) => e.listImages(s, true),
-  volumes: (e, s) => e.listVolumes(s),
-  networks: (e, s) => e.listNetworks(s),
-};
-
-const PANEL_TO_KEY: Record<Exclude<PanelId, "quadlets">, keyof ResourceData> = {
-  containers: "containers",
-  pods: "pods",
-  images: "images",
-  volumes: "volumes",
-  networks: "networks",
+  containers: async (e, s) => ({ containers: (await e.listContainers(s, true)) as ResourceData["containers"] }),
+  pods: async (e, s) => ({ pods: (await e.listPods(s)) as ResourceData["pods"] }),
+  images: async (e, s) => ({ images: (await e.listImages(s, true)) as ResourceData["images"] }),
+  // Volumes need a second list to know which are in use (P4-T3).
+  volumes: async (e, s) => {
+    const [volumes, dangling] = await Promise.all([e.listVolumes(s), e.danglingVolumeNames(s)]);
+    return { volumes: volumes as ResourceData["volumes"], danglingVolumes: dangling };
+  },
+  networks: async (e, s) => ({ networks: (await e.listNetworks(s)) as ResourceData["networks"] }),
 };
 
 /**
@@ -50,7 +100,7 @@ const PANEL_TO_KEY: Record<Exclude<PanelId, "quadlets">, keyof ResourceData> = {
  * Resources are fetched concurrently and independently: one failing endpoint
  * reports an error but still lets the others through.
  */
-export function createVisibleFetcher(engine: ListEngine, socketPath: string) {
+export function createVisibleFetcher(engine: ListEngine, socketPath: string, quadletStates?: QuadletStates) {
   return async function fetchVisible(
     visible: ReadonlySet<PanelId>,
     previous: ResourceData,
@@ -62,12 +112,19 @@ export function createVisibleFetcher(engine: ListEngine, socketPath: string) {
       .filter((panel) => visible.has(panel))
       .map(async (panel) => {
         try {
-          const items = await FETCHERS[panel](engine, socketPath);
-          (data as unknown as Record<string, unknown>)[PANEL_TO_KEY[panel]] = items;
+          Object.assign(data, await FETCHERS[panel](engine, socketPath));
         } catch (e) {
           errors.push(`${panel}: ${e instanceof Error ? e.message : String(e)}`);
         }
       });
+
+    if (visible.has("quadlets")) {
+      work.push(
+        fetchQuadlets(engine, socketPath, quadletStates).then((q) => {
+          Object.assign(data, q);
+        }),
+      );
+    }
 
     await Promise.all(work);
 
