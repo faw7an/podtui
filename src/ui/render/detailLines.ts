@@ -1,8 +1,10 @@
 import type { Layout, Rect } from "../layout/types.ts";
 import { innerWidth } from "../layout/panelView.ts";
 import type { Theme } from "../../theme/theme.ts";
-import { displayWidth, fit, padRight } from "../../util/fit.ts";
-import type { DetailModel } from "../view/model.ts";
+import { displayWidth, fit, padRight, truncate } from "../../util/fit.ts";
+import type { DetailLogModel, DetailModel } from "../view/model.ts";
+import { logWindow } from "../view/logView.ts";
+import { sanitizeLogText } from "../../util/logText.ts";
 import { LABEL_W } from "../view/detail.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 
@@ -36,6 +38,41 @@ function paintContent(line: string, theme: Theme, on: boolean): string {
     return paint(line.slice(0, LABEL_W), [fg(theme.accent)]) + line.slice(LABEL_W);
   }
   return line;
+}
+
+interface ContentWindow {
+  /** Ready-to-place rows (may carry colour); `fit` still trims each to width. */
+  rows: string[];
+  /** Bottom-border hint text, unpainted. */
+  hint: string;
+}
+
+function messageRow(text: string, on: boolean, color?: string): string {
+  return paint(text, on ? [color ? fg(color) : dim()] : []);
+}
+
+/**
+ * The Logs tab: only the lines inside the window are sanitized and formatted,
+ * so a 5,000-line buffer costs no more to draw than a screenful.
+ */
+function logContent(log: DetailLogModel, budget: number, theme: Theme, on: boolean): ContentWindow {
+  const win = logWindow(log.view, log.source, budget);
+  const { status } = log;
+  const rows = win.lines.map((line) => sanitizeLogText(line.text));
+
+  if (rows.length === 0 && budget > 0) {
+    if (status.kind === "error") rows.push(messageRow(`Logs unavailable: ${status.message}`, on, theme.error));
+    else if (status.kind === "connecting") rows.push(messageRow("Connecting to the log stream…", on));
+    else if (status.kind === "ended") rows.push(messageRow("No log output; the stream has ended.", on));
+    else rows.push(messageRow("No log output yet.", on));
+  }
+
+  const parts: string[] = [];
+  if (log.view.mode === "paused") parts.push("PAUSED");
+  if (win.below > 0) parts.push(`↓${win.below} new`);
+  if (status.kind === "ended" && win.lines.length > 0) parts.push("stream ended");
+  if (status.kind === "error" && win.lines.length > 0) parts.push(`error: ${status.message}`);
+  return { rows, hint: parts.length > 0 ? ` ${parts.join(" · ")} ` : "" };
 }
 
 /**
@@ -81,9 +118,17 @@ export function renderDetail(
   // Pager semantics, not selection-follow: the offset is the top row, clamped
   // so the last window is full. (windowRows centers its anchor instead, which
   // is what panels want and detail does not.)
-  const lastTop = Math.max(0, detail.lines.length - contentBudget);
-  const top = Math.min(Math.max(0, opts.scroll ?? 0), lastTop);
-  const rows = detail.lines.slice(top, top + contentBudget);
+  let rows: string[];
+  let hint: string;
+  if (detail.log) {
+    ({ rows, hint } = logContent(detail.log, contentBudget, theme, on));
+  } else {
+    const lastTop = Math.max(0, detail.lines.length - contentBudget);
+    const top = Math.min(Math.max(0, opts.scroll ?? 0), lastTop);
+    rows = detail.lines.slice(top, top + contentBudget).map((line) => paintContent(line, theme, on));
+    const hiddenBelow = detail.lines.length - top - rows.length;
+    hint = hiddenBelow > 0 ? ` ↓${hiddenBelow} more ` : "";
+  }
 
   for (let i = 0; i < innerRows; i++) {
     let inner: string;
@@ -92,14 +137,13 @@ export function renderDetail(
     } else {
       const slot = i - (hasTabs ? 1 : 0);
       const line = slot >= 0 ? rows[slot] : undefined;
-      inner = line === undefined ? padRight("", iw) : padRight(fit(paintContent(line, theme, on), iw), iw);
+      inner = line === undefined ? padRight("", iw) : padRight(fit(line, iw), iw);
     }
     lines.push(`${bc}${V}${on ? RESET : ""}${inner}${bc}${V}${on ? RESET : ""}`);
   }
 
-  const hiddenBelow = detail.lines.length - top - rows.length;
-  const hint = hiddenBelow > 0 ? ` ↓${hiddenBelow} more ` : "";
-  const hintText = hint.length > 0 ? paint(hint, [on ? dim() : ""]) : "";
+  // Fit the hint: an error message can be longer than the border.
+  const hintText = hint.length > 0 ? paint(truncate(hint, Math.max(0, iw - 1)), [on ? dim() : ""]) : "";
   const bottomFill = Math.max(0, iw - displayWidth(hintText));
   lines.push(`${bc}${BL}${H.repeat(bottomFill)}${hintText}${bc}${BR}${on ? RESET : ""}`);
 

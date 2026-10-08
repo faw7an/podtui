@@ -323,3 +323,25 @@ describe("UTF-8 split across frames (recorded live, Podman 5.8.4)", () => {
     ]);
   });
 });
+
+describe("timestamp prefix", () => {
+  test("an empty line keeps its newline (recorded frame `<ts> \\n`)", () => {
+    const decoder = new MultiplexedLogDecoder();
+    const payload = new TextEncoder().encode("2026-10-08T09:46:08.604609938+03:00 \n");
+    const frame = new Uint8Array(8 + payload.length);
+    frame[0] = 1;
+    frame[7] = payload.length;
+    frame.set(payload, 8);
+    decoder.append(frame);
+    expect(decoder.decode().map((f) => f.message)).toEqual(["\n"]);
+  });
+
+  test("leading spaces in the message survive", () => {
+    const payload = new TextEncoder().encode("2026-10-08T09:46:08Z    indented\n");
+    const frame = new Uint8Array(8 + payload.length);
+    frame[0] = 1;
+    frame[7] = payload.length;
+    frame.set(payload, 8);
+    expect(decodeMultiplexedFrame(frame).frame?.message).toBe("   indented\n");
+  });
+});

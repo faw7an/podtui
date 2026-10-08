@@ -1,4 +1,6 @@
 import { PANEL_IDS, type ColumnDef, type PaneId, type PanelId } from "../layout/types.ts";
+import type { LogSource, LogViewState } from "./logView.ts";
+import type { LogStreamStatus } from "./logSession.ts";
 
 /**
  * One row of a panel table. `cells` is keyed by column id so that
@@ -40,6 +42,18 @@ export interface DetailModel {
   tabs: string[];
   activeTab: number;
   lines: string[];
+  /**
+   * Logs tab content (P3-T2). Present only when the Logs tab shows a selected
+   * container; the renderer windows it to the pane height, so only visible
+   * lines are ever formatted.
+   */
+  log?: DetailLogModel;
+}
+
+export interface DetailLogModel {
+  source: LogSource;
+  view: LogViewState;
+  status: LogStreamStatus;
 }
 
 export interface FrameModel {

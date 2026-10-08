@@ -105,7 +105,7 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
 }
 
 /** Which UI state the footer advertises keys for. */
-export type FooterHintContext = "base" | "detail" | "filter" | "filterKept";
+export type FooterHintContext = "base" | "detail" | "filter" | "filterKept" | "logs";
 
 export interface FooterOptions {
   theme: Theme;
@@ -138,6 +138,17 @@ const HINTS: { key: string; desc: string }[] = [
  * the query itself is echoed in the panel title, and `q`/`?` must NOT appear —
  * they type characters in this mode, so advertising them as quit/help would lie.
  */
+/** Detail focused on the Logs tab (P3-T2): the arrows scroll the log. */
+const LOG_HINTS: { key: string; desc: string }[] = [
+  { key: "↑↓jk", desc: "scroll" },
+  { key: "p", desc: "pause" },
+  { key: "g G", desc: "top/live" },
+  { key: "[ ]", desc: "tab" },
+  { key: "Esc", desc: "back" },
+  { key: "?", desc: "help" },
+  { key: "q", desc: "quit" },
+];
+
 const FILTER_HINTS: { key: string; desc: string }[] = [
   { key: "Esc", desc: "clear" },
   { key: "Enter", desc: "keep" },
@@ -190,9 +201,11 @@ export function buildFooter(
       .join("  ");
 
   const context: FooterHintContext =
-    opts.context ?? (model.focus === "detail" ? "detail" : "base");
+    opts.context ?? (model.focus === "detail" ? (model.detail.log ? "logs" : "detail") : "base");
   let hints =
-    context === "detail"
+    context === "logs"
+      ? LOG_HINTS
+      : context === "detail"
       ? DETAIL_HINTS
       : context === "filter"
         ? FILTER_HINTS

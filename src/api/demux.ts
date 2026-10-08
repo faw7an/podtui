@@ -17,7 +17,7 @@ function getStreamType(buffer: Uint8Array, offset: number): number {
   return val ?? 1;
 }
 
-const TIMESTAMP_PREFIX = /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)(\s*)/;
+const TIMESTAMP_PREFIX = /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)( ?)/;
 
 /** Leading ASCII bytes of `payload` as a string (stops at the first non-ASCII byte). */
 function asciiHead(payload: Uint8Array, max: number): string {
@@ -37,8 +37,10 @@ function asciiHead(payload: Uint8Array, max: number): string {
  */
 function splitTimestamp(payload: Uint8Array): { timestamp: Date; body: Uint8Array } {
   const match = TIMESTAMP_PREFIX.exec(asciiHead(payload, 64));
-  // A timestamp counts only when whitespace follows it (same rule as before).
-  if (!match?.[1] || match[4] === undefined || match[4].length === 0) {
+  // Podman separates the timestamp with exactly ONE space. Anything after it
+  // is payload: an empty line is the frame `"<ts> \n"`, and a greedy `\s*`
+  // here once swallowed that `\n` (fixture container-logs-partial-lines.bin).
+  if (!match?.[1] || match[4] !== " ") {
     return { timestamp: new Date(), body: payload };
   }
   return { timestamp: new Date(match[1]), body: payload.subarray(match[0].length) };

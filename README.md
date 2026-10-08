@@ -69,9 +69,10 @@ containers.
 
 | Works today | Coming next |
 |---|---|
-| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | **Logs** tab: live follow, search, errors in red, warnings in yellow |
+| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | Errors in red and warnings in yellow in the Logs tab |
 | Live refresh (every 5 s by default) that keeps your cursor on the same item | **Stats**, **Env** (secrets masked) and **Top** tabs |
 | Container **Config** tab: formatted inspect output, foldable sections | Start / stop / restart / kill / remove, with confirm dialogs |
+| Container **Logs** tab: live follow, pause (`p`), scroll, `g`/`G`, "new lines below" | Log search, level colours, timestamps and wrap toggles |
 | `/` filter in every list, `?` help overlay, `z` zoom | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
 | Adapts to any terminal size, from 40×10 up | **Quadlets**: unit state, journal, start/stop |
 | Works with **podman-docker** setups, and never connects to a Docker daemon by mistake | Omarchy theme colours, mouse support |
@@ -235,9 +236,11 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `/` | filter list |
 | `Ctrl+U` | clear filter line |
 | `Space` | fold sections |
-| `PgUp/PgDn` | scroll detail |
+| `PgUp/PgDn` | scroll detail/logs |
 | `Enter` | open detail |
 | `[ ]` | detail tab |
+| `p` | pause/resume logs |
+| `g G` | logs: oldest / live end |
 | `Esc` | back / close |
 | `?` | help |
 | `q` | quit |

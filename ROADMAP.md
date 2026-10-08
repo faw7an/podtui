@@ -104,7 +104,7 @@ Phase overview
 **Goal:** the features you actually open the tool for.
 
 - [x] **P3-T1** `util/logLevel.ts`: pure function classifying a line as `error | warn | info | debug | unknown` (rules documented in the file, e.g. keywords `ERROR`, `FATAL`, `panic`, `Exception`, `level=error`, JSON `"level":"error"`). Table-driven unit tests, including false-positive cases (e.g. a word like "terror").
-- [ ] **P3-T2** Logs tab: follow mode, ring buffer (default 5,000 lines), windowed rendering, throttled updates (≤ ~20 fps), pause/resume key, scroll with `↑↓`/`PgUp`/`PgDn`/`g`/`G`, "new lines below" indicator when scrolled up.
+- [x] **P3-T2** Logs tab: follow mode, ring buffer (default 5,000 lines), windowed rendering, throttled updates (≤ ~20 fps), pause/resume key, scroll with `↑↓`/`PgUp`/`PgDn`/`g`/`G`, "new lines below" indicator when scrolled up.
 - [ ] **P3-T3** Log coloring: error lines red, warn lines yellow, timestamps dim; stderr vs stdout indicator optional. Decide and record how raw ANSI codes in logs are handled (strip vs pass-through) (FR-5).
 - [ ] **P3-T4** Log search: `/` search with highlight, `n`/`N` next/previous match; level filter toggle (`e` = errors only).
 - [ ] **P3-T5** Timestamps toggle (`t`) and line wrap toggle (`w`).

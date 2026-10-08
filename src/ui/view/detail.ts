@@ -1,4 +1,5 @@
 import type { ContainerInspect } from "../../api/types.ts";
+import type { DetailLogModel } from "./model.ts";
 
 /**
  * Detail pane content (ROADMAP P2-T7: a TabBar plus a Config tab rendering
@@ -19,7 +20,7 @@ export interface DetailTabMeta {
 }
 
 export const DETAIL_TABS: readonly DetailTabMeta[] = [
-  { id: "logs", label: "Logs", phase: "phase 3" },
+  { id: "logs", label: "Logs" },
   { id: "stats", label: "Stats", phase: "phase 3" },
   { id: "env", label: "Env", phase: "phase 3" },
   { id: "config", label: "Config" },
@@ -33,6 +34,8 @@ export interface DetailView {
   activeTabId: DetailTabId;
   /** Flat, pre-formatted rows; `#` starts a collapsible section heading. */
   lines: string[];
+  /** Logs tab stream; set by `buildFrameModel`, never by `buildDetail`. */
+  log?: DetailLogModel;
 }
 
 /** Section keys that can be collapsed in the Config tab. */

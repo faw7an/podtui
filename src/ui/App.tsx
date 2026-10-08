@@ -14,6 +14,9 @@ import type { ContainerInspect } from "../api/types.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
 import { resolvePollMs } from "../config.ts";
 import { routeFilterKey } from "../input/filterKeys.ts";
+import { computeLayout } from "./layout/computeLayout.ts";
+import { useLogStream } from "./hooks/useLogStream.ts";
+import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
 
 // FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
 // back to the default rather than reaching setInterval.
@@ -51,10 +54,12 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   // Kept in a ref so the poll interval always reads the latest resource data
   // without being torn down and re-created on every refresh.
   const dataRef = useRef<ResourceData>(EMPTY_DATA);
+  const [logView, setLogView] = useState<LogViewState>(FOLLOW);
 
+  const engine = useMemo(() => createPodmanEngine(), []);
   const fetchVisible = useMemo(
-    () => createVisibleFetcher(createPodmanEngine(), socketPath),
-    [],
+    () => createVisibleFetcher(engine, socketPath),
+    [engine],
   );
 
   // Only panels that are visible are fetched (FR-3); hidden panels keep their
@@ -77,6 +82,24 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       }, POLL_MS),
     [fetchVisible, state.visible],
   );
+
+  // Same layout the Screen computes, needed here for two facts: whether the
+  // detail pane is on screen at all (no pane, no stream) and how many log
+  // rows it shows (a page is one screenful).
+  const layout = useMemo(
+    () =>
+      computeLayout({
+        cols: terminalCols,
+        rows: terminalRows,
+        visible: state.visible,
+        focused: state.focus,
+        zoom: state.zoom,
+        detailFullscreen: state.detailFullscreen,
+      }),
+    [terminalCols, terminalRows, state.visible, state.focus, state.zoom, state.detailFullscreen],
+  );
+  // Detail rect minus its two borders and the tab strip.
+  const logRows = Math.max(1, (layout.detail?.h ?? 3) - 3);
 
   const model = useMemo(
     () =>
@@ -109,6 +132,32 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const focusModel = model.panels.find((p) => p.id === focusId);
   const selectedItemId = focusModel?.items[focusModel.selected]?.id ?? "";
 
+  // The Logs tab follows the selected container while the detail pane is on
+  // screen. Anything else (another tab, another panel, no pane) is null, and
+  // null closes the stream.
+  const logContainerId =
+    activeTab === "logs" && focusId === "containers" && layout.detail && selectedItemId
+      ? selectedItemId
+      : null;
+  const logs = useLogStream(engine, socketPath, logContainerId, logContainerId !== null);
+
+  // A new container or leaving the tab starts back at the live end.
+  useEffect(() => setLogView(FOLLOW), [logContainerId]);
+
+  // Attached after the base model so the stream can depend on the selection
+  // the model resolved (filtering included) without a cycle.
+  const frameModel = useMemo(
+    () =>
+      logContainerId !== null && model.detail.lines.length === 0
+        ? {
+            ...model,
+            detail: { ...model.detail, log: { source: logs.buffer, view: logView, status: logs.status } },
+          }
+        : model,
+    // `logs.version` changes when the (mutable) buffer gains lines.
+    [model, logContainerId, logs.buffer, logs.version, logs.status, logView],
+  );
+
   // Inspect data feeds the Config tab. Fetched only for containers (the one
   // resource P2-T7 needs) and only when the selection actually changes.
   useEffect(() => {
@@ -119,7 +168,6 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     let cancelled = false;
     void (async () => {
       try {
-        const engine = createPodmanEngine();
         const data = await engine.inspectContainer(socketPath, selectedItemId);
         if (!cancelled) setInspect(data);
       } catch {
@@ -129,7 +177,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     return () => {
       cancelled = true;
     };
-  }, [focusId, selectedItemId]);
+  }, [engine, focusId, selectedItemId]);
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
@@ -166,6 +214,23 @@ export const App = ({ socketPath }: { socketPath: string }) => {
 
     if (input === "q") {
       process.exit(0);
+    }
+
+    // --- Logs tab (P3-T2). Only while the tab actually shows a stream. ---
+    // ↑↓jk scroll the log when the detail pane has focus; from a list they
+    // keep moving the selection (handled further down).
+    if (frameModel.detail.log) {
+      const logAction = (type: LogViewAction["type"]): void =>
+        setLogView((v) => reduceLogView(v, { type } as LogViewAction, logs.buffer, logRows));
+      if (input === "p") return logAction("togglePause");
+      if (input === "g") return logAction("top");
+      if (input === "G") return logAction("bottom");
+      if (key.pageUp) return logAction("pageUp");
+      if (key.pageDown) return logAction("pageDown");
+      if (state.focus === "detail") {
+        if (key.upArrow || input === "k") return logAction("lineUp");
+        if (key.downArrow || input === "j") return logAction("lineDown");
+      }
     }
 
     if (input === "?") {
@@ -244,7 +309,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
 
   return (
     <Screen
-      model={model}
+      model={frameModel}
       theme={defaultTheme}
       visible={state.visible}
       zoom={state.zoom}

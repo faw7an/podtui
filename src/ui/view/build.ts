@@ -8,7 +8,7 @@ import type {
 import { formatAge, formatBytes, healthSuffix, parsePodmanTime, shortenImageName, statusText, statusGlyph } from "../../util/format.ts";
 import { PANEL_IDS, type PaneId, type PanelId } from "../layout/types.ts";
 import { selectedIndex } from "../layout/layoutReducer.ts";
-import { PANEL_COLUMNS, panelMeta, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
+import { PANEL_COLUMNS, panelMeta, type DetailLogModel, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
 import { buildDetail, type DetailTabId } from "./detail.ts";
 import type { ContainerInspect } from "../../api/types.ts";
 
@@ -193,6 +193,8 @@ export interface BuildFrameArgs {
   filter?: Partial<Record<PanelId, string>>;
   collapsedSections?: ReadonlySet<string>;
   revealSecrets?: boolean;
+  /** Logs tab stream for the selected container (P3-T2). */
+  log?: DetailLogModel;
 }
 
 export function buildFrameModel(args: BuildFrameArgs): FrameModel {
@@ -215,6 +217,19 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
         revealSecrets: args.revealSecrets,
       })
     : buildDetail({ inspect: null, activeTab: args.activeTab ?? "config", hasSelection: false });
+
+  // Logs belong to containers; other panels say so instead of looking empty.
+  // The title still names the selection; the content is the stream.
+  if ((args.activeTab ?? "config") === "logs") {
+    if (focusId === "containers" && item) {
+      detail.lines = [];
+      if (args.log) detail.log = args.log;
+      if (!inspect) detail.title = `${item.cells["name"] ?? ""} · ${(item.cells["state"] ?? "").slice(2)}`;
+    } else if (item) {
+      detail.lines = ["Logs are shown for containers. Select one in the Containers panel (2)."];
+    }
+    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+  }
 
   if (item && !inspect) {
     for (const [key, value] of Object.entries(item.cells)) {
