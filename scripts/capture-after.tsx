@@ -108,7 +108,7 @@ for (const [cols, rows] of SIZES) {
       detailFullscreen: false,
       color: true,
     }),
-    { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
+    { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false, interactive: true },
   );
 
   await sleep(600);

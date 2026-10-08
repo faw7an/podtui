@@ -131,7 +131,7 @@ async function renderAt(cols: number, rows: number, rows2 = 12) {
   });
   const instance = render(
     React.createElement(Frame, { layout, model: model(rows2), theme: defaultTheme, color: false }),
-    { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
+    { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false, interactive: true },
   );
   await waitFor(() => stdout.peek().includes("podtui"), "initial frame with header");
   return { stdout, instance, layout };
@@ -197,7 +197,7 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
         detailFullscreen: false,
         color: false,
       }),
-      { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
+      { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false, interactive: true },
     );
     await waitFor(() => stdout.frame().includes("[1] Pods"), "initial XL frame");
     const wide = stdout.frame().split("\n");
@@ -247,7 +247,7 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
     });
     const instance = render(
       React.createElement(Frame, { layout, model: model(), theme: defaultTheme, color: false }),
-      { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
+      { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false, interactive: true },
     );
     await waitFor(() => stdout.frame().includes("[2] Containers"), "zoomed frame");
     const frame = stdout.frame();
@@ -261,7 +261,7 @@ describe("Ink render at the spec sizes (LAYOUT_SPEC §10)", () => {
     const layout = computeLayout({ cols: 30, rows: 8, visible: new Set<PanelId>(PANEL_IDS), focused: "containers" });
     const instance = render(
       React.createElement(Frame, { layout, model: model(), theme: defaultTheme, color: false }),
-      { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false },
+      { stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false, exitOnCtrlC: false, interactive: true },
     );
     await waitFor(() => stdout.frame().includes("Terminal too small"), "too-small message");
     const lines = stdout.frame().split("\n").filter((l) => l.length > 0);
