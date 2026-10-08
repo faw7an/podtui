@@ -62,6 +62,11 @@ if [[ "$HOST_ARCH" == "$ARCH" ]]; then
   out=$(dist/podtui --help) || fail "--help exited non-zero"
   [[ "$out" == *"podtui - terminal UI for Podman"* ]] || fail "--help output unexpected: $out"
 
+  # 1b. It reports the version it is being released as (bundled from
+  #     package.json at build time; run from / so no package.json is nearby).
+  out=$(cd / && "$OLDPWD/dist/podtui" --version) || fail "--version exited non-zero"
+  [[ "$out" == "podtui $VERSION" ]] || fail "--version printed '$out', expected 'podtui $VERSION'"
+
   # 2. The bundled app code runs: a missing socket is a clean, readable error
   #    with exit 1 (no stack trace), in an empty environment.
   set +e
