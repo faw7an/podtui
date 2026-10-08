@@ -169,7 +169,7 @@ Phase overview
 **Automated tests:** preview counts match mock engine data; high-risk flow requires the typed word; Esc at any stage aborts without calling execute; partial-failure rendering.
 
 **Manual tests for the human** (sandbox only!)
-1. `x` → "remove stopped containers": preview lists exactly the exited ones (compare with `podman --url ... ps -a --filter status=exited`). Confirm; they disappear.
+1. BEFORE confirming anything: run `podman --url ... ps -a --filter status=exited --filter status=created --format '{{.Names}} {{.State}} pod={{.PodName}}'` and note the containers with an empty `pod=`. Then `x` → "remove stopped containers": the preview lists exactly those, each with its state (containers in pods are kept, Podman's prune rule). Confirm with `y`; they disappear from the panel and from the same CLI command.
 2. Re-seed with `scripts/dev-sandbox.sh seed`; run prune images/volumes/networks and compare counts with the CLI equivalents.
 3. "Remove all (forced)": typing anything but `delete` does nothing.
 4. Confirm your **real** Podman resources are untouched.

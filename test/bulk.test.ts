@@ -98,6 +98,12 @@ describe("command table", () => {
     expect(r.done).toHaveLength(p.count - 1);
   });
 
+  test("the container prune preview shows each container's state", async () => {
+    const { engine } = mockEngine();
+    const p = await cmd("prune-containers").preview(engine, S);
+    expect(p.targets.map((t) => t.name)).toEqual(["failing (exited)"]);
+  });
+
   test("prunes: preview is the dry run, execute the real one; sizes where Podman reports them", async () => {
     const { engine, calls } = mockEngine();
     const vp = await cmd("prune-volumes").preview(engine, S);

@@ -133,9 +133,15 @@ export const BULK_COMMANDS: readonly BulkCommand[] = [
     risk: "low",
     panel: "containers",
     async preview(engine, socket) {
-      return previewFromPrune((await engine.pruneContainers(socket, true)) as PrunePreview, "containers", [
+      const [dry, all] = await Promise.all([engine.pruneContainers(socket, true), engine.listContainers(socket, true)]);
+      const p = previewFromPrune(dry as PrunePreview, "containers", [
         "Exited, stopped and created containers. Containers in pods are kept (Podman's prune rule).",
       ]);
+      // Show each container's state, so it is clear why it is included
+      // (a `created` one is pruned too, and `ps --filter status=exited`
+      // would not list it).
+      const state = new Map(all.map((c) => [nameOf(c), c.State]));
+      return { ...p, targets: p.targets.map((t) => ({ ...t, name: state.has(t.name) ? `${t.name} (${state.get(t.name)})` : t.name })) };
     },
     async execute(engine, socket) {
       return resultFromPrune((await engine.pruneContainers(socket, false)) as PruneResult, "containers", "container", true);
