@@ -206,9 +206,9 @@ Phase overview
 **Goal:** make it feel native; make clicking work.
 
 ### Theme
-- [ ] **P7-T1** Inspect `~/.config/omarchy/current/theme/` on a real install; write the findings (file names, formats, sample content) into DECISIONS.md. ⚠️ Do not write the loader before this is done.
-- [ ] **P7-T2** `theme/omarchy.ts`: parse the discovered palette format into `Theme`; unit tests using copies of real theme files saved as fixtures (at least 2 different Omarchy themes).
-- [ ] **P7-T3** Map palette colors to semantic roles (error→red, ok→green, warn→yellow, accent, border, selection) with sensible contrast; fallback to default if any role is missing.
+- [x] **P7-T1** Inspect `~/.config/omarchy/current/theme/` (current Omarchy: `~/.local/state/omarchy/current/theme/`, see DECISIONS phase-7) on a real install; write the findings (file names, formats, sample content) into DECISIONS.md. ⚠️ Do not write the loader before this is done.
+- [x] **P7-T2** `theme/omarchy.ts`: parse the discovered palette format into `Theme`; unit tests using copies of real theme files saved as fixtures (at least 2 different Omarchy themes).
+- [x] **P7-T3** Map palette colors to semantic roles (error→red, ok→green, warn→yellow, accent, border, selection) with sensible contrast; fallback to default if any role is missing.
 - [ ] **P7-T4** Reload on `T` (and on startup). Stretch: watch the theme path for changes.
 - [ ] **P7-T5** Truecolor vs 256-color degradation.
 

@@ -1,0 +1,2 @@
+Copied from https://github.com/basecamp/omarchy (branch quattro, commit b83d3df0840504299d3099ebf391eb8110527edd) on 2026-10-08:
+themes/<name>/colors.toml, unchanged. Omarchy is MIT-licensed.
