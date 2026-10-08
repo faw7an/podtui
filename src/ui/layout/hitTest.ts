@@ -1,7 +1,7 @@
 import { PANEL_IDS, type Layout, type PanelId } from "./types.ts";
 import { panelMetrics } from "./panelView.ts";
 import { windowRows } from "../render/panelLines.ts";
-import { buildHeader } from "../render/chrome.ts";
+import { buildHeader, headerBrand } from "../render/chrome.ts";
 import { stripAnsi } from "../render/palette.ts";
 import { displayWidth } from "../../util/fit.ts";
 import type { FrameModel } from "../view/model.ts";
@@ -44,8 +44,10 @@ export function headerTabRanges(layout: Layout, model: FrameModel, theme: Theme)
   const starts: number[] = [];
   let col = 0;
   let want = 1;
+  // Tabs come after the brand (which may name a project containing digits).
+  const brandEnd = displayWidth(headerBrand(model));
   for (const ch of cells) {
-    if (want <= PANEL_IDS.length && ch === String(want) && col > 0) {
+    if (want <= PANEL_IDS.length && ch === String(want) && col > brandEnd) {
       starts.push(col - 1); // include the tab's leading space
       want++;
     }

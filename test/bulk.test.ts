@@ -46,6 +46,11 @@ function mockEngine(opts: { failStop?: string } = {}) {
       calls.push(`pruneNetworks dry=${dry}`);
       return dry ? { networks: { count: 1, names: ["spare"] } } : { networks: mapPruneReports(pruneReports.networks) };
     },
+    listVolumes: async () => [],
+    listNetworks: async () => [],
+    danglingVolumeNames: async () => [],
+    removeVolume: async (_s, name) => (calls.push(`rmVolume ${name}`), { success: true }),
+    removeNetwork: async (_s, name) => (calls.push(`rmNetwork ${name}`), { success: true }),
   };
   return { engine, calls };
 }

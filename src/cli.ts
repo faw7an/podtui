@@ -17,6 +17,8 @@ export interface CliArgs {
   version: boolean;
   /** `--no-mouse`: never turn on terminal mouse reporting (P7-T9). */
   noMouse: boolean;
+  /** `--all`: every container on the machine, not just this folder's project. */
+  all: boolean;
 }
 
 export type ParseResult = { ok: true; args: CliArgs } | { ok: false; error: string };
@@ -24,7 +26,7 @@ export type ParseResult = { ok: true; args: CliArgs } | { ok: false; error: stri
 export const USAGE = `podtui - terminal UI for Podman
 
 Usage:
-  podtui [--socket <path>] [--no-mouse]
+  podtui [--all] [--socket <path>] [--no-mouse]
   podtui --version | --help
 
 Options:
@@ -35,6 +37,9 @@ Options:
                    ($XDG_RUNTIME_DIR/podman/podman.sock) and rootful
                    (/run/podman/podman.sock) sockets, and podman-docker's
                    docker.sock links. A Docker daemon is never used.
+  --all, -a        Show everything on this Podman. Without it, podtui shows
+                   only the compose project of the current folder (the
+                   containers, pods, volumes and networks it started).
   --no-mouse       Do not use the mouse (keyboard only; the terminal's own
                    text selection keeps working).
   --version, -v    Print the version and exit.
@@ -42,7 +47,7 @@ Options:
 `;
 
 export function parseArgs(argv: string[]): ParseResult {
-  const args: CliArgs = { help: false, version: false, noMouse: false };
+  const args: CliArgs = { help: false, version: false, noMouse: false, all: false };
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i]!;
@@ -57,6 +62,10 @@ export function parseArgs(argv: string[]): ParseResult {
       continue;
     }
 
+    if (token === "--all" || token === "-a") {
+      args.all = true;
+      continue;
+    }
     if (token === "--no-mouse") {
       args.noMouse = true;
       continue;

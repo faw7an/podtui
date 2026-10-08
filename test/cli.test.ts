@@ -27,7 +27,7 @@ function err(argv: string[]): string {
 
 describe("parseArgs", () => {
   test("no flags is valid and selects nothing", () => {
-    expect(ok([])).toEqual({ help: false, version: false, noMouse: false });
+    expect(ok([])).toEqual({ help: false, version: false, noMouse: false, all: false });
   });
 
   test("--socket takes the next token", () => {
@@ -36,6 +36,7 @@ describe("parseArgs", () => {
       help: false,
       version: false,
     noMouse: false,
+      all: false,
   });
   });
 
@@ -45,17 +46,18 @@ describe("parseArgs", () => {
       help: false,
       version: false,
     noMouse: false,
+      all: false,
   });
   });
 
   test("--help sets the flag and ignores nothing else", () => {
-    expect(ok(["--help"])).toEqual({ help: true, version: false, noMouse: false });
-    expect(ok(["-h"])).toEqual({ help: true, version: false, noMouse: false });
+    expect(ok(["--help"])).toEqual({ help: true, version: false, noMouse: false, all: false });
+    expect(ok(["-h"])).toEqual({ help: true, version: false, noMouse: false, all: false });
   });
 
   test("--version and -v set the version flag", () => {
-    expect(ok(["--version"])).toEqual({ help: false, version: true, noMouse: false });
-    expect(ok(["-v"])).toEqual({ help: false, version: true, noMouse: false });
+    expect(ok(["--version"])).toEqual({ help: false, version: true, noMouse: false, all: false });
+    expect(ok(["-v"])).toEqual({ help: false, version: true, noMouse: false, all: false });
   });
 
   test("a missing --socket value is an error, not an empty string", () => {

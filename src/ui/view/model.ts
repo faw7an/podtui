@@ -91,6 +91,8 @@ export interface FrameModel {
   focus: PaneId;
   /** Right-hand header text, e.g. `9:40 PM`. */
   clock: string;
+  /** What the view is limited to ("project: shop", "all containers"). */
+  scope?: string;
   error?: string;
   /**
    * Result of the last action (P4-T5): busy while pending, then ok/error.

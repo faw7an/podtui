@@ -218,12 +218,26 @@ talks to the API directly.
 ## Usage
 
 ```
-podtui [--socket <path>]
+podtui [--all] [--socket <path>] [--no-mouse]
 podtui --version | --help
+```
+
+**By default podtui shows the project you are working on**: run it in a project folder and
+it shows only that folder's compose project — the containers, pods, volumes and networks that
+`podman compose` / `podman-compose` / `docker compose` started from there (subfolders work too).
+The header says which (`▲ podtui · shop`), and the `x` menu then acts only on the project's own
+items. Anywhere else it says there is no project here. **`podtui --all`** shows everything on
+your Podman, with Podman-wide prune commands.
+
+```bash
+cd ~/code/shop && podman compose up -d && podtui   # just "shop"
+podtui --all                                        # every container on the machine
 ```
 
 | Option / variable | Meaning |
 |---|---|
+| `--all`, `-a` | show everything on this Podman, not just the current folder's project |
+| `--no-mouse` | keyboard only (keeps your terminal's own text selection) |
 | `--socket <path>` | Podman socket to use (path or `unix://` URI) |
 | `--version`, `-v` | print the version |
 | `--help`, `-h` | print usage |

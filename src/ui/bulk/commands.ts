@@ -1,6 +1,7 @@
 import type { ContainerListItem } from "../../api/types.ts";
 import type { ContainerEngine, PrunePreview, PruneResult } from "../../engine/ContainerEngine.ts";
 import type { PanelId } from "../layout/types.ts";
+import { LABEL_PROJECT, type Scope } from "../../engine/project.ts";
 
 /**
  * The `x` bulk commands (P5-T2), as a data table: id, label, risk, the panel
@@ -55,6 +56,11 @@ export type BulkEngine = Pick<
   | "pruneImages"
   | "pruneVolumes"
   | "pruneNetworks"
+  | "listVolumes"
+  | "listNetworks"
+  | "danglingVolumeNames"
+  | "removeVolume"
+  | "removeNetwork"
 >;
 
 export interface BulkCommand {
@@ -225,4 +231,119 @@ export const BULK_COMMANDS: readonly BulkCommand[] = [
 /** Commands for the focused panel first, then the rest in table order (P5-T6). */
 export function orderedCommands(panel: PanelId, commands: readonly BulkCommand[] = BULK_COMMANDS): BulkCommand[] {
   return [...commands.filter((c) => c.panel === panel), ...commands.filter((c) => c.panel !== panel)];
+}
+
+// ------------------------------------------------------------ project mode
+
+/**
+ * The `x` menu when podtui shows one folder's compose project. Prunes are
+ * Podman-WIDE (they would remove other projects' and unrelated stopped
+ * containers, volumes, networks), so in project mode they are replaced by
+ * list commands over the PROJECT's own items, each previewed by name and
+ * executed by id. Images are shared between projects, so no image command
+ * is offered here. Every target is re-checked against the project label
+ * when previewing, from a fresh list.
+ */
+export function projectCommands(projects: readonly string[]): BulkCommand[] {
+  const mine = new Set(projects);
+  const inProject = (labels: Record<string, string> | null | undefined): boolean => mine.has(labels?.[LABEL_PROJECT] ?? "");
+  const where = `in ${projects.join(", ")}`;
+  const PRUNABLE = new Set(["exited", "stopped", "created", "configured"]);
+  const containersOf = async (engine: BulkEngine, socket: string) =>
+    (await engine.listContainers(socket, true)).filter((c) => inProject(c.Labels) && !c.IsInfra);
+
+  return [
+    {
+      id: "project-stop-all",
+      label: "Stop the project's running containers",
+      risk: "low",
+      verb: "stop",
+      noun: "container",
+      panel: "containers",
+      async preview(engine, socket) {
+        const running = (await containersOf(engine, socket)).filter((c) => c.State === "running");
+        return { count: running.length, targets: running.map((c) => ({ id: c.Id, name: nameOf(c) })), notes: [`Only containers ${where}.`] };
+      },
+      async execute(engine, socket, preview) {
+        return { verb: "stopped", noun: "container", ...(await eachTarget(preview.targets, (t) => engine.stopContainer(socket, t.id))) };
+      },
+    },
+    {
+      id: "project-rm-stopped",
+      label: "Remove the project's stopped containers",
+      risk: "low",
+      verb: "remove",
+      noun: "container",
+      panel: "containers",
+      async preview(engine, socket) {
+        const stopped = (await containersOf(engine, socket)).filter((c) => PRUNABLE.has((c.State ?? "").toLowerCase()));
+        return {
+          count: stopped.length,
+          targets: stopped.map((c) => ({ id: c.Id, name: `${nameOf(c)} (${c.State})` })),
+          notes: [`Only containers ${where}; nothing else on this Podman is touched.`],
+        };
+      },
+      async execute(engine, socket, preview) {
+        return { verb: "removed", noun: "container", ...(await eachTarget(preview.targets, (t) => engine.removeContainer(socket, t.id, false))) };
+      },
+    },
+    {
+      id: "project-rm-volumes",
+      label: "Remove the project's unused volumes",
+      risk: "low",
+      verb: "remove",
+      noun: "volume",
+      panel: "volumes",
+      async preview(engine, socket) {
+        const [vols, dangling] = await Promise.all([engine.listVolumes(socket), engine.danglingVolumeNames(socket)]);
+        const unused = new Set(dangling);
+        const targets = vols.filter((v) => inProject(v.Labels) && unused.has(v.Name)).map((v) => ({ id: v.Name, name: v.Name }));
+        return { count: targets.length, targets, notes: [`Volumes ${where} that no container uses. Their data is deleted.`] };
+      },
+      async execute(engine, socket, preview) {
+        return { verb: "removed", noun: "volume", ...(await eachTarget(preview.targets, (t) => engine.removeVolume(socket, t.id))) };
+      },
+    },
+    {
+      id: "project-rm-networks",
+      label: "Remove the project's unused networks",
+      risk: "low",
+      verb: "remove",
+      noun: "network",
+      panel: "networks",
+      async preview(engine, socket) {
+        const [nets, all] = await Promise.all([engine.listNetworks(socket), engine.listContainers(socket, true)]);
+        const used = new Set(all.flatMap((c) => c.Networks ?? []));
+        const targets = nets.filter((n) => inProject(n.labels) && !used.has(n.name)).map((n) => ({ id: n.name, name: n.name }));
+        return { count: targets.length, targets, notes: [`Networks ${where} that no container (running or stopped) is on.`] };
+      },
+      async execute(engine, socket, preview) {
+        return { verb: "removed", noun: "network", ...(await eachTarget(preview.targets, (t) => engine.removeNetwork(socket, t.id))) };
+      },
+    },
+    {
+      id: "project-remove-all",
+      label: "Remove ALL the project's containers (forced)",
+      risk: "high",
+      verb: "remove",
+      noun: "container",
+      panel: "containers",
+      async preview(engine, socket) {
+        const all = await containersOf(engine, socket);
+        return {
+          count: all.length,
+          targets: all.map((c) => ({ id: c.Id, name: nameOf(c) })),
+          notes: [`Only containers ${where}. Running ones are stopped first.`, "Pod infra containers are kept: Podman removes those only with their pod."],
+        };
+      },
+      async execute(engine, socket, preview) {
+        return { verb: "removed", noun: "container", ...(await eachTarget(preview.targets, (t) => engine.removeContainer(socket, t.id, true))) };
+      },
+    },
+  ];
+}
+
+/** The commands for what is on screen: Podman-wide for `--all`, the project's otherwise. */
+export function commandsFor(scope: Scope): readonly BulkCommand[] {
+  return scope.kind === "all" ? BULK_COMMANDS : projectCommands(scope.projects);
 }

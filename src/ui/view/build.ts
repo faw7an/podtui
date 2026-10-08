@@ -34,6 +34,11 @@ export interface ResourceData {
    * session…), shown in place of an empty box (P6-T6). Null when fine.
    */
   quadletNote?: string | null;
+  /**
+   * Why a project-scoped view is empty (no project here / not started),
+   * shown in every empty panel. Null or absent in `--all`.
+   */
+  scopeNote?: string | null;
 }
 
 export const EMPTY_DATA: ResourceData = {
@@ -246,7 +251,9 @@ export function buildPanelModels(
     // showing an empty box that looks like a bug; no fake data is invented.
     ...(id === "quadlets" && rows.quadlets.length === 0
       ? { emptyLabel: data.quadletNote ?? QUADLETS_EMPTY }
-      : {}),
+      : id !== "quadlets" && rows[id].length === 0 && data.scopeNote
+        ? { emptyLabel: data.scopeNote }
+        : {}),
   };
   });
 }
@@ -276,6 +283,8 @@ export interface BuildFrameArgs {
   resource?: ResourceDetailData | null;
   /** The list whose selection the detail shows (defaults: focus, else containers). */
   detailPanel?: PanelId;
+  /** What the view is limited to, e.g. "project: shop" (header). */
+  scope?: string;
 }
 
 export function buildFrameModel(args: BuildFrameArgs): FrameModel {
@@ -326,6 +335,7 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
       panels,
       focus: args.focus,
       clock: args.clock,
+      scope: args.scope,
       error: args.error,
       detail: {
         title: `${item.cells["name"] ?? item.id.slice(0, 12)}${state ? ` · ${state}` : ""}`,
@@ -366,7 +376,8 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
     } else if (item) {
       detail.lines = ["Processes are shown for containers. Select one in the Containers panel (2)."];
     }
-    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+    return { panels, focus: args.focus, clock: args.clock,
+      scope: args.scope, error: args.error, detail };
   }
 
   // Stats, like logs, belong to containers.
@@ -378,7 +389,8 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
     } else if (item) {
       detail.lines = ["Stats are shown for containers. Select one in the Containers panel (2)."];
     }
-    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+    return { panels, focus: args.focus, clock: args.clock,
+      scope: args.scope, error: args.error, detail };
   }
 
   // Logs belong to containers; other panels say so instead of looking empty.
@@ -391,7 +403,8 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
     } else if (item) {
       detail.lines = ["Logs are shown for containers. Select one in the Containers panel (2)."];
     }
-    return { panels, focus: args.focus, clock: args.clock, error: args.error, detail };
+    return { panels, focus: args.focus, clock: args.clock,
+      scope: args.scope, error: args.error, detail };
   }
 
   if (item && !inspect) {
@@ -405,6 +418,7 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
     panels,
     focus: args.focus,
     clock: args.clock,
+      scope: args.scope,
     error: args.error,
     detail,
   };

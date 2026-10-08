@@ -4,6 +4,7 @@ import { Screen } from "./components/Screen.tsx";
 import { HelpOverlay } from "./components/HelpOverlay.tsx";
 import { useTerminalSize } from "./hooks/useTerminalSize.ts";
 import { createPodmanEngine } from "../engine/podman.ts";
+import { applyScope, projectScope, scopeEmptyNote, scopeLabel, type Scope } from "../engine/project.ts";
 import { bunRunner, createSystemd, type CommandRunner, type SystemdScope } from "../engine/systemd.ts";
 import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/layoutReducer.ts";
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
@@ -35,7 +36,7 @@ import { actionFor, failureContent, podJumpTarget, quadletJumpTarget } from "./a
 import { busyText, doneText, runAction, type ActionVerb, type ResourceAction } from "./actions/resourceActions.ts";
 import type { Notice } from "./view/model.ts";
 import { bulkKey, executed, openBulk, previewed, type BulkEffect, type BulkFlow } from "./bulk/bulkFlow.ts";
-import { orderedCommands } from "./bulk/commands.ts";
+import { commandsFor, orderedCommands } from "./bulk/commands.ts";
 
 // FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
 // back to the default rather than reaching setInterval.
@@ -69,10 +70,39 @@ const homeDir = (): string => process.env["HOME"] || homedir();
  * `runner` exists for tests: they pass a fake so nothing ever reaches the real
  * user systemd. Production uses the Bun.spawn runner.
  */
-export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; runner?: CommandRunner }) => {
+/** What the App shows: one folder's compose project, or everything. */
+export type AppScope = { kind: "all" } | { kind: "project"; cwd: string; composeFile: string | null };
+
+export const App = ({
+  socketPath,
+  runner = bunRunner,
+  scope: scopeMode = { kind: "all" },
+}: {
+  socketPath: string;
+  runner?: CommandRunner;
+  /** Default `all` keeps tests and embedders unchanged; the CLI decides. */
+  scope?: AppScope;
+}) => {
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState());
   const { columns: terminalCols, rows: terminalRows } = useTerminalSize();
-  const [data, setData] = useState<ResourceData>(EMPTY_DATA);
+  // Everything the refresh loop fetched; what is SHOWN is `data`, narrowed
+  // to the scope below.
+  const [rawData, setData] = useState<ResourceData>(EMPTY_DATA);
+  const viewScope: Scope = useMemo(
+    () => (scopeMode.kind === "all" ? { kind: "all" } : projectScope(scopeMode.cwd, rawData.containers, scopeMode.composeFile)),
+    [scopeMode, rawData.containers],
+  );
+  const data: ResourceData = useMemo(() => {
+    if (viewScope.kind === "all") return rawData;
+    const note = scopeEmptyNote(viewScope);
+    return {
+      ...applyScope(viewScope, rawData),
+      // Quadlets belong to systemd, not to a compose project.
+      quadlets: [],
+      quadletNote: "Quadlets are not part of a compose project; run podtui --all to see them.",
+      scopeNote: note,
+    };
+  }, [viewScope, rawData]);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [error, setError] = useState<string | undefined>(undefined);
   // Each panel remembers its own detail tab (P4: pods/images have their own).
@@ -256,6 +286,7 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
         focus: state.focus,
         now: Date.now(),
         clock: new Date(lastRefresh).toLocaleTimeString(),
+        scope: scopeLabel(viewScope),
         error,
         activeTab,
         inspect,
@@ -266,6 +297,7 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
         resource,
       }),
     [
+      viewScope,
       detailPanel,
       resource,
       data,
@@ -341,6 +373,7 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
             focus: state.focus,
             now: Date.now(),
             clock: new Date(lastRefresh).toLocaleTimeString(),
+        scope: scopeLabel(viewScope),
             error,
             activeTab,
             inspect,
@@ -393,6 +426,7 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
       stats.history,
       stats.status,
       top,
+      viewScope,
       data,
       state.selected,
       state.focus,
@@ -710,7 +744,11 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
         setNotice({ tone: "error", text: "Another action is still running." });
         return;
       }
-      setBulk(openBulk(orderedCommands(detailPanel)));
+      if (viewScope.kind === "project" && viewScope.projects.length === 0) {
+        setNotice({ tone: "error", text: "No project here: the bulk menu acts on a project. Run podtui --all for Podman-wide commands." });
+        return;
+      }
+      setBulk(openBulk(orderedCommands(detailPanel, commandsFor(viewScope))));
       return;
     }
 

@@ -24,6 +24,20 @@ function tabText(
 }
 
 /**
+ * The brand, with what the view is limited to: `▲ podtui · shop` for a
+ * project, `▲ podtui · all` for `--all`. Cut to a bounded width so the panel
+ * tabs keep their room. Exported for hit-testing (a project name may hold
+ * digits, which must not be mistaken for tab numbers).
+ */
+export const BRAND_SCOPE_MAX = 24;
+export function headerBrand(model: FrameModel): string {
+  const scope = model.scope;
+  if (!scope) return "▲ podtui";
+  const short = scope === "all containers" ? "all" : scope.replace(/^project: /, "");
+  return `▲ podtui · ${fit(short, Math.min(BRAND_SCOPE_MAX, displayWidth(short))).trimEnd()}`;
+}
+
+/**
  * The one-row header (LAYOUT_SPEC §3): brand, tab bar, clock.
  *
  * Degrades in a fixed order so numbers are the last thing to go:
@@ -50,7 +64,7 @@ export function buildHeader(layout: Layout, model: FrameModel, opts: HeaderOptio
   };
 
   const style = styleFor();
-  const brand = "▲ podtui";
+  const brand = headerBrand(model);
   const brandW = displayWidth(brand) + 2;
 
   const buildTabs = (markFiltered: boolean): string => {
