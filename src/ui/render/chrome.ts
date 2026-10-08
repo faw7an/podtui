@@ -141,6 +141,9 @@ const HINTS: { key: string; desc: string }[] = [
 /** Detail focused on the Logs tab (P3-T2): the arrows scroll the log. */
 const LOG_HINTS: { key: string; desc: string }[] = [
   { key: "↑↓jk", desc: "scroll" },
+  { key: "/", desc: "search" },
+  { key: "n N", desc: "match" },
+  { key: "e", desc: "errors" },
   { key: "p", desc: "pause" },
   { key: "g G", desc: "top/live" },
   { key: "[ ]", desc: "tab" },

@@ -233,7 +233,7 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `Tab` | focus next panel |
 | `z` | zoom panel |
 | `↑↓jk` | move selection |
-| `/` | filter list |
+| `/` | filter list / search logs |
 | `Ctrl+U` | clear filter line |
 | `Space` | fold sections |
 | `PgUp/PgDn` | scroll detail/logs |
@@ -241,6 +241,10 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `[ ]` | detail tab |
 | `p` | pause/resume logs |
 | `g G` | logs: oldest / live end |
+| `n N` | logs: next / previous match |
+| `e` | logs: errors only |
+| `t` | logs: timestamps |
+| `w` | logs: wrap lines |
 | `Esc` | back / close |
 | `?` | help |
 | `q` | quit |

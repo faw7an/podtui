@@ -108,3 +108,21 @@ describe("R-17: help overlay", () => {
     expect(lines.join("\n")).not.toContain("\u001B");
   });
 });
+describe("help overlay fits the full key map (P3-T4/T5 grew it)", () => {
+  // Reuses the file-level `theme` fixture above.
+  test("at 80×24 every key in KEYMAP is visible, plus the close hint", () => {
+    const text = stripAnsi(renderHelp({ cols: 80, rows: 24 }, theme, false).join("\n"));
+    for (const { desc } of KEYMAP) expect(text).toContain(desc);
+    expect(text).toContain("Esc close");
+    // The key column is wide enough for the longest key (`PgUp/PgDn`).
+    expect(text).toContain("PgUp/PgDn  scroll");
+  });
+
+  test("a terminal too small for all keys says how many are hidden", () => {
+    const lines = renderHelp({ cols: 50, rows: 20 }, theme, false);
+    for (const line of lines) expect(visibleWidth(line)).toBe(50);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toMatch(/… \d+ more; enlarge the terminal/);
+    expect(text).toContain("Esc close");
+  });
+});

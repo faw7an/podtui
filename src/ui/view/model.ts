@@ -1,6 +1,7 @@
 import { PANEL_IDS, type ColumnDef, type PaneId, type PanelId } from "../layout/types.ts";
 import type { LogSource, LogViewState } from "./logView.ts";
 import type { LogStreamStatus } from "./logSession.ts";
+import type { LogSearchState } from "./logSearch.ts";
 
 /**
  * One row of a panel table. `cells` is keyed by column id so that
@@ -56,6 +57,12 @@ export interface DetailLogModel {
   status: LogStreamStatus;
   /** Prefix each line with its timestamp (P3-T5 `t`). */
   timestamps?: boolean;
+  /** Wrap long lines instead of truncating (P3-T5 `w`). */
+  wrap?: boolean;
+  /** Show error lines only (P3-T4 `e`). */
+  errorsOnly?: boolean;
+  /** `/` search (P3-T4). */
+  search?: LogSearchState;
 }
 
 export interface FrameModel {

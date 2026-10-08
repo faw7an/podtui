@@ -58,31 +58,77 @@ export function renderHelp(
   const titleFill = Math.max(0, innerW - title.length - 1);
   push(`${bc}${TL}${H}${on ? bold() : ""}${on ? fg(theme.accent) : ""}${title}${on ? RESET : ""}${bc}${H.repeat(titleFill)}${TR}${on ? RESET : ""}`);
 
-  const rows_: string[] = [];
-  rows_.push("");
-  for (const line of helpLines()) {
-    rows_.push(line.startsWith("#") ? paint(line, [on ? fg(theme.accent) : "", on ? bold() : ""]) : line);
-  }
-  rows_.push("");
-  rows_.push(paint(HELP_CLOSE_HINT, [on ? dim() : ""]));
+  // Content rows between the title border and the bottom border. The close
+  // hint lives IN the bottom border, so it can never be windowed away.
+  const lines = helpLines();
+  const columns = layoutColumns(lines, Math.max(0, boxH - 2) - 1, innerW);
+  // Spacer row + the tallest column, never more than the box allows.
+  const contentRoom = Math.min(Math.max(0, boxH - 2), 1 + Math.max(...columns.map((c) => c.length)));
+  const colW = Math.floor(innerW / columns.length);
 
-  // Window the content to the box height (title + borders accounted for).
-  const contentRoom = Math.max(0, boxH - 2);
-  const shown = rows_.slice(0, contentRoom);
+  const paintLine = (line: string): string =>
+    line.startsWith("#") ? paint(line, [on ? fg(theme.accent) : "", on ? bold() : ""]) : line;
 
-  for (const line of shown) {
-    const body = fit(stripTrailing(line), innerW);
-    push(`${bc}${V}${on ? RESET : ""}${body}${bc}${V}${on ? RESET : ""}`);
-  }
-  while (out.length < boxY + 1 + contentRoom) {
-    push(`${bc}${V}${on ? RESET : ""}${" ".repeat(innerW)}${bc}${V}${on ? RESET : ""}`);
+  // Anything that still does not fit is announced, never silently dropped.
+  const overflow = Math.max(0, Math.max(...columns.map((c) => c.length)) - (contentRoom - 1));
+  if (overflow > 0 && contentRoom > 1) {
+    const col = columns[columns.length - 1];
+    if (col) {
+      const keep = contentRoom - 2;
+      const hidden = col.length - keep;
+      col.splice(keep, col.length - keep, `… ${hidden} more; enlarge the terminal`);
+    }
   }
 
-  const bottomFill = Math.max(0, innerW);
-  push(`${bc}${BL}${H.repeat(bottomFill)}${BR}${on ? RESET : ""}`);
+  for (let r = 0; r < contentRoom; r++) {
+    // Row 0 is a spacer under the title; content starts on row 1.
+    const body =
+      r === 0
+        ? ""
+        : columns.map((col, i) => {
+            const text = col[r - 1] ?? "";
+            const w = i === columns.length - 1 ? innerW - colW * (columns.length - 1) : colW;
+            return fit(paintLine(stripTrailing(text)), w);
+          }).join("");
+    push(`${bc}${V}${on ? RESET : ""}${fit(body, innerW)}${bc}${V}${on ? RESET : ""}`);
+  }
+
+  const hint = ` ${HELP_CLOSE_HINT} `;
+  const hintW = Math.min(hint.length, Math.max(0, innerW - 1));
+  const hintText = hint.slice(0, hintW);
+  push(`${bc}${BL}${H.repeat(Math.max(0, innerW - hintW))}${on ? RESET + dim() : ""}${hintText}${on ? RESET : ""}${bc}${BR}${on ? RESET : ""}`);
 
   for (let y = out.length; y < rows; y++) push("");
   return out.slice(0, rows);
+}
+
+/**
+ * Split help rows into as few columns as fit `room` rows (at most two, and
+ * only if each column stays wide enough to read). Breaks happen only at
+ * section headings, so a section is never split across columns. If even two
+ * columns overflow, the overflow is cut, but the close hint is safe in the
+ * border.
+ */
+function layoutColumns(lines: string[], room: number, innerW: number): string[][] {
+  if (lines.length <= room || innerW < 60) return [lines];
+  const sections: string[][] = [];
+  for (const line of lines) {
+    if (line.startsWith("#") || sections.length === 0) sections.push([]);
+    sections[sections.length - 1]?.push(line);
+  }
+  // Best split: the section boundary that minimises the taller column.
+  let best: [string[], string[]] = [lines, []];
+  let bestH = Infinity;
+  for (let i = 1; i < sections.length; i++) {
+    const left = sections.slice(0, i).flat();
+    const right = sections.slice(i).flat();
+    const h = Math.max(left.length, right.length);
+    if (h < bestH) {
+      bestH = h;
+      best = [left, right];
+    }
+  }
+  return best[1].length > 0 ? best : [lines];
 }
 
 function stripTrailing(text: string): string {

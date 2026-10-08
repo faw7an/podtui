@@ -17,6 +17,8 @@ import { routeFilterKey } from "../input/filterKeys.ts";
 import { computeLayout } from "./layout/computeLayout.ts";
 import { useLogStream } from "./hooks/useLogStream.ts";
 import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
+import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
+import { errorsOnly } from "./render/detailLines.ts";
 
 // FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
 // back to the default rather than reaching setInterval.
@@ -55,6 +57,9 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   // without being torn down and re-created on every refresh.
   const dataRef = useRef<ResourceData>(EMPTY_DATA);
   const [logView, setLogView] = useState<LogViewState>(FOLLOW);
+  const [logSearch, setLogSearch] = useState<LogSearchState>(NO_SEARCH);
+  // Display preferences survive switching containers; they are the user's.
+  const [logOpts, setLogOpts] = useState({ timestamps: false, wrap: false, errorsOnly: false });
 
   const engine = useMemo(() => createPodmanEngine(), []);
   const fetchVisible = useMemo(
@@ -142,7 +147,10 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const logs = useLogStream(engine, socketPath, logContainerId, logContainerId !== null);
 
   // A new container or leaving the tab starts back at the live end.
-  useEffect(() => setLogView(FOLLOW), [logContainerId]);
+  useEffect(() => {
+    setLogView(FOLLOW);
+    setLogSearch(NO_SEARCH);
+  }, [logContainerId]);
 
   // Attached after the base model so the stream can depend on the selection
   // the model resolved (filtering included) without a cycle.
@@ -151,11 +159,14 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       logContainerId !== null && model.detail.lines.length === 0
         ? {
             ...model,
-            detail: { ...model.detail, log: { source: logs.buffer, view: logView, status: logs.status } },
+            detail: {
+              ...model.detail,
+              log: { source: logs.buffer, view: logView, status: logs.status, search: logSearch, ...logOpts },
+            },
           }
         : model,
     // `logs.version` changes when the (mutable) buffer gains lines.
-    [model, logContainerId, logs.buffer, logs.version, logs.status, logView],
+    [model, logContainerId, logs.buffer, logs.version, logs.status, logView, logSearch, logOpts],
   );
 
   // Inspect data feeds the Config tab. Fetched only for containers (the one
@@ -189,15 +200,47 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     // sees an Escape that a higher-priority state should consume first. A kept
     // (non-typing) filter on the focused panel counts as active, so Esc clears
     // it — at base Esc otherwise does nothing, so nothing is overwritten.
+    // A log search being typed closes first; a kept one ranks with filters.
+    const logSearchKept = frameModel.detail.log !== undefined && logSearch.query !== "";
     if (key.escape) {
+      if (logSearch.typing) {
+        setLogSearch(NO_SEARCH);
+        return;
+      }
       const action = resolveEscape(state, {
         helpOpen: state.help,
         filterActive:
           state.filterFor !== null ||
-          (isPanelId(state.focus) && state.filterQuery[state.focus] !== undefined),
+          (isPanelId(state.focus) && state.filterQuery[state.focus] !== undefined) ||
+          logSearchKept,
         clearFilter: { type: "clearFilter" },
       });
+      const listFilterKept = isPanelId(state.focus) && state.filterQuery[state.focus] !== undefined;
+      if (action?.type === "clearFilter" && logSearchKept && state.filterFor === null && !listFilterKept) {
+        setLogSearch(NO_SEARCH);
+        return;
+      }
       if (action) dispatch(action);
+      return;
+    }
+
+    // --- Log search input (P3-T4): captures typing like the list filter. ---
+    if (logSearch.typing) {
+      const action = routeFilterKey(input, key);
+      if (!action) return;
+      if (action.type === "filterInput") {
+        setLogSearch((s) => ({ ...s, query: s.query + action.text, current: null }));
+      } else if (action.type === "filterBackspace") {
+        setLogSearch((s) => ({ ...s, query: Array.from(s.query).slice(0, -1).join(""), current: null }));
+      } else if (action.type === "clearFilterLine") {
+        setLogSearch((s) => ({ ...s, query: "", current: null }));
+      } else if (action.type === "endFilter") {
+        // Enter keeps the query and jumps to the newest match, if any.
+        const show = logOpts.errorsOnly ? errorsOnly : undefined;
+        const seq = logSearch.query === "" ? null : findMatch(logs.buffer, logSearch.query, null, -1, show);
+        setLogSearch((s) => (s.query === "" ? NO_SEARCH : { ...s, typing: false, current: seq }));
+        if (seq !== null) setLogView((v) => reduceLogView(v, { type: "reveal", seq }, logs.buffer, logRows, show));
+      }
       return;
     }
 
@@ -220,8 +263,18 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     // ↑↓jk scroll the log when the detail pane has focus; from a list they
     // keep moving the selection (handled further down).
     if (frameModel.detail.log) {
+      const show = logOpts.errorsOnly ? errorsOnly : undefined;
       const logAction = (type: LogViewAction["type"]): void =>
-        setLogView((v) => reduceLogView(v, { type } as LogViewAction, logs.buffer, logRows));
+        setLogView((v) => reduceLogView(v, { type } as LogViewAction, logs.buffer, logRows, show));
+      if (input === "e") return setLogOpts((o) => ({ ...o, errorsOnly: !o.errorsOnly }));
+      if (input === "t") return setLogOpts((o) => ({ ...o, timestamps: !o.timestamps }));
+      if (input === "w") return setLogOpts((o) => ({ ...o, wrap: !o.wrap }));
+      if ((input === "n" || input === "N") && logSearch.query !== "") {
+        const seq = findMatch(logs.buffer, logSearch.query, logSearch.current, input === "n" ? 1 : -1, show);
+        setLogSearch((s) => ({ ...s, current: seq }));
+        if (seq !== null) setLogView((v) => reduceLogView(v, { type: "reveal", seq }, logs.buffer, logRows, show));
+        return;
+      }
       if (input === "p") return logAction("togglePause");
       if (input === "g") return logAction("top");
       if (input === "G") return logAction("bottom");
@@ -238,8 +291,12 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       return;
     }
 
-    // `/` filters the focused list; in the Phase 3 Logs tab the same key will
-    // search instead. From fullscreen detail it is a no-op (see startFilter).
+    // `/` searches the log when the detail pane has focus on the Logs tab, and
+    // filters the focused list otherwise (DECISIONS phase-2/P2-T5).
+    if (input === "/" && frameModel.detail.log && state.focus === "detail") {
+      setLogSearch({ typing: true, query: "", current: null });
+      return;
+    }
     if (input === "/") {
       dispatch({ type: "startFilter" });
       return;
@@ -315,7 +372,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       zoom={state.zoom}
       detailFullscreen={state.detailFullscreen}
       hintContext={
-        state.filterFor !== null
+        state.filterFor !== null || logSearch.typing
           ? "filter"
           : isPanelId(state.focus) && state.filterQuery[state.focus] !== undefined
             ? "filterKept"

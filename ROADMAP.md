@@ -106,8 +106,8 @@ Phase overview
 - [x] **P3-T1** `util/logLevel.ts`: pure function classifying a line as `error | warn | info | debug | unknown` (rules documented in the file, e.g. keywords `ERROR`, `FATAL`, `panic`, `Exception`, `level=error`, JSON `"level":"error"`). Table-driven unit tests, including false-positive cases (e.g. a word like "terror").
 - [x] **P3-T2** Logs tab: follow mode, ring buffer (default 5,000 lines), windowed rendering, throttled updates (≤ ~20 fps), pause/resume key, scroll with `↑↓`/`PgUp`/`PgDn`/`g`/`G`, "new lines below" indicator when scrolled up.
 - [x] **P3-T3** Log coloring: error lines red, warn lines yellow, timestamps dim; stderr vs stdout indicator optional. Decide and record how raw ANSI codes in logs are handled (strip vs pass-through) (FR-5).
-- [ ] **P3-T4** Log search: `/` search with highlight, `n`/`N` next/previous match; level filter toggle (`e` = errors only).
-- [ ] **P3-T5** Timestamps toggle (`t`) and line wrap toggle (`w`).
+- [x] **P3-T4** Log search: `/` search with highlight, `n`/`N` next/previous match; level filter toggle (`e` = errors only).
+- [x] **P3-T5** Timestamps toggle (`t`) and line wrap toggle (`w`).
 - [ ] **P3-T6** Env tab: sorted key/value; names plain, values colored; masks values whose key matches secret-like patterns (`TOKEN`, `SECRET`, `PASSWORD`, `KEY`) until `v` reveals; unit-tested masker.
 - [ ] **P3-T7** Stats tab: live CPU %, memory used/limit, network rx/tx, block I/O, PIDs; small sparkline history (last ~60 samples). ⚠️ VERIFY field names and how CPU % must be computed from the stats samples; unit-test the calculation with fixture samples.
 - [ ] **P3-T8** Top tab: process table from `top`; column alignment; refresh interval.

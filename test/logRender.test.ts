@@ -227,3 +227,29 @@ describe("log timestamps (rendered dim; toggled by `t` in P3-T5)", () => {
     expect(paintLogLine(line("plain"), defaultTheme, false, true)).toBe("2026-10-08 09:46:07 plain");
   });
 });
+
+describe("wrap in the pane (P3-T5)", () => {
+  test("wrapped rows fill the pane bottom-up; the oldest rows give way", () => {
+    const b = buffer(["old line", "x".repeat(38 * 3)]); // 3 rows at width 38
+    const out = renderDetail(
+      { x: 0, y: 0, w: 40, h: 6 }, // 3 content rows
+      { title: "t", tabs: ["Logs"], activeTab: 0, lines: [], log: { ...model(b), wrap: true } },
+      { theme: defaultTheme, color: true },
+    );
+    for (const line of out) expect(displayWidth(line)).toBe(40);
+    const rows = out.slice(2, -1).map((l) => stripAnsi(l).slice(1, -1));
+    expect(rows).toEqual(["x".repeat(38), "x".repeat(38), "x".repeat(38)]);
+  });
+
+  test("without wrap the same line is one truncated row", () => {
+    const b = buffer(["old line", "x".repeat(38 * 3)]);
+    const out = renderDetail(
+      { x: 0, y: 0, w: 40, h: 6 },
+      { title: "t", tabs: ["Logs"], activeTab: 0, lines: [], log: model(b) },
+      { theme: defaultTheme, color: false },
+    );
+    const rows = out.slice(2, -1).map((l) => l.slice(1, -1));
+    expect(rows[0]?.trimEnd()).toBe("old line");
+    expect(rows[1]?.endsWith("…")).toBe(true);
+  });
+});
