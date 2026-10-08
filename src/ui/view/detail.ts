@@ -47,7 +47,7 @@ export interface DetailView {
 }
 
 /** Section keys that can be collapsed in the Config tab. */
-export const CONFIG_SECTIONS = ["state", "config", "network", "host"] as const;
+export const CONFIG_SECTIONS = ["state", "config", "links", "network", "host"] as const;
 export type ConfigSection = (typeof CONFIG_SECTIONS)[number];
 
 /**
@@ -75,6 +75,8 @@ export interface BuildDetailArgs {
   hasSelection: boolean;
   collapsed?: ReadonlySet<string>;
   revealSecrets?: boolean;
+  /** Names for the Links section (P4-T7), resolved from the lists. */
+  links?: { podName?: string; networkNames?: readonly string[] };
 }
 
 /**
@@ -95,7 +97,36 @@ function section(name: string, collapsed: boolean): string {
  * Flatten the inspect object into a small, readable set of sections. Only
  * fields verified present in test/fixtures/container-inspect.json are used.
  */
-function configLines(inspect: ContainerInspect, collapsed: ReadonlySet<string>): string[] {
+/**
+ * Links (P4-T7): what this container belongs to and uses, as read-only
+ * names with the panel number that lists them. Volumes and bind mounts come
+ * from inspect `Mounts`; networks from `NetworkSettings.Networks`, else the
+ * network mode (rootless default `pasta` joins no podman network).
+ */
+function linkLines(inspect: ContainerInspect, podName: string | undefined, networkNames?: readonly string[]): string[] {
+  const out: string[] = [];
+  out.push(row("Pod", inspect.Pod ? `${podName ?? inspect.Pod.slice(0, 12)}  (1 Pods)` : "(none)"));
+  out.push(row("Image", `${inspect.ImageName || inspect.Image.slice(0, 12)}  (3 Images)`));
+  const mounts = inspect.Mounts ?? [];
+  const volumes = mounts.filter((m) => m.Type === "volume");
+  const binds = mounts.filter((m) => m.Type !== "volume");
+  if (volumes.length === 0) out.push(row("Volumes", "(none)"));
+  volumes.forEach((m, i) => out.push(row(i === 0 ? "Volumes" : "", `${m.Name ?? "?"} → ${m.Destination}  (4 Volumes)`)));
+  binds.forEach((m, i) => out.push(row(i === 0 ? "Mounts" : "", `${m.Type} ${m.Source} → ${m.Destination}`)));
+  // Live, a running pasta container sometimes reports a `pasta` key here
+  // (and sometimes none). Only names in the network list are networks.
+  const known = networkNames ? new Set(networkNames) : null;
+  const nets = Object.keys(inspect.NetworkSettings?.Networks ?? {}).filter((n) => !known || known.has(n));
+  if (nets.length > 0) nets.forEach((n, i) => out.push(row(i === 0 ? "Networks" : "", `${n}  (5 Networks)`)));
+  else out.push(row("Networks", `(none: ${inspect.HostConfig?.NetworkMode || "unknown"} mode)`));
+  return out;
+}
+
+function configLines(
+  inspect: ContainerInspect,
+  collapsed: ReadonlySet<string>,
+  links: BuildDetailArgs["links"] = {},
+): string[] {
   const isCollapsed = (s: string): boolean => collapsed.has(s);
   const out: string[] = [];
 
@@ -119,6 +150,13 @@ function configLines(inspect: ContainerInspect, collapsed: ReadonlySet<string>):
     out.push(row("User", inspect.Config?.User ?? ""));
   } else {
     out.push(section("Config", true));
+  }
+
+  if (!isCollapsed("links")) {
+    out.push(section("Links", false));
+    out.push(...linkLines(inspect, links.podName, links.networkNames));
+  } else {
+    out.push(section("Links", true));
   }
 
   if (!isCollapsed("host")) {
@@ -210,7 +248,7 @@ export function buildDetail(args: BuildDetailArgs): DetailView {
   let hint: string | undefined;
   switch (meta?.id) {
     case "config":
-      lines = configLines(inspect, args.collapsed ?? new Set());
+      lines = configLines(inspect, args.collapsed ?? new Set(), args.links);
       break;
     case "env": {
       const view = envView(inspect, args.revealSecrets ?? false);

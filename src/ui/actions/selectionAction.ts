@@ -68,3 +68,24 @@ export function actionFor(
 
   return confirm(base);
 }
+
+/**
+ * Where `c` on a pod lands (P4-T7): its first member that is not the infra
+ * container, in the pod list's order. Pure, so the choice is testable.
+ */
+export function podJumpTarget(
+  data: ResourceData,
+  podId: string,
+): { kind: "jump"; id: string; message: string } | { kind: "none"; message: string } {
+  const pod = data.pods.find((p) => p.Id === podId);
+  if (!pod) return { kind: "none", message: "Select a pod first." };
+  const members = (pod.Containers ?? []).filter((m) => m.Id !== pod.InfraId);
+  const first = members[0];
+  if (!first) return { kind: "none", message: `${pod.Name} has no containers besides its infra container.` };
+  const others = members.length - 1;
+  return {
+    kind: "jump",
+    id: first.Id,
+    message: `${pod.Name}: ${first.Names}${others > 0 ? ` (+${others} more in this pod)` : ""}`,
+  };
+}

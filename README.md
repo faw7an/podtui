@@ -239,6 +239,7 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `↑↓jk` | move selection |
 | `/` | filter list / search logs |
 | `Ctrl+U` | clear filter line |
+| `c` | pod: go to its containers |
 | `Space` | fold sections |
 | `PgUp/PgDn` | scroll detail/logs |
 | `Enter` | open detail |

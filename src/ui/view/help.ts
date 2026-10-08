@@ -17,6 +17,7 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "↑↓jk", desc: "move selection", section: "navigation" },
   { key: "/", desc: "filter list / search logs", section: "navigation" },
   { key: "Ctrl+U", desc: "clear filter line", section: "navigation" },
+  { key: "c", desc: "pod: go to its containers", section: "navigation" },
   { key: "Space", desc: "fold sections", section: "detail" },
   { key: "PgUp/PgDn", desc: "scroll detail/logs", section: "detail" },
   { key: "Enter", desc: "open detail", section: "detail" },

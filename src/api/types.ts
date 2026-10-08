@@ -41,6 +41,8 @@ export interface PortMapping {
 
 export interface MountPoint {
   Type: string;
+  /** Volume name for `Type: "volume"` (verified live: `probe-vol-stop`). */
+  Name?: string;
   Source: string;
   Destination: string;
   Driver: string;
@@ -151,6 +153,8 @@ export interface NetworkSettings {
   LinkLocalIPv6PrefixLen: number;
   Ports: Record<string, PortBinding[] | null>;
   SandboxKey: string;
+  /** Per-network endpoints, keyed by network name; present for bridged containers (verified live). */
+  Networks?: Record<string, unknown> | null;
 }
 
 export interface PortBinding {

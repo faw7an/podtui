@@ -266,6 +266,11 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
         hasSelection: true,
         collapsed: args.collapsedSections,
         revealSecrets: args.revealSecrets,
+        links: {
+          podName: args.data.pods.find((p) => p.Id === inspect?.Pod)?.Name,
+          // Null until the network list is loaded: then trust inspect as-is.
+          networkNames: args.data.networks.length > 0 ? args.data.networks.map((n) => n.name) : undefined,
+        },
       })
     : buildDetail({ inspect: null, activeTab: args.activeTab ?? "config", hasSelection: false });
 

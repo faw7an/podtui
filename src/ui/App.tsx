@@ -23,7 +23,7 @@ import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./
 import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
 import { errorsOnly } from "./render/detailLines.ts";
 import { dialogKey, openConfirm, type ConfirmDialogState } from "./view/confirmDialog.ts";
-import { actionFor } from "./actions/selectionAction.ts";
+import { actionFor, podJumpTarget } from "./actions/selectionAction.ts";
 import { busyText, doneText, runAction, type ActionVerb, type ResourceAction } from "./actions/resourceActions.ts";
 import type { Notice } from "./view/model.ts";
 
@@ -507,6 +507,20 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     // Space folds/unfolds every Config section; PgUp/PgDn scroll the detail.
     // Both are inert while filtering (the filter branch above returns first),
     // where Space types a space and PgUp/PgDn have no text to append.
+    // --- Cross-link (P4-T7): `c` on a pod jumps to its containers. ---
+    if (input === "c" && focusId === "pods") {
+      const target = podJumpTarget(data, selectedItemId);
+      if (target.kind === "none") {
+        setNotice({ tone: "error", text: target.message });
+        return;
+      }
+      if (state.detailFullscreen || state.zoom) dispatch({ type: "escape" });
+      dispatch({ type: "activate", id: "containers" });
+      dispatch({ type: "select", id: "containers", itemId: target.id });
+      setNotice({ tone: "ok", text: target.message });
+      return;
+    }
+
     // --- Item actions (P4-T5): s start, S stop, r restart, K kill, d remove.
     const verb: ActionVerb | undefined = (
       { s: "start", S: "stop", r: "restart", K: "kill", d: "remove" } as Record<string, ActionVerb>
