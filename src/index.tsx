@@ -2,13 +2,12 @@ import { render } from "ink";
 import { App } from "./ui/App.tsx";
 import { USAGE, parseArgs } from "./cli.ts";
 import { VERSION } from "./version.ts";
+import { appRenderOptions } from "./ui/renderOptions.ts";
 import { describeUnreachable, resolveSocket } from "./api/socket.ts";
 
 /**
- * `alternateScreen: true` keeps scrollback clean and restores the previous
- * screen on exit. Ink performs the enter/exit sequences and the cursor
- * restore itself, symmetrically, including on unmount — verified in
- * docs/DECISIONS.md, so we do not hand-roll the escapes.
+ * Render options (alternate screen, and interactive mode decided by the
+ * terminal rather than CI detection) live in src/ui/renderOptions.ts.
  */
 
 // Flag parsing comes first so `--help` and `--version` work even when stdin
@@ -55,4 +54,4 @@ if (!process.stdin.isTTY) {
   process.exit(1);
 }
 
-render(<App socketPath={socket.path} />, { alternateScreen: true });
+render(<App socketPath={socket.path} />, appRenderOptions(process.stdout));
