@@ -6,7 +6,7 @@ import { useTerminalSize } from "./hooks/useTerminalSize.ts";
 import { createPodmanEngine } from "../engine/podman.ts";
 import { applyScope, emptyContainersNote, scopeLabel, type Scope } from "../engine/scope.ts";
 import { bunRunner, createSystemd, type CommandRunner, type SystemdScope } from "../engine/systemd.ts";
-import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/layoutReducer.ts";
+import { initialState, reducer, resolveEscape, selectedIndex, shownPanels } from "./layout/layoutReducer.ts";
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
 import { defaultTheme, type Theme } from "../theme/theme.ts";
 import { OMARCHY_THEME_DIRS, loadOmarchyTheme } from "../theme/omarchy.ts";
@@ -18,7 +18,7 @@ import { createVisibleFetcher, startPollLoop } from "./view/refresh.ts";
 import { nextTabIndex, type DetailTabId } from "./view/detail.ts";
 import { DEFAULT_TAB, TABS_BY_PANEL, type ResourceDetailData } from "./view/resourceDetail.ts";
 import type { ContainerInspect } from "../api/types.ts";
-import { PANEL_COLUMNS } from "./view/model.ts";
+import { PANEL_COLUMNS, panelMeta } from "./view/model.ts";
 import { resolvePollMs } from "../config.ts";
 import { routeFilterKey } from "../input/filterKeys.ts";
 import { computeLayout } from "./layout/computeLayout.ts";
@@ -112,6 +112,9 @@ export const App = ({
   const [notice, setNotice] = useState<Notice | undefined>(undefined);
   const [refreshKey, setRefreshKey] = useState(0);
   const busyRef = useRef(false);
+  // Panels fetched at least once: an empty panel hides only after its
+  // first answer, so nothing flickers away while the app starts.
+  const [loaded, setLoaded] = useState<ReadonlySet<PanelId>>(new Set());
   // The `x` bulk menu (P5). Results arrive through functional updates
   // (`previewed`/`executed`), which drop them if the user has moved on.
   const [bulk, setBulk] = useState<BulkFlow | null>(null);
@@ -183,6 +186,7 @@ export const App = ({
           if (!isCurrent()) return;
           dataRef.current = data;
           setData(data);
+          setLoaded((prev) => (PANEL_IDS.every((p) => !state.visible.has(p) || prev.has(p)) ? prev : new Set([...prev, ...state.visible])));
           setError(error);
           setLastRefresh(Date.now());
         } catch (e) {
@@ -241,6 +245,33 @@ export const App = ({
       });
   };
 
+  // Empty panels hide (their numbers stay); Containers always stays, since
+  // its empty state explains how to start one. Refreshing keeps running for
+  // hidden panels (it follows the user's own visible set), so they come back
+  // by themselves when something appears.
+  const emptyPanels = useMemo(() => {
+    const count: Record<PanelId, number> = {
+      pods: data.pods.length,
+      containers: 1,
+      images: data.images.length,
+      volumes: data.volumes.length,
+      networks: data.networks.length,
+      quadlets: data.quadlets.length,
+    };
+    return PANEL_IDS.filter((p) => loaded.has(p) && count[p] === 0);
+  }, [data, loaded]);
+  const emptyKey = emptyPanels.join(",");
+  useEffect(() => {
+    dispatch({ type: "setAutoHidden", ids: emptyPanels });
+  }, [emptyKey]);
+  const shown = useMemo(() => shownPanels(state), [state.visible, state.autoHidden]);
+  const emptyNotice = (id: PanelId): boolean => {
+    if (!state.autoHidden.has(id)) return false;
+    const title = panelMeta(id).title.toLowerCase();
+    setNotice({ tone: "ok", text: `No ${title} yet: panel ${panelMeta(id).number} appears when there are some.` });
+    return true;
+  };
+
   // Same layout the Screen computes, needed here for two facts: whether the
   // detail pane is on screen at all (no pane, no stream) and how many log
   // rows it shows (a page is one screenful).
@@ -249,12 +280,12 @@ export const App = ({
       computeLayout({
         cols: terminalCols,
         rows: terminalRows,
-        visible: state.visible,
+        visible: shown,
         focused: state.focus,
         zoom: state.zoom,
         detailFullscreen: state.detailFullscreen,
       }),
-    [terminalCols, terminalRows, state.visible, state.focus, state.zoom, state.detailFullscreen],
+    [terminalCols, terminalRows, shown, state.focus, state.zoom, state.detailFullscreen],
   );
   // The list whose selection the detail pane shows: the focused list, or the
   // one the user came from when the detail pane itself has focus.
@@ -526,7 +557,7 @@ export const App = ({
     if (ev.kind !== "press" || ev.button !== "left") return;
     switch (hit.kind) {
       case "headerTab":
-        dispatch({ type: "activate", id: hit.id });
+        if (!emptyNotice(hit.id)) dispatch({ type: "activate", id: hit.id });
         return;
       case "panelNumber":
         dispatch({ type: "toggle", id: hit.id });
@@ -831,7 +862,7 @@ export const App = ({
 
     if (input >= "1" && input <= "6") {
       const id = PANEL_IDS[Number.parseInt(input, 10) - 1];
-      if (id) dispatch({ type: "activate", id });
+      if (id && !emptyNotice(id)) dispatch({ type: "activate", id });
       return;
     }
 
@@ -858,7 +889,7 @@ export const App = ({
     <Screen
       model={shownModel}
       theme={theme}
-      visible={state.visible}
+      visible={shown}
       zoom={state.zoom}
       detailFullscreen={state.detailFullscreen}
       hintContext={

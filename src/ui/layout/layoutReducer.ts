@@ -38,7 +38,12 @@ export type Action =
   /** `PgUp`/`PgDn` in the detail pane: scroll by roughly half a pane. */
   | { type: "detailScroll"; dir: 1 | -1 }
   /** Selection, tab and filter changes return the detail to the top. */
-  | { type: "resetDetailScroll" };
+  | { type: "resetDetailScroll" }
+  /**
+   * Panels that have nothing to show right now (e.g. no quadlets): hidden
+   * until they do, without changing anyone's number.
+   */
+  | { type: "setAutoHidden"; ids: PanelId[] };
 
 export interface LayoutState {
   visible: Set<PanelId>;
@@ -73,6 +78,12 @@ export interface LayoutState {
   collapsed: ReadonlySet<string>;
   /** Detail content scroll offset in rows (P2-T7); clamped at render time. */
   detailScroll: number;
+  /**
+   * Panels hidden because they are empty. Separate from `visible` (the
+   * user's choice): a panel comes back by itself when it has items, and the
+   * user's toggles are never overwritten.
+   */
+  autoHidden: ReadonlySet<PanelId>;
 }
 
 /** At least one list panel must stay visible (LAYOUT_SPEC §4). */
@@ -104,12 +115,18 @@ export function initialState(
     filterQuery: {},
     collapsed: new Set(),
     detailScroll: 0,
+    autoHidden: new Set(),
   };
 }
 
-/** Canonical order restricted to what is visible. */
+/** Canonical order restricted to what is on screen (shown and not empty). */
 export function visibleOrder(state: LayoutState): PanelId[] {
-  return PANEL_IDS.filter((id) => state.visible.has(id));
+  return PANEL_IDS.filter((id) => state.visible.has(id) && !state.autoHidden.has(id));
+}
+
+/** What is actually drawn: the user's visible panels minus empty ones. */
+export function shownPanels(state: LayoutState): Set<PanelId> {
+  return new Set(visibleOrder(state));
 }
 
 /** Next visible panel after `after`, wrapping; `detail` last. */
@@ -234,6 +251,17 @@ export function reducer(state: LayoutState, action: Action): LayoutState {
         ...state,
         detailScroll: Math.max(0, state.detailScroll + action.dir * DETAIL_SCROLL_PAGE),
       };
+    }
+
+    case "setAutoHidden": {
+      const next = new Set(action.ids);
+      const same = next.size === state.autoHidden.size && [...next].every((id) => state.autoHidden.has(id));
+      if (same) return state;
+      const updated = { ...state, autoHidden: next };
+      // Focus or zoom on a panel that just went away moves to the next one.
+      const focus = isPanelId(state.focus) && next.has(state.focus) ? (visibleOrder(updated)[0] ?? "containers") : state.focus;
+      const zoom = state.zoom && isPanelId(state.zoom) && next.has(state.zoom) ? null : state.zoom;
+      return { ...updated, focus, zoom };
     }
 
     case "resetDetailScroll": {
