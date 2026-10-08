@@ -600,7 +600,10 @@ export interface Network {
 }
 
 export interface ContainerStatsUI {
+  /** Live: CPU % over the last sample interval (`CPU`). */
   cpuPercent: number;
+  /** Average CPU % since the container started (`AvgCPU`). */
+  avgCpuPercent: number;
   memUsage: number;
   memLimit: number;
   memPercent: number;

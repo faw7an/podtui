@@ -65,6 +65,11 @@ export interface ContainerEngine {
   inspectContainer(socketPath: string, id: string): Promise<ContainerInspect>;
   containerTop(socketPath: string, id: string): Promise<ContainerTop>;
   containerStats(socketPath: string, ids: string[], stream?: boolean): Promise<ContainerStats[] | AsyncGenerator<ContainerStatsUI>>;
+  /**
+   * Live stats for one container, one sample per `interval` seconds
+   * (default 1). Pass `signal` to stop the stream.
+   */
+  streamStats(socketPath: string, id: string, options?: { interval?: number; signal?: AbortSignal }): AsyncGenerator<ContainerStatsUI>;
   /** Multiplexed log frames. Pass `signal` to stop the stream promptly. */
   containerLogs(socketPath: string, id: string, options?: { follow?: boolean; tail?: number; timestamps?: boolean; signal?: AbortSignal }): AsyncGenerator<LogFrame>;
   startContainer(socketPath: string, id: string): Promise<ContainerActionResult>;

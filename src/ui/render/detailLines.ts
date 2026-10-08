@@ -2,7 +2,8 @@ import type { Layout, Rect } from "../layout/types.ts";
 import { innerWidth } from "../layout/panelView.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit, padRight, truncate } from "../../util/fit.ts";
-import type { DetailLogModel, DetailModel } from "../view/model.ts";
+import type { DetailLogModel, DetailModel, DetailStatsModel } from "../view/model.ts";
+import { STATS_HISTORY, sparkline, statsRows } from "../view/statsView.ts";
 import { logWindow } from "../view/logView.ts";
 import type { LogLine } from "../../util/logBuffer.ts";
 import { renderLogRows } from "./logRows.ts";
@@ -51,6 +52,33 @@ function paintEnvRow(line: string, keyWidth: number, theme: Theme, on: boolean):
   const key = line.slice(0, keyWidth);
   const value = line.slice(keyWidth);
   return key + paint(value, [value === MASK ? dim() : fg(theme.accent)]);
+}
+
+const STATS_LABEL_W = 11;
+
+/**
+ * The Stats tab (P3-T7): one row per measure, sparklines under CPU and
+ * memory sized to the pane (newest sample on the right).
+ */
+function statsContent(stats: DetailStatsModel, budget: number, width: number, theme: Theme, on: boolean): string[] {
+  const { status, history } = stats;
+  if (stats.state !== "running") {
+    return [messageRow(`${stats.name} is not running (${stats.state || "unknown"}). Stats are shown for running containers.`, on)];
+  }
+  if (status.kind === "error") return [messageRow(`Stats unavailable: ${status.message}`, on, theme.error)];
+  const rows = statsRows(history);
+  if (rows.length === 0) {
+    return [messageRow(status.kind === "ended" ? "The stats stream ended." : "Waiting for the first sample…", on)];
+  }
+  const sparkW = Math.max(0, Math.min(STATS_HISTORY, width - STATS_LABEL_W));
+  const out: string[] = [];
+  for (const row of rows) {
+    out.push(`${paint(row.label.padEnd(STATS_LABEL_W), on ? [fg(theme.accent)] : [])}${row.value}`);
+    if (row.spark && sparkW > 0) {
+      out.push(" ".repeat(STATS_LABEL_W) + paint(sparkline(row.spark.values, sparkW, row.spark.max), on ? [fg(theme.ok)] : []));
+    }
+  }
+  return out.slice(0, budget);
 }
 
 interface ContentWindow {
@@ -167,7 +195,10 @@ export function renderDetail(
   // is what panels want and detail does not.)
   let rows: string[];
   let hint: string;
-  if (detail.log) {
+  if (detail.stats) {
+    rows = statsContent(detail.stats, contentBudget, iw, theme, on);
+    hint = detail.stats.status.kind === "live" ? " live · 1 s " : "";
+  } else if (detail.log) {
     ({ rows, hint } = logContent(detail.log, contentBudget, iw, theme, on));
   } else {
     const lastTop = Math.max(0, detail.lines.length - contentBudget);

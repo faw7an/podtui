@@ -36,7 +36,15 @@ import type {
 } from "./ContainerEngine.ts";
 
 /**
- * `AvgCPU`/`CPU` and `MemPerc` are already PERCENTAGES, not fractions.
+ * `CPU` is the LIVE value: CPU % over the last sample interval. `AvgCPU` is
+ * the average since the container started. Measured on Podman 5.8.4 with a
+ * container that idled, busy-looped 6 s, then idled, streamed at 5 s:
+ * CPU 23 → 96 → 0.00 → 0.00 while AvgCPU went 23 → 59 → 40 → 30 (decaying
+ * slowly). The Stats tab shows `cpuPercent` (live) and keeps the average as
+ * `avgCpuPercent`. The mapper used AvgCPU before, which a live tab would have
+ * shown as a slowly fading number long after a spike ended.
+ *
+ * Both, and `MemPerc`, are already PERCENTAGES, not fractions.
  * Verified live 2026-10-08 against `podman stats --no-stream` on Podman 5.8.4:
  * CLI "123.80%" ↔ API AvgCPU 123.78; CLI "0.11%" ↔ API MemPerc 0.105
  * (= MemUsage/MemLimit × 100). The earlier `× 100` turned a busy container's
@@ -44,7 +52,8 @@ import type {
  */
 export function mapContainerStats(stats: ContainerStats[]): ContainerStatsUI[] {
   return stats.map((s) => ({
-    cpuPercent: s.AvgCPU,
+    cpuPercent: s.CPU,
+    avgCpuPercent: s.AvgCPU,
     memUsage: s.MemUsage,
     memLimit: s.MemLimit,
     memPercent: s.MemPerc,
@@ -299,6 +308,22 @@ export function createPodmanEngine(): ContainerEngine {
 
     async containerTop(socketPath: string, id: string) {
       return get<ContainerTop>(socketPath, `/containers/${id}/top`);
+    },
+
+    async *streamStats(socketPath: string, id: string, options: { interval?: number; signal?: AbortSignal } = {}) {
+      // `interval` (seconds) verified on Podman 5.8.4: interval=1 → one
+      // sample per second; omitted → every 5 s.
+      const interval = Math.max(1, Math.round(options.interval ?? 1));
+      const path = `/containers/stats?containers=${encodeURIComponent(id)}&stream=true&interval=${interval}`;
+      for await (const line of streamLines(socketPath, path, { signal: options.signal })) {
+        if (line.trim() === "") continue;
+        const response = JSON.parse(line) as { Error?: unknown; Stats?: ContainerStats[] | null };
+        if (response.Error) {
+          throw new Error(typeof response.Error === "string" ? response.Error : JSON.stringify(response.Error));
+        }
+        const mapped = mapContainerStats(response.Stats ?? [])[0];
+        if (mapped) yield mapped;
+      }
     },
 
     async containerStats(socketPath: string, ids: string[], stream = false): Promise<ContainerStats[] | AsyncGenerator<ContainerStatsUI>> {

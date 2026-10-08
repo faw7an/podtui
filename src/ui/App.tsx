@@ -16,6 +16,7 @@ import { resolvePollMs } from "../config.ts";
 import { routeFilterKey } from "../input/filterKeys.ts";
 import { computeLayout } from "./layout/computeLayout.ts";
 import { useLogStream } from "./hooks/useLogStream.ts";
+import { useStatsStream } from "./hooks/useStatsStream.ts";
 import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
 import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
 import { errorsOnly } from "./render/detailLines.ts";
@@ -154,6 +155,15 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       : null;
   const logs = useLogStream(engine, socketPath, logContainerId, logContainerId !== null);
 
+  // Stats stream only for a RUNNING container on the Stats tab: a stopped
+  // container's stream sends nothing but zeros (verified), so the tab shows
+  // its state instead.
+  const selectedContainer =
+    focusId === "containers" ? data.containers.find((c) => c.Id === selectedItemId) : undefined;
+  const statsContainerId =
+    activeTab === "stats" && layout.detail && selectedContainer?.State === "running" ? selectedItemId : null;
+  const stats = useStatsStream(engine, socketPath, statsContainerId, statsContainerId !== null);
+
   // A new container or leaving the tab starts back at the live end.
   useEffect(() => {
     setLogView(FOLLOW);
@@ -164,7 +174,20 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   // the model resolved (filtering included) without a cycle.
   const frameModel = useMemo(
     () =>
-      logContainerId !== null && model.detail.lines.length === 0
+      activeTab === "stats" && selectedContainer && model.detail.lines.length === 0
+        ? {
+            ...model,
+            detail: {
+              ...model.detail,
+              stats: {
+                history: stats.history,
+                status: stats.status,
+                state: selectedContainer.State ?? "",
+                name: selectedContainer.Names?.[0] ?? selectedItemId.slice(0, 12),
+              },
+            },
+          }
+        : logContainerId !== null && model.detail.lines.length === 0
         ? {
             ...model,
             detail: {
@@ -174,7 +197,21 @@ export const App = ({ socketPath }: { socketPath: string }) => {
           }
         : model,
     // `logs.version` changes when the (mutable) buffer gains lines.
-    [model, logContainerId, logs.buffer, logs.version, logs.status, logView, logSearch, logOpts],
+    [
+      model,
+      logContainerId,
+      logs.buffer,
+      logs.version,
+      logs.status,
+      logView,
+      logSearch,
+      logOpts,
+      activeTab,
+      selectedContainer,
+      selectedItemId,
+      stats.history,
+      stats.status,
+    ],
   );
 
   // Inspect data feeds the Config tab. Fetched only for containers (the one

@@ -2,6 +2,8 @@ import { PANEL_IDS, type ColumnDef, type PaneId, type PanelId } from "../layout/
 import type { LogSource, LogViewState } from "./logView.ts";
 import type { LogStreamStatus } from "./logSession.ts";
 import type { LogSearchState } from "./logSearch.ts";
+import type { StatsHistory } from "./statsView.ts";
+import type { StatsStreamStatus } from "./statsSession.ts";
 
 /**
  * One row of a panel table. `cells` is keyed by column id so that
@@ -51,8 +53,18 @@ export interface DetailModel {
   log?: DetailLogModel;
   /** Env tab: key column width, so the renderer paints values (P3-T6). */
   env?: { keyWidth: number };
+  /** Stats tab (P3-T7); the renderer sizes the sparklines to the pane. */
+  stats?: DetailStatsModel;
   /** Extra bottom-border text, e.g. `v reveal`. */
   hint?: string;
+}
+
+export interface DetailStatsModel {
+  history: StatsHistory;
+  status: StatsStreamStatus;
+  /** Lifecycle state from the list (`running`, `exited`, ...). */
+  state: string;
+  name: string;
 }
 
 export interface DetailLogModel {

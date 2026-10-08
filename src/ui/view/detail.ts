@@ -1,5 +1,5 @@
 import type { ContainerInspect } from "../../api/types.ts";
-import type { DetailLogModel } from "./model.ts";
+import type { DetailLogModel, DetailStatsModel } from "./model.ts";
 
 /**
  * Detail pane content (ROADMAP P2-T7: a TabBar plus a Config tab rendering
@@ -21,7 +21,7 @@ export interface DetailTabMeta {
 
 export const DETAIL_TABS: readonly DetailTabMeta[] = [
   { id: "logs", label: "Logs" },
-  { id: "stats", label: "Stats", phase: "phase 3" },
+  { id: "stats", label: "Stats" },
   { id: "env", label: "Env" },
   { id: "config", label: "Config" },
   { id: "top", label: "Top", phase: "phase 3" },
@@ -38,6 +38,8 @@ export interface DetailView {
   log?: DetailLogModel;
   /** Env tab layout: key column width, so values can be painted (P3-T6). */
   env?: { keyWidth: number };
+  /** Stats tab; set by `buildFrameModel`, never by `buildDetail`. */
+  stats?: DetailStatsModel;
   /** Extra bottom-border text, e.g. `v reveal secrets`. */
   hint?: string;
 }
