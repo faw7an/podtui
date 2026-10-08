@@ -14,6 +14,7 @@ import type {
   VersionInfo,
   Info,
   ContainerStatsUI,
+  ImageHistoryEntry,
 } from "../api/types.ts";
 import type { LogFrame } from "../api/demux.ts";
 import type { SocketResult } from "../api/socket.ts";
@@ -96,12 +97,16 @@ export interface ContainerEngine {
   // Images
   listImages(socketPath: string, all?: boolean): Promise<ImageListItem[]>;
   inspectImage(socketPath: string, id: string): Promise<ImageInspect>;
-  imageHistory(socketPath: string, id: string): Promise<unknown[]>;
+  imageHistory(socketPath: string, id: string): Promise<ImageHistoryEntry[]>;
   removeImage(socketPath: string, id: string, force?: boolean): Promise<ContainerActionResult>;
   pruneImages(socketPath: string, dryRun?: boolean): Promise<PrunePreview | PruneResult>;
 
   // Volumes
   listVolumes(socketPath: string): Promise<VolumeListItem[]>;
+  /** Volumes nothing references (server `dangling` filter; the prune rule). */
+  danglingVolumeNames(socketPath: string): Promise<string[]>;
+  /** Containers, stopped included, that mount volume `name`. */
+  containersUsingVolume(socketPath: string, name: string): Promise<ContainerListItem[]>;
   inspectVolume(socketPath: string, name: string): Promise<VolumeInspect>;
   removeVolume(socketPath: string, name: string): Promise<ContainerActionResult>;
   pruneVolumes(socketPath: string, dryRun?: boolean): Promise<PrunePreview | PruneResult>;

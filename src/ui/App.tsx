@@ -9,7 +9,8 @@ import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
 import { defaultTheme } from "../theme/theme.ts";
 import { EMPTY_DATA, buildFrameModel, type ResourceData } from "./view/build.ts";
 import { createVisibleFetcher, startPollLoop } from "./view/refresh.ts";
-import { DETAIL_TABS, nextTabIndex, type DetailTabId } from "./view/detail.ts";
+import { nextTabIndex, type DetailTabId } from "./view/detail.ts";
+import { DEFAULT_TAB, TABS_BY_PANEL, type ResourceDetailData } from "./view/resourceDetail.ts";
 import type { ContainerInspect } from "../api/types.ts";
 import { PANEL_COLUMNS } from "./view/model.ts";
 import { resolvePollMs } from "../config.ts";
@@ -57,7 +58,10 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const [data, setData] = useState<ResourceData>(EMPTY_DATA);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [error, setError] = useState<string | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<DetailTabId>("config");
+  // Each panel remembers its own detail tab (P4: pods/images have their own).
+  const [activeTabs, setActiveTabs] = useState<Record<PanelId, DetailTabId>>(DEFAULT_TAB);
+  // Inspect data for a selected pod/image/volume/network (P4-T1..T4).
+  const [resource, setResource] = useState<ResourceDetailData | null>(null);
   const [inspect, setInspect] = useState<ContainerInspect | null>(null);
   // Kept in a ref so the poll interval always reads the latest resource data
   // without being torn down and re-created on every refresh.
@@ -137,6 +141,15 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       }),
     [terminalCols, terminalRows, state.visible, state.focus, state.zoom, state.detailFullscreen],
   );
+  // The list whose selection the detail pane shows: the focused list, or the
+  // one the user came from when the detail pane itself has focus.
+  const detailPanel: PanelId = isPanelId(state.focus)
+    ? state.focus
+    : isPanelId(state.returnFocus)
+      ? state.returnFocus
+      : "containers";
+  const activeTab = activeTabs[detailPanel];
+
   // Detail rect minus its two borders and the tab strip.
   const logRows = Math.max(1, (layout.detail?.h ?? 3) - 3);
 
@@ -154,8 +167,12 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         filter: state.filterQuery,
         collapsedSections: state.collapsed,
         revealSecrets,
+        detailPanel,
+        resource,
       }),
     [
+      detailPanel,
+      resource,
       data,
       state.selected,
       state.focus,
@@ -169,7 +186,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     ],
   );
 
-  const focusId: PanelId = isPanelId(state.focus) ? state.focus : "containers";
+  const focusId: PanelId = detailPanel;
   const focusModel = model.panels.find((p) => p.id === focusId);
   const selectedItemId = focusModel?.items[focusModel.selected]?.id ?? "";
 
@@ -221,6 +238,8 @@ export const App = ({ socketPath }: { socketPath: string }) => {
             filter: state.filterQuery,
             collapsedSections: state.collapsed,
             revealSecrets,
+            detailPanel,
+            resource,
             top: {
               status: top,
               state: selectedContainer.State ?? "",
@@ -297,6 +316,46 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       cancelled = true;
     };
   }, [engine, focusId, selectedItemId]);
+
+  // Pods, images, volumes, networks: inspect (plus image history, volume
+  // users) for the selected item. Refetched on every list refresh, because
+  // what uses a volume or sits on a network changes while you look.
+  useEffect(() => {
+    if (focusId === "containers" || focusId === "quadlets" || !selectedItemId || !layout.detail) {
+      setResource(null);
+      return;
+    }
+    let cancelled = false;
+    const id = selectedItemId;
+    void (async () => {
+      try {
+        let next: ResourceDetailData;
+        if (focusId === "pods") next = { panel: "pods", id, inspect: await engine.inspectPod(socketPath, id) };
+        else if (focusId === "images") {
+          const [inspect, history] = await Promise.all([
+            engine.inspectImage(socketPath, id),
+            engine.imageHistory(socketPath, id).catch(() => []),
+          ]);
+          next = { panel: "images", id, inspect, history };
+        } else if (focusId === "volumes") {
+          const [inspect, users] = await Promise.all([
+            engine.inspectVolume(socketPath, id),
+            engine.containersUsingVolume(socketPath, id),
+          ]);
+          next = { panel: "volumes", id, inspect, users };
+        } else next = { panel: "networks", id, inspect: await engine.inspectNetwork(socketPath, id) };
+        if (!cancelled) setResource(next);
+      } catch (e) {
+        if (!cancelled) {
+          setResource(null);
+          setNotice({ tone: "error", text: e instanceof Error ? e.message : String(e) });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [engine, focusId, selectedItemId, lastRefresh, layout.detail !== null]);
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
@@ -435,9 +494,11 @@ export const App = ({ socketPath }: { socketPath: string }) => {
 
     // [ / ] move through the detail tabs (FR-4).
     if (input === "[" || input === "]") {
-      setActiveTab((prev) => {
-        const idx = DETAIL_TABS.findIndex((t) => t.id === prev);
-        return DETAIL_TABS[nextTabIndex(idx, input === "]" ? 1 : -1)]?.id ?? "config";
+      const tabs = TABS_BY_PANEL[detailPanel];
+      setActiveTabs((prev) => {
+        const idx = tabs.findIndex((t) => t.id === prev[detailPanel]);
+        const next = tabs[nextTabIndex(idx, input === "]" ? 1 : -1, tabs.length)]?.id ?? "config";
+        return { ...prev, [detailPanel]: next };
       });
       dispatch({ type: "resetDetailScroll" });
       return;

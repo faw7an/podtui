@@ -11,6 +11,7 @@ import {
   MultiplexedLogDecoder,
 } from "../api/demux.ts";
 import type {
+  ImageHistoryEntry,
   ContainerListItem,
   ContainerInspect,
   ContainerStats,
@@ -459,7 +460,7 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async imageHistory(socketPath: string, id: string) {
-      return get<unknown[]>(socketPath, `/images/${id}/history`);
+      return get<ImageHistoryEntry[]>(socketPath, `/images/${id}/history`);
     },
 
     async removeImage(socketPath: string, id: string, force = false) {
@@ -474,6 +475,24 @@ export function createPodmanEngine(): ContainerEngine {
     // Volumes
     async listVolumes(socketPath: string) {
       return get<VolumeListItem[]>(socketPath, "/volumes/json");
+    },
+
+    /**
+     * Names of volumes no container references, by the server's own
+     * `dangling` filter — the same rule `volume prune` applies. `MountCount`
+     * cannot tell "in use": it read 0 even for a volume mounted by a RUNNING
+     * container (verified live, Podman 5.8.4).
+     */
+    async danglingVolumeNames(socketPath: string) {
+      const vols = await get<VolumeListItem[]>(socketPath, "/volumes/json", { query: DANGLING_FILTER });
+      return vols.map((v) => v.Name);
+    },
+
+    /** Containers (stopped ones included) that mount volume `name`. Verified live. */
+    async containersUsingVolume(socketPath: string, name: string) {
+      return get<ContainerListItem[]>(socketPath, "/containers/json", {
+        query: { all: "true", filters: JSON.stringify({ volume: [name] }) },
+      });
     },
 
     async inspectVolume(socketPath: string, name: string) {

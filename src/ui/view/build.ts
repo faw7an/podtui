@@ -11,6 +11,7 @@ import { selectedIndex } from "../layout/layoutReducer.ts";
 import { PANEL_COLUMNS, panelMeta, type DetailLogModel, type DetailStatsModel, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
 import { buildDetail, type DetailTabId } from "./detail.ts";
 import { TOP_POLL_MS, topTable } from "./topView.ts";
+import { TABS_BY_PANEL, resourceView, type ResourceDetailData } from "./resourceDetail.ts";
 import type { TopStatus } from "../hooks/useTopPoll.ts";
 import type { ContainerInspect } from "../../api/types.ts";
 
@@ -20,6 +21,11 @@ export interface ResourceData {
   images: ImageListItem[];
   volumes: VolumeListItem[];
   networks: NetworkListItem[];
+  /**
+   * Names of volumes nothing references (server `dangling` filter), or null
+   * before the first fetch. "In use" = not in this list (P4-T3).
+   */
+  danglingVolumes: string[] | null;
   /** No quadlet source is wired yet; the panel stays empty rather than guessing. */
   quadlets: { id: string; name: string; status: string }[];
 }
@@ -30,6 +36,7 @@ export const EMPTY_DATA: ResourceData = {
   images: [],
   volumes: [],
   networks: [],
+  danglingVolumes: null,
   quadlets: [],
 };
 
@@ -39,7 +46,8 @@ function imageName(image: ImageListItem): string {
   if (tag) return shortenImageName(tag);
   const name = image.Names?.[0];
   if (name) return shortenImageName(name);
-  return image.Id.slice(0, 12);
+  // Untagged (RepoTags null, no Names — fixture images-list-untagged.json).
+  return `<none> ${image.Id.slice(0, 12)}`;
 }
 
 function containerRows(items: ContainerListItem[], now: number): RowModel[] {
@@ -75,39 +83,70 @@ function podRows(items: PodListItem[], now: number): RowModel[] {
   });
 }
 
+/**
+ * Image state (P4-T2): `Containers` is the list's own count of containers
+ * using the image; an image without tags is marked `untagged`, the case
+ * `image prune` targets. A glyph accompanies every word.
+ */
 function imageRows(items: ImageListItem[], now: number): RowModel[] {
-  return items.map((i) => ({
-    id: i.Id,
-    tone: "dim" as const,
-    cells: {
-      name: imageName(i),
-      size: formatBytes(i.Size ?? 0),
-      age: formatAge(parsePodmanTime(i.Created) ?? NaN, now),
-    },
-  }));
+  return items.map((i) => {
+    const used = (i.Containers ?? 0) > 0;
+    const untagged = (i.RepoTags ?? []).length === 0 && (i.Names ?? []).length === 0;
+    const tone = used ? ("ok" as const) : untagged ? ("warn" as const) : ("dim" as const);
+    const word = used ? "in use" : untagged ? "untagged" : "unused";
+    return {
+      id: i.Id,
+      tone,
+      cells: {
+        name: imageName(i),
+        state: `${statusGlyph(tone)} ${word}`,
+        size: formatBytes(i.Size ?? 0),
+        age: formatAge(parsePodmanTime(i.Created) ?? NaN, now),
+      },
+    };
+  });
 }
 
-function volumeRows(items: VolumeListItem[]): RowModel[] {
+/**
+ * "In use" means some container (running or stopped) references the volume:
+ * NOT in the server's dangling list, the same rule `volume prune` uses.
+ * `MountCount` is not usable — it read 0 for a volume mounted by a running
+ * container (verified live, Podman 5.8.4). Unknown until fetched: `…`.
+ */
+function volumeRows(items: VolumeListItem[], dangling: string[] | null): RowModel[] {
+  const unused = dangling ? new Set(dangling) : null;
   return items.map((v) => {
-    const inUse = (v.MountCount ?? 0) > 0;
+    const inUse = unused ? !unused.has(v.Name) : null;
     return {
       id: v.Name,
       tone: inUse ? ("ok" as const) : ("dim" as const),
       cells: {
         name: v.Name,
-        state: `${statusGlyph(inUse ? "ok" : "dim")} ${inUse ? "in use" : "unused"}`,
+        state: inUse === null ? `${statusGlyph("dim")} …` : `${statusGlyph(inUse ? "ok" : "dim")} ${inUse ? "in use" : "unused"}`,
         mountpoint: v.Mountpoint ?? "",
       },
     };
   });
 }
 
-function networkRows(items: NetworkListItem[]): RowModel[] {
-  return items.map((n) => ({
-    id: n.id || n.name,
-    tone: "info" as const,
-    cells: { name: n.name, state: n.driver || "bridge" },
-  }));
+/**
+ * Network rows (P4-T4): driver, first subnet, and how many containers (any
+ * state) list this network — the containers list's `Networks` names it.
+ */
+function networkRows(items: NetworkListItem[], containers: ContainerListItem[]): RowModel[] {
+  return items.map((n) => {
+    const count = containers.filter((c) => (c.Networks ?? []).includes(n.name)).length;
+    return {
+      id: n.id || n.name,
+      tone: "info" as const,
+      cells: {
+        name: n.name,
+        state: n.driver || "bridge",
+        subnet: n.subnets?.[0]?.subnet ?? "",
+        count: String(count),
+      },
+    };
+  });
 }
 
 function quadletRows(items: { id: string; name: string; status: string }[]): RowModel[] {
@@ -148,8 +187,8 @@ export function buildPanelModels(
     containers: containerRows(data.containers, now),
     pods: podRows(data.pods, now),
     images: imageRows(data.images, now),
-    volumes: volumeRows(data.volumes),
-    networks: networkRows(data.networks),
+    volumes: volumeRows(data.volumes, data.danglingVolumes),
+    networks: networkRows(data.networks, data.containers),
     quadlets: quadletRows(data.quadlets),
   };
 
@@ -201,13 +240,19 @@ export interface BuildFrameArgs {
   stats?: DetailStatsModel;
   /** Top tab snapshot for the selected container (P3-T8). */
   top?: { status: TopStatus; state: string; name: string };
+  /** Inspect data for a selected pod/image/volume/network (P4-T1..T4). */
+  resource?: ResourceDetailData | null;
+  /** The list whose selection the detail shows (defaults: focus, else containers). */
+  detailPanel?: PanelId;
 }
 
 export function buildFrameModel(args: BuildFrameArgs): FrameModel {
   const panels = buildPanelModels(args.data, args.selected, args.now, args.filter);
 
   // Detail shows whatever is selected in the focused list panel.
-  const focusId: PanelId = args.focus === "detail" ? "containers" : args.focus;
+  // Detail shows the selection of `detailPanel` (the list the user came from
+  // when the detail pane has focus); older callers fall back to containers.
+  const focusId: PanelId = args.detailPanel ?? (args.focus === "detail" ? "containers" : args.focus);
   const panel = panels.find((p) => p.id === focusId);
   const item = panel?.items[panel.selected];
 
@@ -223,6 +268,32 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
         revealSecrets: args.revealSecrets,
       })
     : buildDetail({ inspect: null, activeTab: args.activeTab ?? "config", hasSelection: false });
+
+  // Pods, images, volumes, networks (P4-T1..T4): their own tabs, built from
+  // inspect data fetched for exactly this item.
+  if (focusId !== "containers" && focusId !== "quadlets" && item) {
+    const tabs = TABS_BY_PANEL[focusId];
+    const wanted = args.activeTab ?? "config";
+    const idx = Math.max(0, tabs.findIndex((t) => t.id === wanted));
+    const tab = tabs[idx]?.id ?? "config";
+    const resource = args.resource && args.resource.panel === focusId && args.resource.id === item.id ? args.resource : null;
+    const view = resource ? resourceView(tab, resource, args.data, args.now) : { lines: ["Loading…"] };
+    const state = (item.cells["state"] ?? "").replace(/^\S+ /, "");
+    return {
+      panels,
+      focus: args.focus,
+      clock: args.clock,
+      error: args.error,
+      detail: {
+        title: `${item.cells["name"] ?? item.id.slice(0, 12)}${state ? ` · ${state}` : ""}`,
+        tabs: tabs.map((t) => t.label),
+        activeTab: idx,
+        lines: view.lines,
+        ...(view.table ? { table: true } : {}),
+        ...(view.hint ? { hint: view.hint } : {}),
+      },
+    };
+  }
 
   // The list is re-polled; inspect is fetched once per selection. So the
   // title takes the name from inspect but the state from the list: a

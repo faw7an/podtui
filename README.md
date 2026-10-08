@@ -70,10 +70,11 @@ networks are never force-removed.
 
 | Works today | Coming next |
 |---|---|
-| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | Detail views for pods, images, volumes and networks |
-| Live refresh (every 5 s by default) that keeps your cursor on the same item | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
-| Container **Config** tab: formatted inspect output, foldable sections | **Quadlets**: unit state, journal, start/stop |
-| Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | Omarchy theme colours, mouse support |
+| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
+| Live refresh (every 5 s by default) that keeps your cursor on the same item | **Quadlets**: unit state, journal, start/stop |
+| Container **Config** tab: formatted inspect output, foldable sections | Omarchy theme colours, mouse support |
+| Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | |
+| Pod (members), image (history, users), volume (users) and network (subnets, members) detail views | |
 | **Stats** (live CPU with a 1-minute sparkline, memory, net, block, PIDs), **Env** (secrets masked until `v`) and **Top** (process list, every 2 s) tabs | |
 | `/` filter in every list, `?` help overlay, `z` zoom |  |
 | Start / stop / restart / kill / remove with confirm dialogs that name every target |  |

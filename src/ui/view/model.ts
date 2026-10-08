@@ -138,6 +138,7 @@ export const PANEL_COLUMNS: Record<PanelId, ColumnDef[]> = {
   ],
   images: [
     { id: "name", minW: 10, flex: 3, priority: 100 },
+    { id: "state", minW: 8, priority: 60 },
     { id: "size", minW: 7, priority: 80 },
     { id: "age", minW: 4, priority: 20 },
   ],
@@ -149,6 +150,8 @@ export const PANEL_COLUMNS: Record<PanelId, ColumnDef[]> = {
   networks: [
     { id: "name", minW: 10, flex: 3, priority: 100 },
     { id: "state", minW: 8, priority: 70 },
+    { id: "subnet", minW: 10, flex: 1, priority: 40 },
+    { id: "count", minW: 3, priority: 30 },
   ],
   quadlets: [
     { id: "name", minW: 10, flex: 3, priority: 100 },
@@ -165,4 +168,5 @@ export const COLUMN_HEADERS: Record<string, string> = {
   size: "SIZE",
   count: "CNT",
   mountpoint: "MOUNTPOINT",
+  subnet: "SUBNET",
 };

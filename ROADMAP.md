@@ -134,10 +134,10 @@ Phase overview
 
 **Goal:** panels 1, 3, 4, 5 and per-item actions.
 
-- [ ] **P4-T1** Pods panel: name, status, container count, infra info. Selecting a pod shows Config and a member-container list; pod actions start/stop/restart/kill/remove.
-- [ ] **P4-T2** Images panel: repo:tag, size, age, dangling marker; Config tab; layers/history view ⚠️ VERIFY the history endpoint; remove action.
-- [ ] **P4-T3** Volumes panel: name, driver, mountpoint, in-use indicator ⚠️ VERIFY how "in use" is determined; remove action.
-- [ ] **P4-T4** Networks panel: name, driver, subnet, connected containers; remove action.
+- [x] **P4-T1** Pods panel: name, status, container count, infra info. Selecting a pod shows Config and a member-container list; pod actions start/stop/restart/kill/remove.
+- [x] **P4-T2** Images panel: repo:tag, size, age, dangling marker; Config tab; layers/history view ⚠️ VERIFY the history endpoint; remove action.
+- [x] **P4-T3** Volumes panel: name, driver, mountpoint, in-use indicator ⚠️ VERIFY how "in use" is determined; remove action.
+- [x] **P4-T4** Networks panel: name, driver, subnet, connected containers; remove action.
 - [x] **P4-T5** Container actions: `s` start, `S` stop, `r` restart, `K` kill, `d` remove, all via engine; busy indicator while pending; errors surface in the status bar.
 - [x] **P4-T6** `ConfirmDialog` component: lists exactly what will be affected, default focus on Cancel, `y`/`n`/Enter/Esc (FR-6). Used by every remove action.
 - [ ] **P4-T7** Cross-links: from a pod, jump to its containers; from a container, show its pod/image/volumes/networks as read-only info in Config.

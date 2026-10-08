@@ -10,7 +10,7 @@ import type { DetailLogModel, DetailStatsModel } from "./model.ts";
  * lines come out of here.
  */
 
-export type DetailTabId = "logs" | "stats" | "env" | "config" | "top";
+export type DetailTabId = "logs" | "stats" | "env" | "config" | "top" | "members" | "history";
 
 export interface DetailTabMeta {
   id: DetailTabId;

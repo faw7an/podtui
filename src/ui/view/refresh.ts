@@ -10,6 +10,7 @@ export interface ListEngine {
   listPods(socketPath: string): Promise<unknown[]>;
   listImages(socketPath: string, all?: boolean): Promise<unknown[]>;
   listVolumes(socketPath: string): Promise<unknown[]>;
+  danglingVolumeNames(socketPath: string): Promise<string[]>;
   listNetworks(socketPath: string): Promise<unknown[]>;
 }
 
@@ -22,21 +23,17 @@ export interface RefreshOutcome {
 /** Which list call feeds which panel. Quadlets has no source until Phase 6. */
 const FETCHERS: Record<
   Exclude<PanelId, "quadlets">,
-  (engine: ListEngine, socketPath: string) => Promise<unknown>
+  (engine: ListEngine, socketPath: string) => Promise<Partial<ResourceData>>
 > = {
-  containers: (e, s) => e.listContainers(s, true),
-  pods: (e, s) => e.listPods(s),
-  images: (e, s) => e.listImages(s, true),
-  volumes: (e, s) => e.listVolumes(s),
-  networks: (e, s) => e.listNetworks(s),
-};
-
-const PANEL_TO_KEY: Record<Exclude<PanelId, "quadlets">, keyof ResourceData> = {
-  containers: "containers",
-  pods: "pods",
-  images: "images",
-  volumes: "volumes",
-  networks: "networks",
+  containers: async (e, s) => ({ containers: (await e.listContainers(s, true)) as ResourceData["containers"] }),
+  pods: async (e, s) => ({ pods: (await e.listPods(s)) as ResourceData["pods"] }),
+  images: async (e, s) => ({ images: (await e.listImages(s, true)) as ResourceData["images"] }),
+  // Volumes need a second list to know which are in use (P4-T3).
+  volumes: async (e, s) => {
+    const [volumes, dangling] = await Promise.all([e.listVolumes(s), e.danglingVolumeNames(s)]);
+    return { volumes: volumes as ResourceData["volumes"], danglingVolumes: dangling };
+  },
+  networks: async (e, s) => ({ networks: (await e.listNetworks(s)) as ResourceData["networks"] }),
 };
 
 /**
@@ -62,8 +59,7 @@ export function createVisibleFetcher(engine: ListEngine, socketPath: string) {
       .filter((panel) => visible.has(panel))
       .map(async (panel) => {
         try {
-          const items = await FETCHERS[panel](engine, socketPath);
-          (data as unknown as Record<string, unknown>)[PANEL_TO_KEY[panel]] = items;
+          Object.assign(data, await FETCHERS[panel](engine, socketPath));
         } catch (e) {
           errors.push(`${panel}: ${e instanceof Error ? e.message : String(e)}`);
         }

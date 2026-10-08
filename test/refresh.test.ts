@@ -43,6 +43,8 @@ function mockEngine() {
       calls.networks++;
       return [];
     },
+    // Fetched together with listVolumes (P4-T3), counted with it.
+    danglingVolumeNames: async () => [],
   };
   return { engine, calls };
 }
