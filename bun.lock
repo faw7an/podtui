@@ -10,17 +10,20 @@
         "typescript": "5.7.3",
       },
       "devDependencies": {
-        "@eslint/js": "^10.0.1",
-        "@types/bun": "^1.4.2",
+        "@eslint/js": "10.0.1",
+        "@types/bun": "1.4.2",
         "@types/react": "19.3.0",
         "@typescript-eslint/eslint-plugin": "8.71.0",
         "@typescript-eslint/parser": "8.71.0",
         "eslint": "10.11.0",
         "ink-testing-library": "4.0.0",
         "react-devtools-core": "6.1.2",
-        "typescript-eslint": "^8.71.0",
+        "typescript-eslint": "8.71.0",
       },
     },
+  },
+  "patchedDependencies": {
+    "string-width@8.3.0": "patches/string-width@8.3.0.patch",
   },
   "packages": {
     "@alcalzone/ansi-tokenize": ["@alcalzone/ansi-tokenize@0.3.1", "", { "dependencies": { "ansi-styles": "^6.2.1", "is-fullwidth-code-point": "^5.0.0" } }, "sha512-cUD0PT0YX+rImRhfn7BfMRduP/tX/Zqt/N0dHlAyn2RlcJssCb5KsCJkhln61eh9vuJDkH8wKn3L8zJzzWXPFg=="],
