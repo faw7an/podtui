@@ -7,6 +7,7 @@ import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
 import type { FooterHintContext } from "../render/chrome.ts";
 import type { DialogState } from "../view/confirmDialog.ts";
+import type { BulkFlow } from "../bulk/bulkFlow.ts";
 
 export interface ScreenProps {
   model: FrameModel;
@@ -29,6 +30,8 @@ export interface ScreenProps {
   filterPopup?: PanelId | null;
   /** Open confirm dialog (P4-T6). */
   dialog?: DialogState | null;
+  /** Open `x` bulk menu (P5). */
+  bulk?: BulkFlow | null;
 }
 
 /**
@@ -53,6 +56,7 @@ export function Screen({
   detailScroll,
   filterPopup,
   dialog,
+  bulk,
 }: ScreenProps) {
   const detected = useTerminalSize();
   const { columns, rows } = size ?? detected;
@@ -80,6 +84,7 @@ export function Screen({
       detailScroll={detailScroll}
       filterPopup={filterPopup}
       dialog={dialog}
+      bulk={bulk}
     />
   );
 }

@@ -26,6 +26,8 @@ import { dialogKey, openConfirm, openMessage, type DialogState } from "./view/co
 import { actionFor, failureContent, podJumpTarget } from "./actions/selectionAction.ts";
 import { busyText, doneText, runAction, type ActionVerb, type ResourceAction } from "./actions/resourceActions.ts";
 import type { Notice } from "./view/model.ts";
+import { bulkKey, executed, openBulk, previewed, type BulkEffect, type BulkFlow } from "./bulk/bulkFlow.ts";
+import { orderedCommands } from "./bulk/commands.ts";
 
 // FR-2 polling fallback. Configurable via PODTUI_POLL_MS; invalid values fall
 // back to the default rather than reaching setInterval.
@@ -75,6 +77,9 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const [notice, setNotice] = useState<Notice | undefined>(undefined);
   const [refreshKey, setRefreshKey] = useState(0);
   const busyRef = useRef(false);
+  // The `x` bulk menu (P5). Results arrive through functional updates
+  // (`previewed`/`executed`), which drop them if the user has moved on.
+  const [bulk, setBulk] = useState<BulkFlow | null>(null);
   const [logSearch, setLogSearch] = useState<LogSearchState>(NO_SEARCH);
   // Display preferences survive switching containers; they are the user's.
   const [logOpts, setLogOpts] = useState({ timestamps: false, wrap: false, errorsOnly: false });
@@ -113,6 +118,29 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     const t = setTimeout(() => setNotice(undefined), 8000);
     return () => clearTimeout(t);
   }, [notice]);
+
+  // Run what the bulk state machine asked for, and feed the result back.
+  const runBulkEffect = (effect: BulkEffect | undefined): void => {
+    if (!effect) return;
+    const { command } = effect;
+    const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+    if (effect.type === "preview") {
+      void command
+        .preview(engine, socketPath)
+        .then((preview) => setBulk((f) => previewed(f, command, { preview })))
+        .catch((e: unknown) => setBulk((f) => previewed(f, command, { error: message(e) })));
+    } else {
+      busyRef.current = true;
+      void command
+        .execute(engine, socketPath, effect.preview)
+        .then((result) => setBulk((f) => executed(f, command, { result })))
+        .catch((e: unknown) => setBulk((f) => executed(f, command, { error: message(e) })))
+        .finally(() => {
+          busyRef.current = false;
+          setRefreshKey((k) => k + 1);
+        });
+    }
+  };
 
   const perform = (action: ResourceAction): void => {
     busyRef.current = true;
@@ -368,6 +396,14 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       process.exit(0);
     }
 
+    // --- Bulk menu (P5): owns every key while open. ---
+    if (bulk) {
+      const step = bulkKey(bulk, input, key);
+      setBulk(step.flow);
+      runBulkEffect(step.effect);
+      return;
+    }
+
     // --- Confirm dialog (P4-T6): owns every key while open. ---
     if (dialog) {
       const outcome = dialogKey(dialog, input, key);
@@ -393,7 +429,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         return;
       }
       const action = resolveEscape(state, {
-        dialogOpen: dialog !== null,
+        dialogOpen: dialog !== null || bulk !== null,
         helpOpen: state.help,
         filterActive:
           state.filterFor !== null ||
@@ -513,6 +549,16 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     // Space folds/unfolds every Config section; PgUp/PgDn scroll the detail.
     // Both are inert while filtering (the filter branch above returns first),
     // where Space types a space and PgUp/PgDn have no text to append.
+    // --- `x`: bulk commands, the focused panel's first (P5-T6). ---
+    if (input === "x") {
+      if (busyRef.current) {
+        setNotice({ tone: "error", text: "Another action is still running." });
+        return;
+      }
+      setBulk(openBulk(orderedCommands(detailPanel)));
+      return;
+    }
+
     // --- Cross-link (P4-T7): `c` on a pod jumps to its containers. ---
     if (input === "c" && focusId === "pods") {
       const target = podJumpTarget(data, selectedItemId);
@@ -609,6 +655,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       detailScroll={state.detailScroll}
       filterPopup={state.filterFor}
       dialog={dialog}
+      bulk={bulk}
     />
   );
 };

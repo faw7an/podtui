@@ -70,7 +70,7 @@ networks are never force-removed.
 
 | Works today | Coming next |
 |---|---|
-| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | Bulk menu (`x`): prune and clean-up with a preview of exactly what goes |
+| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | |
 | Live refresh (every 5 s by default) that keeps your cursor on the same item | **Quadlets**: unit state, journal, start/stop |
 | Container **Config** tab: formatted inspect output, foldable sections | Omarchy theme colours, mouse support |
 | Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | |
@@ -78,6 +78,7 @@ networks are never force-removed.
 | **Stats** (live CPU with a 1-minute sparkline, memory, net, block, PIDs), **Env** (secrets masked until `v`) and **Top** (process list, every 2 s) tabs | |
 | `/` filter in every list, `?` help overlay, `z` zoom |  |
 | Start / stop / restart / kill / remove with confirm dialogs that name every target |  |
+| Bulk menu (`x`): stop all, prune containers/images/volumes/networks, remove all — each previews exactly what it touches |  |
 | Adapts to any terminal size, from 40×10 up |  |
 | Works with **podman-docker** setups, and never connects to a Docker daemon by mistake |  |
 
@@ -257,6 +258,7 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `r` | restart |
 | `K` | kill (asks first) |
 | `d` | remove (asks first) |
+| `x` | bulk: prune, stop, remove |
 | `?` | help |
 | `q` | quit |
 

@@ -37,7 +37,9 @@ function fakePodman(fail?: { match: RegExp; status: number; message: string }) {
         };
         if (method !== "GET") {
           actions.push(`${method} ${target.replace(/^\/v[\d.]+\/libpod/, "")}`);
-          if (fail?.match.test(target)) {
+          if (target.includes("/prune")) {
+            reply(200, "[]");
+          } else if (fail?.match.test(target)) {
             reply(fail.status, JSON.stringify({ cause: fail.message, message: fail.message, response: fail.status }), "Error");
           } else {
             socket.write("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
@@ -159,6 +161,58 @@ describe("actions in the App", () => {
       // …then the app is alive and responsive.
       h.stdin.type("?");
       await waitFor(() => h.stdout.frame().includes("Actions") || h.stdout.frame().includes("keys"), "help opens");
+    } finally {
+      h.stop();
+    }
+  }, 30000);
+
+  test("x → remove stopped containers: preview names them; Esc sends nothing; y prunes once", async () => {
+    const h = await launch();
+    try {
+      const open = async (): Promise<void> => {
+        h.stdin.type("x");
+        await waitFor(() => h.stdout.frame().includes("Bulk commands"), "menu");
+        h.stdin.type("j"); // row 2 on the Containers panel: Remove stopped containers
+        await new Promise((r) => setTimeout(r, 50));
+        h.stdin.type("\r");
+        await waitFor(() => h.stdout.frame().includes("This will remove"), "preview");
+      };
+      await open();
+      // Fixture: `failing` is the only exited container outside a pod.
+      expect(h.stdout.frame()).toContain("This will remove 1 container:");
+      expect(h.stdout.frame()).toContain("failing");
+      h.stdin.type("\u001B");
+      await waitFor(() => !h.stdout.frame().includes("This will remove"), "closed");
+      await new Promise((r) => setTimeout(r, 150));
+      expect(h.api.actions).toEqual([]);
+
+      await open();
+      h.stdin.type("y");
+      await waitFor(() => h.api.actions.length === 1, "prune sent");
+      expect(h.api.actions).toEqual(["POST /containers/prune"]);
+      await waitFor(() => h.stdout.frame().includes("Removed 0 containers"), "result screen");
+    } finally {
+      h.stop();
+    }
+  }, 30000);
+
+  test("x → remove ALL: anything but the typed word sends nothing", async () => {
+    const h = await launch();
+    try {
+      h.stdin.type("x");
+      await waitFor(() => h.stdout.frame().includes("Bulk commands"), "menu");
+      h.stdin.type("3"); // row 3 on the Containers panel: Remove ALL containers
+      await waitFor(() => h.stdout.frame().includes("Type delete and press Enter"), "typed-word prompt");
+      for (const ch of "yes") {
+        h.stdin.type(ch);
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      h.stdin.type("\r");
+      await new Promise((r) => setTimeout(r, 200));
+      expect(h.stdout.frame()).toContain("> yes▌");
+      h.stdin.type("\u001B");
+      await waitFor(() => !h.stdout.frame().includes("Type delete"), "closed");
+      expect(h.api.actions).toEqual([]);
     } finally {
       h.stop();
     }

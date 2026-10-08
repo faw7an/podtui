@@ -159,12 +159,12 @@ Phase overview
 
 **Goal:** the `x` menu from the original mock.
 
-- [ ] **P5-T1** `BulkMenu` component: modal list navigated with arrows, `Enter` to select, `Esc` to close; footer shows keys.
-- [ ] **P5-T2** Commands: stop all containers; remove stopped containers; prune dangling images; prune unused volumes; prune unused networks; remove all containers (forced). Each is defined in a data table (id, label, risk level, preview function, execute function).
-- [ ] **P5-T3** Preview step: before executing, call the engine's preview function and show "This will remove N items: …" (first 10 names + "and M more"). If N = 0 show "Nothing to do".
-- [ ] **P5-T4** Risk levels: low = single confirm; high ("remove all containers", forced) = type the word `delete` to confirm.
-- [ ] **P5-T5** Progress and result summary: "Removed 3 containers, reclaimed 120 MB" (⚠️ VERIFY what the prune responses actually return); partial failures listed.
-- [ ] **P5-T6** Context-aware entries: the menu can show panel-specific commands first (e.g. on the Volumes panel, "prune volumes" first).
+- [x] **P5-T1** `BulkMenu` component: modal list navigated with arrows, `Enter` to select, `Esc` to close; footer shows keys.
+- [x] **P5-T2** Commands: stop all containers; remove stopped containers; prune dangling images; prune unused volumes; prune unused networks; remove all containers (forced). Each is defined in a data table (id, label, risk level, preview function, execute function).
+- [x] **P5-T3** Preview step: before executing, call the engine's preview function and show "This will remove N items: …" (first 10 names + "and M more"). If N = 0 show "Nothing to do".
+- [x] **P5-T4** Risk levels: low = single confirm; high ("remove all containers", forced) = type the word `delete` to confirm.
+- [x] **P5-T5** Progress and result summary: "Removed 3 containers, reclaimed 120 MB" (⚠️ VERIFY what the prune responses actually return); partial failures listed.
+- [x] **P5-T6** Context-aware entries: the menu can show panel-specific commands first (e.g. on the Volumes panel, "prune volumes" first).
 
 **Automated tests:** preview counts match mock engine data; high-risk flow requires the typed word; Esc at any stage aborts without calling execute; partial-failure rendering.
 

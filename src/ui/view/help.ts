@@ -36,6 +36,7 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "r", desc: "restart", section: "actions" },
   { key: "K", desc: "kill (asks first)", section: "actions" },
   { key: "d", desc: "remove (asks first)", section: "actions" },
+  { key: "x", desc: "bulk: prune, stop, remove", section: "actions" },
   { key: "?", desc: "help", section: "app" },
   { key: "q", desc: "quit", section: "app" },
 ] as const;
