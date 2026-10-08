@@ -22,8 +22,8 @@ import { useTopPoll } from "./hooks/useTopPoll.ts";
 import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
 import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
 import { errorsOnly } from "./render/detailLines.ts";
-import { dialogKey, openConfirm, type ConfirmDialogState } from "./view/confirmDialog.ts";
-import { actionFor, podJumpTarget } from "./actions/selectionAction.ts";
+import { dialogKey, openConfirm, openMessage, type DialogState } from "./view/confirmDialog.ts";
+import { actionFor, failureContent, podJumpTarget } from "./actions/selectionAction.ts";
 import { busyText, doneText, runAction, type ActionVerb, type ResourceAction } from "./actions/resourceActions.ts";
 import type { Notice } from "./view/model.ts";
 
@@ -71,7 +71,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const [revealSecrets, setRevealSecrets] = useState(false);
   // Actions (P4-T5/T6): the open dialog, the footer notice, and a counter
   // that restarts the poll loop so a finished action shows at once.
-  const [dialog, setDialog] = useState<ConfirmDialogState | null>(null);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
   const [notice, setNotice] = useState<Notice | undefined>(undefined);
   const [refreshKey, setRefreshKey] = useState(0);
   const busyRef = useRef(false);
@@ -119,7 +119,13 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     setNotice({ tone: "busy", text: busyText(action) });
     void runAction(engine, socketPath, action)
       .then((r) => setNotice({ tone: "ok", text: r.message ?? doneText(action) }))
-      .catch((e: unknown) => setNotice({ tone: "error", text: e instanceof Error ? e.message : String(e) }))
+      .catch((e: unknown) => {
+        // A failed action answers something the user just asked for, so it
+        // gets a dialog they must acknowledge, not a footer line that fades.
+        const content = failureContent(action, e instanceof Error ? e.message : String(e), dataRef.current);
+        setNotice(undefined);
+        setDialog(openMessage(content.title, content.lines));
+      })
       .finally(() => {
         busyRef.current = false;
         setRefreshKey((k) => k + 1);

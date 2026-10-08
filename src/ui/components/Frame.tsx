@@ -4,7 +4,7 @@ import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
 import { renderFrame } from "../render/frame.ts";
 import type { FooterHintContext } from "../render/chrome.ts";
-import type { ConfirmDialogState } from "../view/confirmDialog.ts";
+import type { DialogState } from "../view/confirmDialog.ts";
 
 export interface FrameProps {
   layout: Layout;
@@ -14,7 +14,7 @@ export interface FrameProps {
   hintContext?: FooterHintContext;
   detailScroll?: number;
   filterPopup?: PanelId | null;
-  dialog?: ConfirmDialogState | null;
+  dialog?: DialogState | null;
 }
 
 /**

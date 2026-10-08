@@ -147,8 +147,16 @@ describe("actions in the App", () => {
       h.stdin.type("s");
       await waitFor(() => h.api.actions.length === 1, "start request");
       expect(h.api.actions).toEqual([`POST /containers/${WEB_ID}/start`]);
-      await waitFor(() => h.stdout.frame().includes("container already being started elsewhere"), "error notice");
-      // Still alive and responsive.
+      // A failure opens a dialog (phase-4/error-dialog) with Podman's text.
+      await waitFor(() => h.stdout.frame().includes("Could not start container web"), "error dialog");
+      expect(h.stdout.frame()).toContain("container already being started elsewhere");
+      // The dialog holds the keyboard until acknowledged…
+      h.stdin.type("s");
+      await new Promise((r) => setTimeout(r, 150));
+      expect(h.api.actions).toHaveLength(1);
+      h.stdin.type("\u001B");
+      await waitFor(() => !h.stdout.frame().includes("Could not start"), "dialog closed");
+      // …then the app is alive and responsive.
       h.stdin.type("?");
       await waitFor(() => h.stdout.frame().includes("Actions") || h.stdout.frame().includes("keys"), "help opens");
     } finally {

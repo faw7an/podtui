@@ -6,7 +6,7 @@ import type { PanelId, PaneId } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import type { FrameModel } from "../view/model.ts";
 import type { FooterHintContext } from "../render/chrome.ts";
-import type { ConfirmDialogState } from "../view/confirmDialog.ts";
+import type { DialogState } from "../view/confirmDialog.ts";
 
 export interface ScreenProps {
   model: FrameModel;
@@ -28,7 +28,7 @@ export interface ScreenProps {
   /** Open filter popup for this panel, if any (redesigned filter UX). */
   filterPopup?: PanelId | null;
   /** Open confirm dialog (P4-T6). */
-  dialog?: ConfirmDialogState | null;
+  dialog?: DialogState | null;
 }
 
 /**

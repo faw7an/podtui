@@ -1,7 +1,7 @@
 import type { Rect } from "../layout/types.ts";
 import type { Theme } from "../../theme/theme.ts";
 import { displayWidth, fit } from "../../util/fit.ts";
-import type { ConfirmDialogState } from "../view/confirmDialog.ts";
+import type { DialogState } from "../view/confirmDialog.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 
 /**
@@ -27,6 +27,7 @@ const BR = "┘";
 const H = "─";
 const V = "│";
 const HINT = " y confirm · n/Esc cancel ";
+const MESSAGE_HINT = " Enter/Esc close ";
 
 export const DIALOG_MAX_W = 64;
 
@@ -63,12 +64,12 @@ export function wrapText(text: string, width: number): string[] {
 }
 
 /** Body lines (wrapped) for a dialog of inner width `iw`. */
-export function dialogBody(state: ConfirmDialogState, iw: number): string[] {
+export function dialogBody(state: DialogState, iw: number): string[] {
   return state.content.lines.flatMap((l) => wrapText(l, Math.max(1, iw - 2)));
 }
 
 /** Rect for the dialog, centred in the frame body; null if it cannot fit. */
-export function dialogRect(cols: number, rows: number, state: ConfirmDialogState): Rect | null {
+export function dialogRect(cols: number, rows: number, state: DialogState): Rect | null {
   const w = Math.min(DIALOG_MAX_W, cols - 4);
   if (w < 30) return null;
   const body = dialogBody(state, w - 2);
@@ -78,7 +79,7 @@ export function dialogRect(cols: number, rows: number, state: ConfirmDialogState
   return { x: Math.floor((cols - w) / 2), y: Math.max(1, Math.floor((rows - h) / 2)), w, h };
 }
 
-export function renderConfirmDialog(rect: Rect, state: ConfirmDialogState, theme: Theme, on: boolean): string[] {
+export function renderConfirmDialog(rect: Rect, state: DialogState, theme: Theme, on: boolean): string[] {
   const iw = Math.max(0, rect.w - 2);
   const bc = on ? fg(theme.error) : "";
   const R = on ? RESET : "";
@@ -101,11 +102,18 @@ export function renderConfirmDialog(rect: Rect, state: ConfirmDialogState, theme
       : `[ ${label} ]`;
   // Without colour the focused button is still unmistakable: it is marked.
   const mark = (label: string, focused: boolean): string => (on ? button(label, focused) : `${focused ? ">" : " "}${button(label, false)}`);
-  const buttons = `${mark("Cancel", state.focus === "cancel")}  ${mark(state.content.confirmLabel, state.focus === "confirm")}`;
+  // A message box has one button, always focused; a confirm has two.
+  const buttons =
+    state.kind === "message"
+      ? on
+        ? paint("[ OK ]", [bg(theme.accent), fg(theme.selectionFg), bold()])
+        : ">[ OK ]"
+      : `${mark("Cancel", state.focus === "cancel")}  ${mark(state.content.confirmLabel, state.focus === "confirm")}`;
   const pad = Math.max(0, iw - displayWidth(buttons) - 1);
   out.push(row(`${" ".repeat(pad)}${buttons}`));
 
-  const hint = HINT.length <= iw ? HINT : "";
+  const hintText = state.kind === "message" ? MESSAGE_HINT : HINT;
+  const hint = hintText.length <= iw ? hintText : "";
   out.push(`${bc}${BL}${H.repeat(Math.max(0, iw - hint.length))}${R}${hint ? paint(hint, on ? [dim()] : []) : ""}${bc}${BR}${R}`);
   return out;
 }

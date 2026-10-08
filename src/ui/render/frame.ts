@@ -9,7 +9,7 @@ import { renderDetail, renderMessage } from "./detailLines.ts";
 import { renderFilterBar, renderFilterPopup, type FilterPopupData } from "./filterPopup.ts";
 import { renderPanel } from "./panelLines.ts";
 import { dialogRect, renderConfirmDialog } from "./confirmDialog.ts";
-import type { ConfirmDialogState } from "../view/confirmDialog.ts";
+import type { DialogState } from "../view/confirmDialog.ts";
 import { bold, fg, paint } from "./palette.ts";
 import { fit } from "../../util/fit.ts";
 
@@ -28,7 +28,7 @@ export interface FrameOptions {
    */
   filterPopup?: PanelId | null;
   /** Open confirm dialog (P4-T6): drawn over everything except the header. */
-  dialog?: ConfirmDialogState | null;
+  dialog?: DialogState | null;
 }
 
 /**
@@ -110,7 +110,8 @@ export function renderFrame(layout: Layout, model: FrameModel, opts: FrameOption
       buffer.excise(rect.x, rect.y, rect.w, rect.h);
       renderConfirmDialog(rect, opts.dialog, opts.theme, on).forEach((line, i) => buffer.write(rect.x, rect.y + i, line));
     } else {
-      const text = `${opts.dialog.content.title} ${opts.dialog.content.lines[0] ?? ""} y/n`;
+      const keys = opts.dialog.kind === "message" ? "Enter" : "y/n";
+      const text = `${opts.dialog.content.title} ${opts.dialog.content.lines[0] ?? ""} ${keys}`;
       dialogBar = paint(fit(text, layout.cols), on ? [fg(opts.theme.error), bold()] : []);
     }
   }

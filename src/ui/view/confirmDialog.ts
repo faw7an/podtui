@@ -10,13 +10,29 @@ import type { ConfirmContent, ResourceAction } from "../actions/resourceActions.
  */
 
 export interface ConfirmDialogState {
+  kind: "confirm";
   action: ResourceAction;
   content: ConfirmContent;
   focus: "cancel" | "confirm";
 }
 
+/**
+ * A message box with one OK button: an action failed (phase-4/error-dialog).
+ * Enter, Esc, Space, y or n close it; nothing else gets through.
+ */
+export interface MessageDialogState {
+  kind: "message";
+  content: ConfirmContent;
+}
+
+export type DialogState = ConfirmDialogState | MessageDialogState;
+
 export function openConfirm(action: ResourceAction, content: ConfirmContent): ConfirmDialogState {
-  return { action, content, focus: "cancel" };
+  return { kind: "confirm", action, content, focus: "cancel" };
+}
+
+export function openMessage(title: string, lines: string[]): MessageDialogState {
+  return { kind: "message", content: { title, lines, confirmLabel: "OK" } };
 }
 
 export interface DialogKey {
@@ -33,7 +49,11 @@ export type DialogOutcome =
   | { type: "focus"; state: ConfirmDialogState }
   | { type: "ignore" };
 
-export function dialogKey(state: ConfirmDialogState, input: string, key: DialogKey): DialogOutcome {
+export function dialogKey(state: DialogState, input: string, key: DialogKey): DialogOutcome {
+  if (state.kind === "message") {
+    const close = key.escape || key.return || [" ", "y", "Y", "n", "N", "q"].includes(input);
+    return close ? { type: "cancel" } : { type: "ignore" };
+  }
   if (key.escape || input === "n" || input === "N") return { type: "cancel" };
   if (input === "y" || input === "Y") return { type: "confirm", action: state.action };
   if (key.return) {

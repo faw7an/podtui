@@ -268,6 +268,20 @@ export async function postVoid(
   return { changed: status !== 304 };
 }
 
+/**
+ * DELETE that returns the raw status and body. Several libpod removals answer
+ * `200` and report a per-item failure INSIDE the body (verified live: removing
+ * the default network answers 200 `[{"Name":"podman","Err":"default network
+ * podman cannot be removed"}]`), so the caller must read it.
+ */
+export async function delReport(
+  socketPath: string,
+  path: string,
+  options?: Omit<RequestOptions, "method" | "body">
+): Promise<{ status: number; text: string }> {
+  return send(socketPath, path, { ...options, method: "DELETE" });
+}
+
 export async function delVoid(
   socketPath: string,
   path: string,

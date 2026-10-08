@@ -89,3 +89,35 @@ export function podJumpTarget(
     message: `${pod.Name}: ${first.Names}${others > 0 ? ` (+${others} more in this pod)` : ""}`,
   };
 }
+
+/**
+ * What the failure dialog says (phase-4/error-dialog). Podman's own message
+ * is always shown; full container IDs in it become names, and the refusals
+ * a user meets most often get one line on what to do next. Recorded texts
+ * (Podman 5.8.4, `test/fixtures/remove-reports.json`):
+ * - volume: "volume X is being used by the following container(s): <id>: volume is being used"
+ * - image: "image used by <id>: image is in use by a container: consider … force-removing image"
+ * - network: "default network podman cannot be removed"
+ */
+export function failureContent(
+  action: ResourceAction,
+  message: string,
+  data: ResourceData,
+): { title: string; lines: string[] } {
+  const nameOf = (id: string): string =>
+    data.containers.find((c) => c.Id === id || c.Id.startsWith(id))?.Names?.[0]?.replace(/^\//, "") ?? id.slice(0, 12);
+  const ids = [...new Set(message.match(/\b[0-9a-f]{64}\b/g) ?? [])];
+  const readable = ids.reduce((m, id) => m.replaceAll(id, nameOf(id)), message);
+  const names = ids.map(nameOf);
+
+  const lines = [readable];
+  if (action.kind === "volume" && /is being used/.test(message)) {
+    lines.push(`Remove ${names.length > 0 ? names.join(", ") : "the containers using it"} first; the volume's Config lists them under "Used by".`);
+  } else if (action.kind === "image" && /in use by a container/.test(message)) {
+    lines.push(`Used by ${names.length > 0 ? names.join(", ") : "a container"}. podtui never force-removes images: that would remove those containers too.`);
+  } else if (action.kind === "network" && /default network/.test(message)) {
+    lines.push("Podman's default network always stays.");
+  }
+  const verb = { start: "start", stop: "stop", restart: "restart", kill: "kill", remove: "remove" }[action.verb];
+  return { title: `Could not ${verb} ${action.kind} ${action.name}`, lines };
+}

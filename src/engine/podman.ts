@@ -2,7 +2,8 @@ import {
   get,
   post,
   postVoid,
-  delVoid,
+  delReport,
+  EngineError,
   streamChunks,
   streamJson,
   streamLines,
@@ -278,6 +279,48 @@ export function actionResult(result: VoidResult): ContainerActionResult {
     : { success: true, message: "Already in that state; nothing changed" };
 }
 
+export type RemovedKind = "container" | "pod" | "image" | "network" | "volume";
+
+/**
+ * Read a DELETE answer. Bodies recorded live on Podman 5.8.4
+ * (`test/fixtures/remove-reports.json`):
+ * - container `[{Id, Err?}]` · network `[{Name, Err}]`
+ * - pod `{Id, Err, RemovedCtrs: {id: err|null}}`
+ * - image `{Untagged?, Deleted?, Errors, ExitCode}` · volume 204, empty
+ * A failure reported inside a 200 (e.g. the default network) is thrown as a
+ * conflict with Podman's own text. An image delete that only removed a TAG
+ * (other tags keep the image) says so instead of claiming removal.
+ */
+export function removeOutcome(kind: RemovedKind, status: number, text: string): ContainerActionResult {
+  if (status === 304) return actionResult({ changed: false });
+  if (text.trim() === "") return { success: true };
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return { success: true };
+  }
+  const errs: string[] = [];
+  const add = (e: unknown): void => {
+    const t = errorText(e);
+    if (t) errs.push(t);
+  };
+  if (Array.isArray(body)) {
+    for (const r of body as { Err?: unknown }[]) add(r?.Err);
+  } else if (body && typeof body === "object") {
+    const o = body as { Err?: unknown; RemovedCtrs?: Record<string, unknown> | null; Errors?: unknown[] | null; ExitCode?: number; Deleted?: string[] | null; Untagged?: string[] | null };
+    add(o.Err);
+    for (const e of Object.values(o.RemovedCtrs ?? {})) add(e);
+    for (const e of o.Errors ?? []) add(e);
+    if (errs.length === 0 && typeof o.ExitCode === "number" && o.ExitCode !== 0) errs.push(`exit code ${o.ExitCode}`);
+    if (errs.length === 0 && kind === "image" && (o.Deleted ?? []).length === 0 && (o.Untagged ?? []).length > 0) {
+      return { success: true, message: `Untagged ${(o.Untagged ?? []).join(", ")}; the image stays (it has other tags)` };
+    }
+  }
+  if (errs.length > 0) throw new EngineError("conflict", errs.join("; "));
+  return { success: true };
+}
+
 export function createPodmanEngine(): ContainerEngine {
   return {
     async findSocket(cliSocket?: string) {
@@ -402,14 +445,16 @@ export function createPodmanEngine(): ContainerEngine {
 
     async removeContainer(socketPath: string, id: string, force = false) {
       if (!force) {
-        return actionResult(await delVoid(socketPath, `/containers/${id}`, { query: { force: "false" } }));
+        const r = await delReport(socketPath, `/containers/${id}`, { query: { force: "false" } });
+        return removeOutcome("container", r.status, r.text);
       }
       // A forced remove stops a running container first, with its grace period.
       const grace = await graceSeconds(socketPath, id);
-      return actionResult(await delVoid(socketPath, `/containers/${id}`, {
+      const r = await delReport(socketPath, `/containers/${id}`, {
         query: { force: "true", timeout: String(grace) },
         timeout: graceDeadlineMs(grace),
-      }));
+      });
+      return removeOutcome("container", r.status, r.text);
     },
 
     async pruneContainers(socketPath: string, dryRun = false) {
@@ -447,7 +492,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removePod(socketPath: string, id: string, force = false) {
-      return actionResult(await delVoid(socketPath, `/pods/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS }));
+      const r = await delReport(socketPath, `/pods/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS });
+      return removeOutcome("pod", r.status, r.text);
     },
 
     // Images
@@ -464,7 +510,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeImage(socketPath: string, id: string, force = false) {
-      return actionResult(await delVoid(socketPath, `/images/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS }));
+      const r = await delReport(socketPath, `/images/${id}`, { query: { force: force.toString() }, timeout: LONG_ACTION_MS });
+      return removeOutcome("image", r.status, r.text);
     },
 
     async pruneImages(socketPath: string, dryRun = false) {
@@ -500,7 +547,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeVolume(socketPath: string, name: string) {
-      return actionResult(await delVoid(socketPath, `/volumes/${name}`));
+      const r = await delReport(socketPath, `/volumes/${name}`);
+      return removeOutcome("volume", r.status, r.text);
     },
 
     async pruneVolumes(socketPath: string, dryRun = false) {
@@ -518,7 +566,8 @@ export function createPodmanEngine(): ContainerEngine {
     },
 
     async removeNetwork(socketPath: string, id: string) {
-      return actionResult(await delVoid(socketPath, `/networks/${id}`));
+      const r = await delReport(socketPath, `/networks/${id}`);
+      return removeOutcome("network", r.status, r.text);
     },
 
     async pruneNetworks(socketPath: string, dryRun = false) {

@@ -12,8 +12,8 @@ import {
   type ResourceAction,
   type ResourceKind,
 } from "../src/ui/actions/resourceActions.ts";
-import { actionFor } from "../src/ui/actions/selectionAction.ts";
-import { dialogKey, openConfirm } from "../src/ui/view/confirmDialog.ts";
+import { actionFor, failureContent } from "../src/ui/actions/selectionAction.ts";
+import { dialogKey, openConfirm, openMessage } from "../src/ui/view/confirmDialog.ts";
 import { dialogRect, renderConfirmDialog, wrapText } from "../src/ui/render/confirmDialog.ts";
 import { EMPTY_DATA, type ResourceData } from "../src/ui/view/build.ts";
 import { displayWidth } from "../src/util/fit.ts";
@@ -194,5 +194,51 @@ describe("dialog render", () => {
   test("wrapText keeps words whole and hard-splits only overlong words", () => {
     expect(wrapText("a bb ccc", 4)).toEqual(["a bb", "ccc"]);
     expect(wrapText("abcdefgh", 3)).toEqual(["abc", "def", "gh"]);
+  });
+});
+
+describe("failure dialog (phase-4/error-dialog)", () => {
+  const reports = JSON.parse(readFileSync("test/fixtures/remove-reports.json", "utf8")) as Record<string, { body: string }>;
+  const msg = (name: string): string => (JSON.parse(reports[name]!.body) as { message: string }).message;
+
+  test("volume in use: container ids become names, with what to do next", () => {
+    const users: ResourceData = {
+      ...data,
+      containers: [{ ...data.containers[0]!, Id: "4a9a786d2077da742de949d312a1250c88420fcc052ddced580d8dbffd867407", Names: ["probe-vr"] }],
+    };
+    const c = failureContent({ kind: "volume", verb: "remove", id: "probe-vol-run", name: "probe-vol-run" }, msg("volumeInUse409"), users);
+    expect(c.title).toBe("Could not remove volume probe-vol-run");
+    expect(c.lines[0]).toBe("volume probe-vol-run is being used by the following container(s): probe-vr: volume is being used");
+    expect(c.lines[1]).toContain("Remove probe-vr first");
+  });
+
+  test("image in use: explains why podtui does not force", () => {
+    const c = failureContent({ kind: "image", verb: "remove", id: "i", name: "alpine:latest" }, msg("imageInUse409"), data);
+    expect(c.lines[0]).not.toMatch(/[0-9a-f]{64}/);
+    expect(c.lines[1]).toContain("never force-removes images");
+  });
+
+  test("default network", () => {
+    const c = failureContent({ kind: "network", verb: "remove", id: "podman", name: "podman" }, "default network podman cannot be removed", data);
+    expect(c.lines).toEqual(["default network podman cannot be removed", "Podman's default network always stays."]);
+  });
+
+  test("a message box closes on Enter/Esc/Space/y/n and swallows everything else", () => {
+    const box = openMessage("Could not remove volume v", ["busy"]);
+    for (const [input, key] of [["", { return: true }], ["", { escape: true }], [" ", {}], ["y", {}], ["n", {}]] as const) {
+      expect(dialogKey(box, input, key)).toEqual({ type: "cancel" });
+    }
+    for (const input of ["d", "s", "1", "/"]) expect(dialogKey(box, input, {})).toEqual({ type: "ignore" });
+  });
+
+  test("renders one focused OK button and a close hint", () => {
+    const box = openMessage("Could not remove volume v", ["volume v is being used by the following container(s): web: volume is being used"]);
+    const rect = dialogRect(80, 24, box)!;
+    const out = renderConfirmDialog(rect, box, defaultTheme, false);
+    for (const line of out) expect(displayWidth(line)).toBe(rect.w);
+    const text = out.join("\n");
+    expect(text).toContain(">[ OK ]");
+    expect(text).not.toContain("Cancel");
+    expect(text).toContain("Enter/Esc close");
   });
 });
