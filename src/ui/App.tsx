@@ -4,7 +4,7 @@ import { Screen } from "./components/Screen.tsx";
 import { HelpOverlay } from "./components/HelpOverlay.tsx";
 import { useTerminalSize } from "./hooks/useTerminalSize.ts";
 import { createPodmanEngine } from "../engine/podman.ts";
-import { applyScope, projectScope, scopeEmptyNote, scopeLabel, type Scope } from "../engine/project.ts";
+import { applyScope, emptyContainersNote, scopeLabel, type Scope } from "../engine/scope.ts";
 import { bunRunner, createSystemd, type CommandRunner, type SystemdScope } from "../engine/systemd.ts";
 import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/layoutReducer.ts";
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
@@ -70,8 +70,8 @@ const homeDir = (): string => process.env["HOME"] || homedir();
  * `runner` exists for tests: they pass a fake so nothing ever reaches the real
  * user systemd. Production uses the Bun.spawn runner.
  */
-/** What the App shows: one folder's compose project, or everything. */
-export type AppScope = { kind: "all" } | { kind: "project"; cwd: string; composeFile: string | null };
+/** What the App shows: your containers, or everything (`--all`). */
+export type AppScope = Scope;
 
 export const App = ({
   socketPath,
@@ -88,20 +88,10 @@ export const App = ({
   // Everything the refresh loop fetched; what is SHOWN is `data`, narrowed
   // to the scope below.
   const [rawData, setData] = useState<ResourceData>(EMPTY_DATA);
-  const viewScope: Scope = useMemo(
-    () => (scopeMode.kind === "all" ? { kind: "all" } : projectScope(scopeMode.cwd, rawData.containers, scopeMode.composeFile)),
-    [scopeMode, rawData.containers],
-  );
+  const viewScope: Scope = scopeMode;
   const data: ResourceData = useMemo(() => {
-    if (viewScope.kind === "all") return rawData;
-    const note = scopeEmptyNote(viewScope);
-    return {
-      ...applyScope(viewScope, rawData),
-      // Quadlets belong to systemd, not to a compose project.
-      quadlets: [],
-      quadletNote: "Quadlets are not part of a compose project; run podtui --all to see them.",
-      scopeNote: note,
-    };
+    const scoped = applyScope(viewScope, rawData);
+    return { ...scoped, scopeNote: emptyContainersNote(viewScope, scoped.hiddenEnvironments) };
   }, [viewScope, rawData]);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [error, setError] = useState<string | undefined>(undefined);
@@ -742,10 +732,6 @@ export const App = ({
     if (input === "x") {
       if (busyRef.current) {
         setNotice({ tone: "error", text: "Another action is still running." });
-        return;
-      }
-      if (viewScope.kind === "project" && viewScope.projects.length === 0) {
-        setNotice({ tone: "error", text: "No project here: the bulk menu acts on a project. Run podtui --all for Podman-wide commands." });
         return;
       }
       setBulk(openBulk(orderedCommands(detailPanel, commandsFor(viewScope))));

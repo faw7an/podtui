@@ -17,7 +17,7 @@ export interface CliArgs {
   version: boolean;
   /** `--no-mouse`: never turn on terminal mouse reporting (P7-T9). */
   noMouse: boolean;
-  /** `--all`: every container on the machine, not just this folder's project. */
+  /** `--all`: also show toolbox/distrobox environments (system-level). */
   all: boolean;
 }
 
@@ -37,9 +37,9 @@ Options:
                    ($XDG_RUNTIME_DIR/podman/podman.sock) and rootful
                    (/run/podman/podman.sock) sockets, and podman-docker's
                    docker.sock links. A Docker daemon is never used.
-  --all, -a        Show everything on this Podman. Without it, podtui shows
-                   only the compose project of the current folder (the
-                   containers, pods, volumes and networks it started).
+  --all, -a        Also show system-level containers: toolbox and distrobox
+                   environments. Without it, podtui shows your containers
+                   (podman run, podman compose) from any folder.
   --no-mouse       Do not use the mouse (keyboard only; the terminal's own
                    text selection keeps working).
   --version, -v    Print the version and exit.

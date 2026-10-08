@@ -5,8 +5,7 @@ import { VERSION } from "./version.ts";
 import { appRenderOptions } from "./ui/renderOptions.ts";
 import { describeUnreachable, resolveSocket } from "./api/socket.ts";
 import { enableMouse } from "./input/mouse.ts";
-import { COMPOSE_FILES } from "./engine/project.ts";
-import { existsSync } from "node:fs";
+
 
 /**
  * Render options (alternate screen, and interactive mode decided by the
@@ -62,13 +61,9 @@ if (!process.stdin.isTTY) {
 // the request, and the keyboard works the same either way.
 if (!parsed.args.noMouse) enableMouse(process.stdout);
 
-// Project scope: plain `podtui` shows the compose project of this folder,
-// `--all` everything (src/engine/project.ts). A compose file here only
-// changes the wording of the empty state.
-const cwd = process.cwd();
-const composeFile = COMPOSE_FILES.find((f) => existsSync(`${cwd}/${f}`)) ?? null;
-
+// Plain `podtui` shows your containers from any folder; `--all` also shows
+// toolbox/distrobox environments (src/engine/scope.ts).
 render(
-  <App socketPath={socket.path} scope={parsed.args.all ? { kind: "all" } : { kind: "project", cwd, composeFile }} />,
+  <App socketPath={socket.path} scope={parsed.args.all ? { kind: "all" } : { kind: "mine" }} />,
   appRenderOptions(process.stdout),
 );

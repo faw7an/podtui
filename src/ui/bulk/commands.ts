@@ -1,7 +1,7 @@
 import type { ContainerListItem } from "../../api/types.ts";
 import type { ContainerEngine, PrunePreview, PruneResult } from "../../engine/ContainerEngine.ts";
 import type { PanelId } from "../layout/types.ts";
-import { LABEL_PROJECT, type Scope } from "../../engine/project.ts";
+import { isEnvironment, type Scope } from "../../engine/scope.ts";
 
 /**
  * The `x` bulk commands (P5-T2), as a data table: id, label, risk, the panel
@@ -233,107 +233,72 @@ export function orderedCommands(panel: PanelId, commands: readonly BulkCommand[]
   return [...commands.filter((c) => c.panel === panel), ...commands.filter((c) => c.panel !== panel)];
 }
 
-// ------------------------------------------------------------ project mode
+// ------------------------------------------------------- your containers
 
 /**
- * The `x` menu when podtui shows one folder's compose project. Prunes are
- * Podman-WIDE (they would remove other projects' and unrelated stopped
- * containers, volumes, networks), so in project mode they are replaced by
- * list commands over the PROJECT's own items, each previewed by name and
- * executed by id. Images are shared between projects, so no image command
- * is offered here. Every target is re-checked against the project label
- * when previewing, from a fresh list.
+ * The `x` menu in the default view (your containers; toolbox/distrobox
+ * environments hidden). A Podman-wide CONTAINER prune would delete stopped
+ * environments too — on the maintainer's machine `node-dev` and
+ * `fedora-toolbox-42` were stopped at the time — so the container commands
+ * here are list commands over YOUR containers only, previewed by name and
+ * executed by id, re-checked from a fresh list. Image, volume and network
+ * prunes only remove items no container uses, so they cannot touch an
+ * environment and are kept as they are.
  */
-export function projectCommands(projects: readonly string[]): BulkCommand[] {
-  const mine = new Set(projects);
-  const inProject = (labels: Record<string, string> | null | undefined): boolean => mine.has(labels?.[LABEL_PROJECT] ?? "");
-  const where = `in ${projects.join(", ")}`;
+export function mineCommands(): BulkCommand[] {
   const PRUNABLE = new Set(["exited", "stopped", "created", "configured"]);
-  const containersOf = async (engine: BulkEngine, socket: string) =>
-    (await engine.listContainers(socket, true)).filter((c) => inProject(c.Labels) && !c.IsInfra);
+  const mine = async (engine: BulkEngine, socket: string) =>
+    (await engine.listContainers(socket, true)).filter((c) => !c.IsInfra && !isEnvironment(c.Labels));
+  const note = "toolbox/distrobox environments are never touched here (podtui --all shows them).";
+  const byId = (id: string) => BULK_COMMANDS.find((c) => c.id === id)!;
 
   return [
     {
-      id: "project-stop-all",
-      label: "Stop the project's running containers",
+      id: "mine-stop-all",
+      label: "Stop all your running containers",
       risk: "low",
       verb: "stop",
       noun: "container",
       panel: "containers",
       async preview(engine, socket) {
-        const running = (await containersOf(engine, socket)).filter((c) => c.State === "running");
-        return { count: running.length, targets: running.map((c) => ({ id: c.Id, name: nameOf(c) })), notes: [`Only containers ${where}.`] };
+        const running = (await mine(engine, socket)).filter((c) => c.State === "running");
+        return { count: running.length, targets: running.map((c) => ({ id: c.Id, name: nameOf(c) })), notes: [note] };
       },
       async execute(engine, socket, preview) {
         return { verb: "stopped", noun: "container", ...(await eachTarget(preview.targets, (t) => engine.stopContainer(socket, t.id))) };
       },
     },
     {
-      id: "project-rm-stopped",
-      label: "Remove the project's stopped containers",
+      id: "mine-rm-stopped",
+      label: "Remove your stopped containers",
       risk: "low",
       verb: "remove",
       noun: "container",
       panel: "containers",
       async preview(engine, socket) {
-        const stopped = (await containersOf(engine, socket)).filter((c) => PRUNABLE.has((c.State ?? "").toLowerCase()));
-        return {
-          count: stopped.length,
-          targets: stopped.map((c) => ({ id: c.Id, name: `${nameOf(c)} (${c.State})` })),
-          notes: [`Only containers ${where}; nothing else on this Podman is touched.`],
-        };
+        const stopped = (await mine(engine, socket)).filter((c) => PRUNABLE.has((c.State ?? "").toLowerCase()));
+        return { count: stopped.length, targets: stopped.map((c) => ({ id: c.Id, name: `${nameOf(c)} (${c.State})` })), notes: [note] };
       },
       async execute(engine, socket, preview) {
         return { verb: "removed", noun: "container", ...(await eachTarget(preview.targets, (t) => engine.removeContainer(socket, t.id, false))) };
       },
     },
+    byId("prune-images"),
+    byId("prune-volumes"),
+    byId("prune-networks"),
     {
-      id: "project-rm-volumes",
-      label: "Remove the project's unused volumes",
-      risk: "low",
-      verb: "remove",
-      noun: "volume",
-      panel: "volumes",
-      async preview(engine, socket) {
-        const [vols, dangling] = await Promise.all([engine.listVolumes(socket), engine.danglingVolumeNames(socket)]);
-        const unused = new Set(dangling);
-        const targets = vols.filter((v) => inProject(v.Labels) && unused.has(v.Name)).map((v) => ({ id: v.Name, name: v.Name }));
-        return { count: targets.length, targets, notes: [`Volumes ${where} that no container uses. Their data is deleted.`] };
-      },
-      async execute(engine, socket, preview) {
-        return { verb: "removed", noun: "volume", ...(await eachTarget(preview.targets, (t) => engine.removeVolume(socket, t.id))) };
-      },
-    },
-    {
-      id: "project-rm-networks",
-      label: "Remove the project's unused networks",
-      risk: "low",
-      verb: "remove",
-      noun: "network",
-      panel: "networks",
-      async preview(engine, socket) {
-        const [nets, all] = await Promise.all([engine.listNetworks(socket), engine.listContainers(socket, true)]);
-        const used = new Set(all.flatMap((c) => c.Networks ?? []));
-        const targets = nets.filter((n) => inProject(n.labels) && !used.has(n.name)).map((n) => ({ id: n.name, name: n.name }));
-        return { count: targets.length, targets, notes: [`Networks ${where} that no container (running or stopped) is on.`] };
-      },
-      async execute(engine, socket, preview) {
-        return { verb: "removed", noun: "network", ...(await eachTarget(preview.targets, (t) => engine.removeNetwork(socket, t.id))) };
-      },
-    },
-    {
-      id: "project-remove-all",
-      label: "Remove ALL the project's containers (forced)",
+      id: "mine-remove-all",
+      label: "Remove ALL your containers (forced)",
       risk: "high",
       verb: "remove",
       noun: "container",
       panel: "containers",
       async preview(engine, socket) {
-        const all = await containersOf(engine, socket);
+        const all = await mine(engine, socket);
         return {
           count: all.length,
           targets: all.map((c) => ({ id: c.Id, name: nameOf(c) })),
-          notes: [`Only containers ${where}. Running ones are stopped first.`, "Pod infra containers are kept: Podman removes those only with their pod."],
+          notes: ["Running ones are stopped first. Their writable layers are lost.", note, "Pod infra containers are kept: Podman removes those only with their pod."],
         };
       },
       async execute(engine, socket, preview) {
@@ -343,7 +308,7 @@ export function projectCommands(projects: readonly string[]): BulkCommand[] {
   ];
 }
 
-/** The commands for what is on screen: Podman-wide for `--all`, the project's otherwise. */
+/** The commands for what is on screen: Podman-wide for `--all`, yours otherwise. */
 export function commandsFor(scope: Scope): readonly BulkCommand[] {
-  return scope.kind === "all" ? BULK_COMMANDS : projectCommands(scope.projects);
+  return scope.kind === "all" ? BULK_COMMANDS : mineCommands();
 }

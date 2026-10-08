@@ -35,8 +35,8 @@ export interface ResourceData {
    */
   quadletNote?: string | null;
   /**
-   * Why a project-scoped view is empty (no project here / not started),
-   * shown in every empty panel. Null or absent in `--all`.
+   * What an empty Containers panel says in the default view (how to start
+   * one; how many toolbox/distrobox environments are hidden). Null in `--all`.
    */
   scopeNote?: string | null;
 }
@@ -251,7 +251,7 @@ export function buildPanelModels(
     // showing an empty box that looks like a bug; no fake data is invented.
     ...(id === "quadlets" && rows.quadlets.length === 0
       ? { emptyLabel: data.quadletNote ?? QUADLETS_EMPTY }
-      : id !== "quadlets" && rows[id].length === 0 && data.scopeNote
+      : id === "containers" && rows[id].length === 0 && data.scopeNote
         ? { emptyLabel: data.scopeNote }
         : {}),
   };

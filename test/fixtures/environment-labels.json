@@ -1,0 +1,38 @@
+{
+  "_comment": "Recorded 2026-10-08 from the maintainer machine real rootless Podman (podman ps -a --format json): LABELS ONLY (no names, ids, commands or env), trimmed to toolbox/distrobox/compose keys.",
+  "containers": [
+    {
+      "example": "toolbox env",
+      "State": "exited",
+      "Labels": {
+        "com.github.containers.toolbox": "true"
+      }
+    },
+    {
+      "example": "distrobox env",
+      "State": "exited",
+      "Labels": {
+        "distrobox.unshare_groups": "0",
+        "manager": "distrobox"
+      }
+    },
+    {
+      "example": "podman run",
+      "State": "exited",
+      "Labels": {}
+    },
+    {
+      "example": "podman run",
+      "State": "exited",
+      "Labels": {}
+    },
+    {
+      "example": "distrobox env",
+      "State": "running",
+      "Labels": {
+        "distrobox.unshare_groups": "0",
+        "manager": "distrobox"
+      }
+    }
+  ]
+}

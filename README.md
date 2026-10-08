@@ -71,6 +71,7 @@ networks are never force-removed.
 | Works today | Coming next |
 |---|---|
 | Six numbered panels (pods, containers, images, volumes, networks, quadlets), each can be shown or hidden | |
+| Shows **your** containers by default from any folder; toolbox/distrobox environments only with `--all` | |
 | **Quadlets**: unit state from systemd, the file, the generated unit, live journal; start / stop / restart, reload systemd | |
 | Live refresh (every 5 s by default) that keeps your cursor on the same item | |
 | Follows your **Omarchy theme** live (`T` reloads); readable status colours on light and dark themes; 256-colour fallback | |
@@ -222,21 +223,24 @@ podtui [--all] [--socket <path>] [--no-mouse]
 podtui --version | --help
 ```
 
-**By default podtui shows the project you are working on**: run it in a project folder and
-it shows only that folder's compose project — the containers, pods, volumes and networks that
-`podman compose` / `podman-compose` / `docker compose` started from there (subfolders work too).
-The header says which (`▲ podtui · shop`), and the `x` menu then acts only on the project's own
-items. Anywhere else it says there is no project here. **`podtui --all`** shows everything on
-your Podman, with Podman-wide prune commands.
+**By default podtui shows your containers**, from whatever folder you are in: everything you
+start with `podman run` / `podman create` or `podman compose` / `podman-compose` /
+`docker compose`. System-level containers — **toolbox** and **distrobox** development
+environments — are hidden (and so are pods and images only they use). The header says which
+view you are in (`▲ podtui · yours` or `▲ podtui · all`).
 
 ```bash
-cd ~/code/shop && podman compose up -d && podtui   # just "shop"
-podtui --all                                        # every container on the machine
+podman run -d --name db postgres   # shows up in podtui, from any folder
+podtui --all                       # also shows toolbox / distrobox environments
 ```
+
+In the default view the `x` menu's container commands (stop all, remove stopped, remove all)
+act only on your containers; a Podman-wide container prune would also delete stopped
+toolbox/distrobox environments, so it is only offered in `--all`.
 
 | Option / variable | Meaning |
 |---|---|
-| `--all`, `-a` | show everything on this Podman, not just the current folder's project |
+| `--all`, `-a` | also show toolbox / distrobox environments (system-level containers) |
 | `--no-mouse` | keyboard only (keeps your terminal's own text selection) |
 | `--socket <path>` | Podman socket to use (path or `unix://` URI) |
 | `--version`, `-v` | print the version |
