@@ -77,6 +77,7 @@ The app has destructive actions (remove, prune). A bug during development can de
 | `bun run build` | compile the standalone binary to `dist/podtui` (never loads `.env`/`bunfig.toml` from the working directory) |
 | `scripts/build-release.sh <x64\|arm64> [version]` | the release build: compile, smoke-test (set `SMOKE_CONTAINER=1` to also run it in a clean container with no Bun), package `dist/release/podtui-<version>-linux-<arch>.tar.gz`. CI and releases run exactly this |
 | `install.sh` | end-user installer (`curl … \| sh`): newest release, checksum-verified, test-run before it replaces anything, into `~/.local/bin`. Tested by `test/install-script.test.ts` |
+| `git push origin development` | day-to-day work: CI runs (check + build), never a release. Flow: `development` → `stable` (releases) → `main` (follows stable) |
 | `git push origin <commit>:stable` | publish a GitHub Release (`.github/workflows/release.yml`) if package.json `version` is new: checks, builds x64/arm64, tags `v<version>` on that commit, publishes; an already-released version publishes nothing |
 | `git tag vX.Y.Z && git push origin vX.Y.Z` | the same, by hand; the tag must equal `v` + package.json `version` |
 | `scripts/dev-sandbox.sh` | start/stop an isolated sandbox Podman + seed containers |

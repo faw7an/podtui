@@ -345,6 +345,16 @@ never guess), [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) (architecture) and
 [ROADMAP.md](ROADMAP.md) (what's next). Decisions and the evidence behind them are logged in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+### Branches
+
+| Branch | Purpose |
+|---|---|
+| `development` | day-to-day work and testing; CI runs on every push, **nothing is released** |
+| `stable` | what users get: a push with a new `package.json` version publishes a release |
+| `main` | the core line, brought up to date from `stable` |
+
+Work lands on `development`, moves to `stable` to release, and `main` follows `stable`.
+
 ### Releasing
 
 Push to the **`stable`** branch with a new `"version"` in `package.json`:

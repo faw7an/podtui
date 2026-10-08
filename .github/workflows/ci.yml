@@ -13,7 +13,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # development: test every push there; it never releases (release.yml
+    # only publishes from stable).
+    branches: [main, development]
   pull_request:
 
 permissions:
