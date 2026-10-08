@@ -11,6 +11,7 @@ import { selectedIndex } from "../layout/layoutReducer.ts";
 import { PANEL_COLUMNS, panelMeta, type DetailLogModel, type DetailStatsModel, type FrameModel, type PanelModel, type RowModel } from "./model.ts";
 import { buildDetail, type DetailTabId } from "./detail.ts";
 import { TOP_POLL_MS, topTable } from "./topView.ts";
+import { QUADLET_LABEL, type QuadletType } from "../../engine/quadlet.ts";
 import { TABS_BY_PANEL, resourceView, type ResourceDetailData } from "./resourceDetail.ts";
 import type { TopStatus } from "../hooks/useTopPoll.ts";
 import type { ContainerInspect } from "../../api/types.ts";
@@ -26,8 +27,13 @@ export interface ResourceData {
    * before the first fetch. "In use" = not in this list (P4-T3).
    */
   danglingVolumes: string[] | null;
-  /** No quadlet source is wired yet; the panel stays empty rather than guessing. */
-  quadlets: { id: string; name: string; status: string }[];
+  /** Quadlets (P6): Podman's list plus the unit state systemd reports. */
+  quadlets: QuadletData[];
+  /**
+   * Why the quadlet list is empty or partial (no quadlet API, no systemd user
+   * session…), shown in place of an empty box (P6-T6). Null when fine.
+   */
+  quadletNote?: string | null;
 }
 
 export const EMPTY_DATA: ResourceData = {
@@ -149,15 +155,41 @@ function networkRows(items: NetworkListItem[], containers: ContainerListItem[]):
   });
 }
 
-function quadletRows(items: { id: string; name: string; status: string }[]): RowModel[] {
+/** Shown when there are no quadlets: where they would live (P6-T6). */
+export const QUADLETS_EMPTY =
+  "No quadlets. Rootless ones live in ~/.config/containers/systemd/, rootful ones in /etc/containers/systemd/; run systemctl --user daemon-reload after adding one.";
+
+/**
+ * Quadlet rows: file name, type label, and the unit state from systemd with
+ * a glyph (never colour alone). `not loaded` means systemd has not generated
+ * the unit yet — usually a daemon-reload is due.
+ */
+function quadletRows(items: QuadletData[]): RowModel[] {
   return items.map((q) => {
-    const st = statusText(q.status);
+    const tone =
+      q.active === "active" ? ("ok" as const)
+      : q.active === "failed" ? ("error" as const)
+      : q.load === "not-found" ? ("warn" as const)
+      : ("dim" as const);
     return {
       id: q.id,
-      tone: st.tone,
-      cells: { name: q.name, state: st.text },
+      tone,
+      cells: { name: q.name, type: QUADLET_LABEL[q.type], state: `${statusGlyph(tone)} ${q.state}` },
     };
   });
+}
+
+export interface QuadletData {
+  /** The quadlet file name, e.g. `hello.container` (unique in the list). */
+  id: string;
+  name: string;
+  unit: string;
+  type: QuadletType;
+  path: string;
+  /** Display state, e.g. "active (running)", "not loaded", "unknown". */
+  state: string;
+  active: string;
+  load: string;
 }
 
 /**
@@ -213,7 +245,7 @@ export function buildPanelModels(
     // Quadlets has no data source until Phase 6. Say so explicitly instead of
     // showing an empty box that looks like a bug; no fake data is invented.
     ...(id === "quadlets" && rows.quadlets.length === 0
-      ? { emptyLabel: "not implemented yet (phase 6)" }
+      ? { emptyLabel: data.quadletNote ?? QUADLETS_EMPTY }
       : {}),
   };
   });
@@ -276,13 +308,19 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
 
   // Pods, images, volumes, networks (P4-T1..T4): their own tabs, built from
   // inspect data fetched for exactly this item.
-  if (focusId !== "containers" && focusId !== "quadlets" && item) {
+  if (focusId !== "containers" && item) {
     const tabs = TABS_BY_PANEL[focusId];
     const wanted = args.activeTab ?? "config";
     const idx = Math.max(0, tabs.findIndex((t) => t.id === wanted));
     const tab = tabs[idx]?.id ?? "config";
     const resource = args.resource && args.resource.panel === focusId && args.resource.id === item.id ? args.resource : null;
-    const view = resource ? resourceView(tab, resource, args.data, args.now) : { lines: ["Loading…"] };
+    // The quadlet Journal tab is a log stream the App attaches (P6-T3).
+    const view =
+      focusId === "quadlets" && tab === "journal"
+        ? { lines: [] as string[] }
+        : resource
+          ? resourceView(tab, resource, args.data, args.now)
+          : { lines: ["Loading…"] };
     const state = (item.cells["state"] ?? "").replace(/^\S+ /, "");
     return {
       panels,
@@ -295,6 +333,7 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
         activeTab: idx,
         lines: view.lines,
         ...(view.table ? { table: true } : {}),
+        ...("ini" in view && view.ini ? { ini: true } : {}),
         ...(view.hint ? { hint: view.hint } : {}),
       },
     };

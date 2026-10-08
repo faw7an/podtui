@@ -10,7 +10,7 @@ import type { DetailLogModel, DetailStatsModel } from "./model.ts";
  * lines come out of here.
  */
 
-export type DetailTabId = "logs" | "stats" | "env" | "config" | "top" | "members" | "history";
+export type DetailTabId = "logs" | "stats" | "env" | "config" | "top" | "members" | "history" | "file" | "unit" | "journal";
 
 export interface DetailTabMeta {
   id: DetailTabId;
@@ -42,6 +42,8 @@ export interface DetailView {
   stats?: DetailStatsModel;
   /** `lines[0]` is a sticky column header (Top tab). */
   table?: boolean;
+  /** Lines are a systemd-style file: colour sections, keys, comments (P6). */
+  ini?: boolean;
   /** Extra bottom-border text, e.g. `v reveal secrets`. */
   hint?: string;
 }

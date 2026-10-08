@@ -1,5 +1,6 @@
 import type { ContainerEngine } from "../../engine/ContainerEngine.ts";
-import type { LogBuffer } from "../../util/logBuffer.ts";
+import type { Systemd } from "../../engine/systemd.ts";
+import type { LogBuffer, LogInput } from "../../util/logBuffer.ts";
 
 /**
  * One follow-mode log stream feeding a `LogBuffer` (P3-T2, P3-T9).
@@ -31,13 +32,30 @@ export interface LogSessionOptions {
   throttleMs?: number;
 }
 
-/** Start streaming; returns `stop`, which aborts the request and timers. */
+/** A source of log lines: container logs, or a unit's journal (P6). */
+export type LineSource = (signal: AbortSignal, tail: number) => AsyncIterable<LogInput>;
+
+/** Container logs as a line source (follow, timestamps). */
+export function containerLogSource(
+  engine: Pick<ContainerEngine, "containerLogs">,
+  socketPath: string,
+  containerId: string,
+): LineSource {
+  return (signal, tail) => engine.containerLogs(socketPath, containerId, { follow: true, tail, timestamps: true, signal });
+}
+
+/** Start streaming container logs; returns `stop`. */
 export function startLogSession(
   engine: Pick<ContainerEngine, "containerLogs">,
   socketPath: string,
   containerId: string,
   opts: LogSessionOptions,
 ): () => void {
+  return startLineSession(containerLogSource(engine, socketPath, containerId), opts);
+}
+
+/** Start streaming any line source; returns `stop`, which aborts it and timers. */
+export function startLineSession(source: LineSource, opts: LogSessionOptions): () => void {
   const controller = new AbortController();
   const throttleMs = opts.throttleMs ?? LOG_THROTTLE_MS;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -57,12 +75,7 @@ export function startLogSession(
   void (async () => {
     let live = false;
     try {
-      for await (const frame of engine.containerLogs(socketPath, containerId, {
-        follow: true,
-        tail: opts.tail ?? LOG_TAIL,
-        timestamps: true,
-        signal: controller.signal,
-      })) {
+      for await (const frame of source(controller.signal, opts.tail ?? LOG_TAIL)) {
         if (stopped) return;
         if (!live) {
           live = true;
@@ -89,5 +102,22 @@ export function startLogSession(
     if (timer !== undefined) clearTimeout(timer);
     timer = undefined;
     controller.abort();
+  };
+}
+
+/**
+ * A unit's journal as a line source (P6-T3). journald's PRIORITY sets the
+ * level: 0-3 error, 4 warning (syslog levels); the text can still raise it.
+ */
+export function journalSource(systemd: Pick<Systemd, "journal">, unit: string): LineSource {
+  return async function* (signal) {
+    for await (const e of systemd.journal(unit, signal)) {
+      yield {
+        stream: "stdout",
+        timestamp: e.timestamp,
+        message: `${e.message}\n`,
+        ...(e.priority <= 3 ? { level: "error" as const } : e.priority === 4 ? { level: "warn" as const } : {}),
+      };
+    }
   };
 }

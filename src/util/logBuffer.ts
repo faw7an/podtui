@@ -19,7 +19,15 @@ export interface LogInput {
   stream: LogStreamName;
   timestamp: Date;
   message: string;
+  /**
+   * A level the source already knows (journald PRIORITY, P6). It can only
+   * raise the text-based level: an error the text does not spell out still
+   * turns red; text saying ERROR is never quietened by a calm priority.
+   */
+  level?: LogLevel;
 }
+
+const SEVERITY: Record<LogLevel, number> = { unknown: 0, debug: 1, info: 2, warn: 3, error: 4 };
 
 export interface LogLine {
   /** Monotonic, never reused. */
@@ -137,7 +145,8 @@ export class LogBuffer {
     } else {
       this.open[frame.stream] = line;
     }
-    line.level = classifyLogLine(line.text);
+    const fromText = classifyLogLine(line.text);
+    line.level = frame.level && SEVERITY[frame.level] > SEVERITY[fromText] ? frame.level : fromText;
   }
 
   private cap(line: LogLine, text: string): string {

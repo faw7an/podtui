@@ -17,7 +17,7 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "↑↓jk", desc: "move selection", section: "navigation" },
   { key: "/", desc: "filter list / search logs", section: "navigation" },
   { key: "Ctrl+U", desc: "clear filter line", section: "navigation" },
-  { key: "c", desc: "pod: go to its containers", section: "navigation" },
+  { key: "c", desc: "jump to container", section: "navigation" },
   { key: "Space", desc: "fold sections", section: "detail" },
   { key: "PgUp/PgDn", desc: "scroll detail/logs", section: "detail" },
   { key: "Enter", desc: "open detail", section: "detail" },
@@ -37,6 +37,7 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "K", desc: "kill (asks first)", section: "actions" },
   { key: "d", desc: "remove (asks first)", section: "actions" },
   { key: "x", desc: "bulk: prune, stop, remove", section: "actions" },
+  { key: "R", desc: "quadlets: reload systemd", section: "actions" },
   { key: "?", desc: "help", section: "app" },
   { key: "q", desc: "quit", section: "app" },
 ] as const;

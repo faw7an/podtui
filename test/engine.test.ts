@@ -188,20 +188,30 @@ describe("engine: fixture-driven resource mapping", () => {
     expect(n?.items[0]?.cells["state"]).toBe(networks[0]?.driver);
   });
 
-  test("quadlets declares an explicit placeholder while it has no source", () => {
+  // Rewritten in Phase 6: the "not implemented (phase 6)" placeholder these
+  // tests pinned is replaced by the real empty state (P6-T6).
+  test("no quadlets: the panel says where they live", () => {
     const q = buildPanelModels(data, noSelection(), now).find((m) => m.id === "quadlets");
     expect(q?.items).toHaveLength(0);
-    expect(q?.emptyLabel).toContain("not implemented");
+    expect(q?.emptyLabel).toContain("~/.config/containers/systemd/");
+    expect(q?.emptyLabel).toContain("/etc/containers/systemd/");
   });
 
-  test("a populated quadlet list drops the placeholder", () => {
+  test("a reason for an empty list replaces the generic text", () => {
+    const q = buildPanelModels({ ...data, quadletNote: "This Podman has no quadlet API" }, noSelection(), now).find((m) => m.id === "quadlets");
+    expect(q?.emptyLabel).toBe("This Podman has no quadlet API");
+  });
+
+  test("a populated quadlet list drops the empty label and shows type and state", () => {
     const withQuadlets: ResourceData = {
       ...data,
-      quadlets: [{ id: "hello", name: "hello.container", status: "running" }],
+      quadlets: [{ id: "hello.container", name: "hello.container", unit: "hello.service", type: "container", path: "/x", state: "active (running)", active: "active", load: "loaded" }],
     };
     const q = buildPanelModels(withQuadlets, noSelection(), now).find((m) => m.id === "quadlets");
     expect(q?.items).toHaveLength(1);
     expect(q?.emptyLabel).toBeUndefined();
+    expect(q?.items[0]?.cells).toMatchObject({ type: "ctr", state: "● active (running)" });
+    expect(q?.items[0]?.tone).toBe("ok");
   });
 
   test("selection is resolved from a stored item id", () => {

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { ContainerEngine } from "../../engine/ContainerEngine.ts";
 import { DEFAULT_LOG_LINES, LogBuffer } from "../../util/logBuffer.ts";
-import { startLogSession, type LogStreamStatus } from "../view/logSession.ts";
+import { startLineSession, type LineSource, type LogStreamStatus } from "../view/logSession.ts";
 
 export interface LogStreamState {
   buffer: LogBuffer;
@@ -18,13 +17,11 @@ export interface LogStreamState {
  * or unmounting stops it (the effect cleanup aborts the request). Each new
  * container starts with a fresh buffer.
  */
-export function useLogStream(
-  engine: Pick<ContainerEngine, "containerLogs">,
-  socketPath: string,
-  containerId: string | null,
-  enabled: boolean,
-  capacity = DEFAULT_LOG_LINES,
-): LogStreamState {
+/**
+ * Follow any line source while `source` is non-null; `key` identifies what
+ * is followed (a new key = a fresh buffer and a new stream).
+ */
+export function useLineStream(key: string | null, source: LineSource | null, capacity = DEFAULT_LOG_LINES): LogStreamState {
   const bufferRef = useRef<LogBuffer>(new LogBuffer(capacity));
   const [status, setStatus] = useState<LogStreamStatus>({ kind: "idle" });
   const [version, setVersion] = useState(0);
@@ -32,16 +29,16 @@ export function useLogStream(
   useEffect(() => {
     bufferRef.current = new LogBuffer(capacity);
     setVersion((v) => v + 1);
-    if (!enabled || !containerId) {
+    if (!source || !key) {
       setStatus({ kind: "idle" });
       return;
     }
-    return startLogSession(engine, socketPath, containerId, {
+    return startLineSession(source, {
       buffer: bufferRef.current,
       onLines: () => setVersion((v) => v + 1),
       onStatus: setStatus,
     });
-  }, [engine, socketPath, containerId, enabled, capacity]);
+  }, [key, source, capacity]);
 
   return { buffer: bufferRef.current, status, version };
 }

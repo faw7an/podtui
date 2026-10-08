@@ -163,3 +163,13 @@ describe("LogBuffer: ring", () => {
     expect(b.at(2)?.text).toBe("tail");
   });
 });
+
+describe("LogBuffer: a source-provided level (journald priority, P6)", () => {
+  test("raises the level, never lowers it", () => {
+    const b = new LogBuffer();
+    b.push({ stream: "stdout", timestamp: T, message: "disk full\n", level: "error" });
+    b.push({ stream: "stdout", timestamp: T, message: "ERROR boom\n", level: "info" });
+    b.push({ stream: "stdout", timestamp: T, message: "plain\n" });
+    expect([0, 1, 2].map((i) => b.at(i)?.level)).toEqual(["error", "error", "unknown"]);
+  });
+});

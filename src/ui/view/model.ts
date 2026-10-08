@@ -57,6 +57,8 @@ export interface DetailModel {
   stats?: DetailStatsModel;
   /** `lines[0]` is a column header: painted, and kept on screen while scrolling (Top tab). */
   table?: boolean;
+  /** Lines are a systemd-style file: colour sections, keys, comments (P6). */
+  ini?: boolean;
   /** Extra bottom-border text, e.g. `v reveal`. */
   hint?: string;
 }
@@ -155,7 +157,9 @@ export const PANEL_COLUMNS: Record<PanelId, ColumnDef[]> = {
   ],
   quadlets: [
     { id: "name", minW: 10, flex: 3, priority: 100 },
-    { id: "state", minW: 9, priority: 80 },
+    { id: "type", minW: 4, priority: 40 },
+    // "● active (running)" is 18 cells; anything narrower hid the state.
+    { id: "state", minW: 18, priority: 80 },
   ],
 };
 
@@ -169,4 +173,5 @@ export const COLUMN_HEADERS: Record<string, string> = {
   count: "CNT",
   mountpoint: "MOUNTPOINT",
   subnet: "SUBNET",
+  type: "TYPE",
 };

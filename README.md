@@ -70,8 +70,9 @@ networks are never force-removed.
 
 | Works today | Coming next |
 |---|---|
-| Six numbered panels (pods, containers, images, volumes, networks, quadlets placeholder), each can be shown or hidden | |
-| Live refresh (every 5 s by default) that keeps your cursor on the same item | **Quadlets**: unit state, journal, start/stop |
+| Six numbered panels (pods, containers, images, volumes, networks, quadlets), each can be shown or hidden | |
+| **Quadlets**: unit state from systemd, the file, the generated unit, live journal; start / stop / restart, reload systemd | |
+| Live refresh (every 5 s by default) that keeps your cursor on the same item | |
 | Container **Config** tab: formatted inspect output, foldable sections | Omarchy theme colours, mouse support |
 | Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | |
 | Pod (members), image (history, users), volume (users) and network (subnets, members) detail views | |
@@ -240,7 +241,7 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `↑↓jk` | move selection |
 | `/` | filter list / search logs |
 | `Ctrl+U` | clear filter line |
-| `c` | pod: go to its containers |
+| `c` | jump to container |
 | `Space` | fold sections |
 | `PgUp/PgDn` | scroll detail/logs |
 | `Enter` | open detail |
@@ -259,6 +260,7 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `K` | kill (asks first) |
 | `d` | remove (asks first) |
 | `x` | bulk: prune, stop, remove |
+| `R` | quadlets: reload systemd |
 | `?` | help |
 | `q` | quit |
 

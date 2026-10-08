@@ -7,6 +7,8 @@ import { STATS_HISTORY, sparkline, statsRows } from "../view/statsView.ts";
 import { logWindow } from "../view/logView.ts";
 import type { LogLine } from "../../util/logBuffer.ts";
 import { renderLogRows } from "./logRows.ts";
+import { sanitizeLogText } from "../../util/logText.ts";
+import { iniLine } from "../../engine/quadlet.ts";
 import { matchCount } from "../view/logSearch.ts";
 import { LABEL_W, MASK } from "../view/detail.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
@@ -82,6 +84,24 @@ function statsContent(stats: DetailStatsModel, budget: number, width: number, th
     }
   }
   return out.slice(0, budget);
+}
+
+/**
+ * A systemd-style file row (P6 File/Unit tabs): `[Section]` bold accent, the
+ * key of `Key=Value` accent, comments dim, `── heading ──` bold. Tabs and
+ * control characters are made safe like log text.
+ */
+function paintIniRow(raw: string, theme: Theme, on: boolean): string {
+  const line = sanitizeLogText(raw);
+  if (!on) return line;
+  if (/^── .* ──$/.test(line)) return paint(line, [bold()]);
+  const kind = iniLine(line);
+  if (kind.kind === "section") return paint(line, [fg(theme.accent), bold()]);
+  if (kind.kind === "comment") return paint(line, [dim()]);
+  if (kind.kind === "key" && kind.keyEnd !== undefined) {
+    return paint(line.slice(0, kind.keyEnd), [fg(theme.accent)]) + line.slice(kind.keyEnd);
+  }
+  return line;
 }
 
 interface ContentWindow {
@@ -214,7 +234,13 @@ export function renderDetail(
     rows = [
       ...(header !== undefined && contentBudget > 0 ? [paint(header, on ? [fg(theme.accent), bold()] : [])] : []),
       ...shown.map((line) =>
-        detail.table ? line : env ? paintEnvRow(line, env.keyWidth, theme, on) : paintContent(line, theme, on),
+        detail.table
+          ? line
+          : detail.ini
+            ? paintIniRow(line, theme, on)
+            : env
+              ? paintEnvRow(line, env.keyWidth, theme, on)
+              : paintContent(line, theme, on),
       ),
     ];
     const hiddenBelow = body.length - bodyTop - shown.length;

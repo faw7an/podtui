@@ -1,7 +1,9 @@
 import type { PanelId } from "../layout/types.ts";
+import { quadletContainerName } from "../../engine/quadlet.ts";
 import type { ResourceData } from "../view/build.ts";
 import {
   confirmContent,
+  needsConfirm,
   supports,
   type ActionVerb,
   type ConfirmContent,
@@ -23,6 +25,7 @@ const KIND: Partial<Record<PanelId, ResourceKind>> = {
   images: "image",
   volumes: "volume",
   networks: "network",
+  quadlets: "quadlet",
 };
 
 export type ActionRequest =
@@ -38,10 +41,16 @@ export function actionFor(
   displayName: string,
 ): ActionRequest {
   const kind = KIND[panel];
-  if (!kind) return { kind: "refuse", message: "No actions for quadlets yet (phase 6)." };
+  if (!kind) return { kind: "refuse", message: "No actions here." };
   if (!itemId) return { kind: "refuse", message: "Nothing selected." };
   if (!supports(kind, verb)) {
-    return { kind: "refuse", message: `${kind[0]?.toUpperCase()}${kind.slice(1)}s can only be removed (d).` };
+    return {
+      kind: "refuse",
+      message:
+        kind === "quadlet"
+          ? "Quadlets: s start, S stop, r restart the unit; R reloads systemd."
+          : `${kind[0]?.toUpperCase()}${kind.slice(1)}s can only be removed (d).`,
+    };
   }
 
   const base = { kind, verb, id: itemId, name: displayName || itemId.slice(0, 12) };
@@ -64,6 +73,16 @@ export function actionFor(
     const running = (p.Containers ?? []).some((m) => m.Status === "running");
     // `pod rm` refuses a pod with ANY containers unless forced (CLI help).
     return confirm({ ...base, force: verb === "remove" && members.length > 0 }, { running, members });
+  }
+
+  if (kind === "quadlet") {
+    const q = data.quadlets.find((x) => x.id === itemId);
+    if (!q) return { kind: "refuse", message: "That quadlet is gone; the list will refresh." };
+    const action: ResourceAction = { kind: "quadlet", verb, id: q.unit, name: q.name };
+    const running = q.active === "active";
+    return needsConfirm(action, running)
+      ? { kind: "confirm", action, content: confirmContent(action, { running }) }
+      : { kind: "run", action };
   }
 
   return confirm(base);
@@ -120,4 +139,22 @@ export function failureContent(
   }
   const verb = { start: "start", stop: "stop", restart: "restart", kill: "kill", remove: "remove" }[action.verb];
   return { title: `Could not ${verb} ${action.kind} ${action.name}`, lines };
+}
+
+/**
+ * Where `c` on a quadlet lands (P6-T5): the container a `.container` quadlet
+ * runs — `ContainerName=`, else `systemd-<unit>` (verified with the
+ * generator). Quadlet containers run with `--rm`, so a stopped unit has no
+ * container; the message says so instead of failing silently.
+ */
+export function quadletJumpTarget(
+  q: { name: string; unit: string },
+  fileText: string,
+  data: ResourceData,
+): { kind: "jump"; id: string; message: string } | { kind: "none"; message: string } {
+  const name = quadletContainerName(q.name, q.unit, fileText);
+  if (!name) return { kind: "none", message: `${q.name} does not run a container (only .container quadlets do).` };
+  const c = data.containers.find((x) => (x.Names ?? []).some((n) => n.replace(/^\//, "") === name));
+  if (!c) return { kind: "none", message: `No container ${name} right now: start the unit with s.` };
+  return { kind: "jump", id: c.Id, message: `${q.name}: container ${name} (${c.State})` };
 }

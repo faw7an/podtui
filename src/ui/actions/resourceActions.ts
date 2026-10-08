@@ -1,4 +1,5 @@
 import type { ContainerActionResult, ContainerEngine } from "../../engine/ContainerEngine.ts";
+import type { Systemd } from "../../engine/systemd.ts";
 
 /**
  * Per-item actions (P4-T1..T5). An action is a plain descriptor; `runAction`
@@ -23,7 +24,7 @@ import type { ContainerActionResult, ContainerEngine } from "../../engine/Contai
  *   is shown instead.
  */
 
-export type ResourceKind = "container" | "pod" | "image" | "volume" | "network";
+export type ResourceKind = "container" | "pod" | "image" | "volume" | "network" | "quadlet";
 export type ActionVerb = "start" | "stop" | "restart" | "kill" | "remove";
 
 export interface ResourceAction {
@@ -43,13 +44,16 @@ export const VERBS: Record<ResourceKind, readonly ActionVerb[]> = {
   image: ["remove"],
   volume: ["remove"],
   network: ["remove"],
+  // A quadlet's UNIT (P6-T4); the file itself is never removed by podtui.
+  quadlet: ["start", "stop", "restart"],
 };
 
 export function supports(kind: ResourceKind, verb: ActionVerb): boolean {
   return VERBS[kind].includes(verb);
 }
 
-export function needsConfirm(action: ResourceAction): boolean {
+export function needsConfirm(action: ResourceAction, running = false): boolean {
+  if (action.kind === "quadlet") return running && (action.verb === "stop" || action.verb === "restart");
   return action.verb === "remove" || action.verb === "kill";
 }
 
@@ -91,8 +95,15 @@ export function runAction(
   >,
   socketPath: string,
   a: ResourceAction,
+  systemd?: Pick<Systemd, "action">,
 ): Promise<ContainerActionResult> {
   switch (a.kind) {
+    case "quadlet":
+      if (!systemd) return Promise.reject(new Error("systemd is not available"));
+      if (a.verb === "start" || a.verb === "stop" || a.verb === "restart") {
+        return systemd.action(a.verb, a.id).then(() => ({ success: true }));
+      }
+      break;
     case "container":
       switch (a.verb) {
         case "start":
@@ -151,6 +162,14 @@ export interface ConfirmContext {
 
 export function confirmContent(a: ResourceAction, ctx: ConfirmContext = {}): ConfirmContent {
   const what = `${a.kind} ${a.name}`;
+  if (a.kind === "quadlet") {
+    const verb = a.verb === "restart" ? "Restart" : "Stop";
+    return {
+      title: `${verb} unit?`,
+      lines: [`${verb} ${a.id} (from ${a.name}).`, "It is running; what it manages stops with it."],
+      confirmLabel: verb,
+    };
+  }
   if (a.verb === "kill") {
     return {
       title: `Kill ${a.kind}?`,

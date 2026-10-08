@@ -198,3 +198,24 @@ export const bunRunner: CommandRunner = {
     }
   },
 };
+
+/** Everything the UI needs from systemd, bound to a runner and a scope. */
+export interface Systemd {
+  scope: SystemdScope;
+  states(units: string[]): Promise<Map<string, UnitState>>;
+  action(verb: UnitVerb, unit: string): Promise<void>;
+  reload(): Promise<void>;
+  text(unit: string): Promise<{ cat: string; status: string }>;
+  journal(unit: string, signal: AbortSignal): AsyncGenerator<JournalEntry>;
+}
+
+export function createSystemd(runner: CommandRunner, scope: SystemdScope): Systemd {
+  return {
+    scope,
+    states: (units) => unitStates(runner, scope, units),
+    action: (verb, unit) => unitAction(runner, scope, verb, unit),
+    reload: () => daemonReload(runner, scope),
+    text: (unit) => unitText(runner, scope, unit),
+    journal: (unit, signal) => followJournal(runner, scope, unit, signal),
+  };
+}

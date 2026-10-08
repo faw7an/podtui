@@ -4,6 +4,7 @@ import { Screen } from "./components/Screen.tsx";
 import { HelpOverlay } from "./components/HelpOverlay.tsx";
 import { useTerminalSize } from "./hooks/useTerminalSize.ts";
 import { createPodmanEngine } from "../engine/podman.ts";
+import { bunRunner, createSystemd, type CommandRunner, type SystemdScope } from "../engine/systemd.ts";
 import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/layoutReducer.ts";
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
 import { defaultTheme } from "../theme/theme.ts";
@@ -16,14 +17,15 @@ import { PANEL_COLUMNS } from "./view/model.ts";
 import { resolvePollMs } from "../config.ts";
 import { routeFilterKey } from "../input/filterKeys.ts";
 import { computeLayout } from "./layout/computeLayout.ts";
-import { useLogStream } from "./hooks/useLogStream.ts";
+import { useLineStream } from "./hooks/useLogStream.ts";
+import { containerLogSource, journalSource } from "./view/logSession.ts";
 import { useStatsStream } from "./hooks/useStatsStream.ts";
 import { useTopPoll } from "./hooks/useTopPoll.ts";
 import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
 import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
 import { errorsOnly } from "./render/detailLines.ts";
 import { dialogKey, openConfirm, openMessage, type DialogState } from "./view/confirmDialog.ts";
-import { actionFor, failureContent, podJumpTarget } from "./actions/selectionAction.ts";
+import { actionFor, failureContent, podJumpTarget, quadletJumpTarget } from "./actions/selectionAction.ts";
 import { busyText, doneText, runAction, type ActionVerb, type ResourceAction } from "./actions/resourceActions.ts";
 import type { Notice } from "./view/model.ts";
 import { bulkKey, executed, openBulk, previewed, type BulkEffect, type BulkFlow } from "./bulk/bulkFlow.ts";
@@ -54,7 +56,11 @@ function selectionStep(
 
 export { PANEL_COLUMNS };
 
-export const App = ({ socketPath }: { socketPath: string }) => {
+/**
+ * `runner` exists for tests: they pass a fake so nothing ever reaches the real
+ * user systemd. Production uses the Bun.spawn runner.
+ */
+export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; runner?: CommandRunner }) => {
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState());
   const { columns: terminalCols, rows: terminalRows } = useTerminalSize();
   const [data, setData] = useState<ResourceData>(EMPTY_DATA);
@@ -85,9 +91,19 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const [logOpts, setLogOpts] = useState({ timestamps: false, wrap: false, errorsOnly: false });
 
   const engine = useMemo(() => createPodmanEngine(), []);
+  // Quadlet units live in the USER systemd for a rootless Podman and in the
+  // system manager for a rootful one (P6); asked once, user until known.
+  const [scope, setScope] = useState<SystemdScope>("user");
+  useEffect(() => {
+    void engine
+      .getInfo(socketPath)
+      .then((info) => setScope(info.host?.security?.rootless === false ? "system" : "user"))
+      .catch(() => undefined);
+  }, [engine]);
+  const systemd = useMemo(() => createSystemd(runner, scope), [runner, scope]);
   const fetchVisible = useMemo(
-    () => createVisibleFetcher(engine, socketPath),
-    [engine],
+    () => createVisibleFetcher(engine, socketPath, systemd.states),
+    [engine, systemd],
   );
 
   // Only panels that are visible are fetched (FR-3); hidden panels keep their
@@ -145,7 +161,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   const perform = (action: ResourceAction): void => {
     busyRef.current = true;
     setNotice({ tone: "busy", text: busyText(action) });
-    void runAction(engine, socketPath, action)
+    void runAction(engine, socketPath, action, systemd)
       .then((r) => setNotice({ tone: "ok", text: r.message ?? doneText(action) }))
       .catch((e: unknown) => {
         // A failed action answers something the user just asked for, so it
@@ -235,7 +251,21 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     activeTab === "logs" && focusId === "containers" && layout.detail && selectedItemId
       ? selectedItemId
       : null;
-  const logs = useLogStream(engine, socketPath, logContainerId, logContainerId !== null);
+  // A quadlet's Journal tab streams its unit's journal through the same
+  // machinery (P6-T3). One stream at a time: the key says which.
+  const selectedQuadlet = focusId === "quadlets" ? data.quadlets.find((q) => q.id === selectedItemId) : undefined;
+  const journalUnit = activeTab === "journal" && layout.detail && selectedQuadlet ? selectedQuadlet.unit : null;
+  const streamKey = logContainerId ?? (journalUnit ? `journal:${journalUnit}` : null);
+  const lineSource = useMemo(
+    () =>
+      logContainerId
+        ? containerLogSource(engine, socketPath, logContainerId)
+        : journalUnit
+          ? journalSource(systemd, journalUnit)
+          : null,
+    [engine, logContainerId, journalUnit, systemd],
+  );
+  const logs = useLineStream(streamKey, lineSource);
 
   // Stats stream only for a RUNNING container on the Stats tab: a stopped
   // container's stream sends nothing but zeros (verified), so the tab shows
@@ -253,7 +283,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   useEffect(() => {
     setLogView(FOLLOW);
     setLogSearch(NO_SEARCH);
-  }, [logContainerId]);
+  }, [streamKey]);
 
   // Attached after the base model so the stream can depend on the selection
   // the model resolved (filtering included) without a cycle.
@@ -293,7 +323,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
               },
             },
           }
-        : logContainerId !== null && model.detail.lines.length === 0
+        : streamKey !== null && model.detail.lines.length === 0
         ? {
             ...model,
             detail: {
@@ -305,7 +335,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     // `logs.version` changes when the (mutable) buffer gains lines.
     [
       model,
-      logContainerId,
+      streamKey,
       logs.buffer,
       logs.version,
       logs.status,
@@ -355,7 +385,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   // users) for the selected item. Refetched on every list refresh, because
   // what uses a volume or sits on a network changes while you look.
   useEffect(() => {
-    if (focusId === "containers" || focusId === "quadlets" || !selectedItemId || !layout.detail) {
+    if (focusId === "containers" || !selectedItemId || !layout.detail) {
       setResource(null);
       return;
     }
@@ -377,6 +407,15 @@ export const App = ({ socketPath }: { socketPath: string }) => {
             engine.containersUsingVolume(socketPath, id),
           ]);
           next = { panel: "volumes", id, inspect, users };
+        } else if (focusId === "quadlets") {
+          const q = dataRef.current.quadlets.find((x) => x.id === id);
+          if (!q) return;
+          const [file, unitText] = await Promise.all([
+            engine.quadletFile(socketPath, id),
+            // No systemd answer is not fatal: the File tab still shows.
+            systemd.text(q.unit).catch(() => null),
+          ]);
+          next = { panel: "quadlets", id, unit: q.unit, file, unitText };
         } else next = { panel: "networks", id, inspect: await engine.inspectNetwork(socketPath, id) };
         if (!cancelled) setResource(next);
       } catch (e) {
@@ -389,7 +428,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     return () => {
       cancelled = true;
     };
-  }, [engine, focusId, selectedItemId, lastRefresh, layout.detail !== null]);
+  }, [engine, systemd, focusId, selectedItemId, lastRefresh, layout.detail !== null]);
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
@@ -556,6 +595,44 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         return;
       }
       setBulk(openBulk(orderedCommands(detailPanel)));
+      return;
+    }
+
+    // --- Quadlets (P6): `R` reloads systemd; `c` jumps to the container. ---
+    if (input === "R" && focusId === "quadlets") {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      setNotice({ tone: "busy", text: "reloading systemd (daemon-reload)…" });
+      void systemd
+        .reload()
+        .then(() => setNotice({ tone: "ok", text: "systemd reloaded: quadlet units regenerated" }))
+        .catch((e: unknown) => {
+          setNotice(undefined);
+          setDialog(openMessage("Could not reload systemd", [e instanceof Error ? e.message : String(e)]));
+        })
+        .finally(() => {
+          busyRef.current = false;
+          setRefreshKey((k) => k + 1);
+        });
+      return;
+    }
+    if (input === "c" && focusId === "quadlets") {
+      const q = data.quadlets.find((x) => x.id === selectedItemId);
+      if (!q) return;
+      const known = resource?.panel === "quadlets" && resource.id === q.id ? resource.file : null;
+      void (known !== null ? Promise.resolve(known) : engine.quadletFile(socketPath, q.id))
+        .then((file) => {
+          const target = quadletJumpTarget(q, file, dataRef.current);
+          if (target.kind === "none") {
+            setNotice({ tone: "error", text: target.message });
+            return;
+          }
+          if (state.detailFullscreen || state.zoom) dispatch({ type: "escape" });
+          dispatch({ type: "activate", id: "containers" });
+          dispatch({ type: "select", id: "containers", itemId: target.id });
+          setNotice({ tone: "ok", text: target.message });
+        })
+        .catch((e: unknown) => setNotice({ tone: "error", text: e instanceof Error ? e.message : String(e) }));
       return;
     }
 

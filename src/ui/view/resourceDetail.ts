@@ -45,7 +45,11 @@ export const TABS_BY_PANEL: Record<PanelId, readonly TabMeta[]> = {
   ],
   volumes: [{ id: "config", label: "Config" }],
   networks: [{ id: "config", label: "Config" }],
-  quadlets: [{ id: "config", label: "Config" }],
+  quadlets: [
+    { id: "file", label: "File" },
+    { id: "unit", label: "Unit" },
+    { id: "journal", label: "Journal" },
+  ],
 };
 
 /** Default tab per panel: what you most likely opened it for. */
@@ -55,7 +59,7 @@ export const DEFAULT_TAB: Record<PanelId, DetailTabId> = {
   images: "config",
   volumes: "config",
   networks: "config",
-  quadlets: "config",
+  quadlets: "file",
 };
 
 /** Inspect payloads, fetched for the selected item of the focused panel. */
@@ -63,12 +67,15 @@ export type ResourceDetailData =
   | { panel: "pods"; id: string; inspect: PodInspect }
   | { panel: "images"; id: string; inspect: ImageInspect; history: ImageHistoryEntry[] | null }
   | { panel: "volumes"; id: string; inspect: VolumeInspect; users: ContainerListItem[] }
-  | { panel: "networks"; id: string; inspect: NetworkInspect };
+  | { panel: "networks"; id: string; inspect: NetworkInspect }
+  | { panel: "quadlets"; id: string; unit: string; file: string; unitText: { cat: string; status: string } | null };
 
 export interface ResourceView {
   lines: string[];
   /** `lines[0]` is a sticky table header. */
   table?: boolean;
+  /** Systemd-style file lines (File/Unit tabs). */
+  ini?: boolean;
   hint?: string;
 }
 
@@ -245,6 +252,28 @@ export function networkView(inspect: NetworkInspect, data: ResourceData): Resour
   };
 }
 
+// ------------------------------------------------------------- quadlets
+
+/** File (the quadlet as written) and Unit (status + what systemd generated). */
+export function quadletView(tab: DetailTabId, d: Extract<ResourceDetailData, { panel: "quadlets" }>): ResourceView {
+  if (tab === "unit") {
+    if (!d.unitText) return { lines: ["Loading unit…"] };
+    return {
+      lines: [
+        // Not `# …`: in a systemd file that is a comment, and these are headings.
+        "── Status ──",
+        ...d.unitText.status.trimEnd().split("\n"),
+        "── Generated unit ──",
+        ...d.unitText.cat.trimEnd().split("\n"),
+      ],
+      ini: true,
+      hint: d.unit,
+    };
+  }
+  const lines = d.file.replace(/\n$/, "").split("\n");
+  return { lines: lines.length > 0 ? lines : ["(empty file)"], ini: true, hint: d.unit };
+}
+
 /** Build the view for a non-container panel. */
 export function resourceView(
   tab: DetailTabId,
@@ -261,5 +290,7 @@ export function resourceView(
       return volumeView(detail.inspect, detail.users);
     case "networks":
       return networkView(detail.inspect, data);
+    case "quadlets":
+      return quadletView(tab, detail);
   }
 }

@@ -182,12 +182,12 @@ Phase overview
 
 **Goal:** panel 6.
 
-- [ ] **P6-T1** `engine/quadlet.ts`: read quadlet directory (rootless default; rootful path ⚠️ VERIFY), parse file type and name; list with type icon/label.
-- [ ] **P6-T2** Unit mapping: determine each quadlet's systemd unit name and state via `systemctl --user` ⚠️ VERIFY naming rules by testing each file type; unit-test the mapping with real examples.
-- [ ] **P6-T3** Detail tabs: **File** (raw quadlet content, syntax-colored sections), **Unit** (`systemctl --user cat/status`), **Journal** (`journalctl --user -u <unit> -f`, streamed, same coloring as Logs).
-- [ ] **P6-T4** Actions: start/stop/restart unit; "reload systemd" (daemon-reload) with a clear label. Confirm for stop/restart of running units.
-- [ ] **P6-T5** Link quadlet → container (if the container is running, offer to jump to it).
-- [ ] **P6-T6** Graceful behavior when systemd user session or the quadlet dir does not exist (friendly empty state, explains where quadlets live).
+- [x] **P6-T1** `engine/quadlet.ts`: read quadlet directory (rootless default; rootful path ⚠️ VERIFY), parse file type and name; list with type icon/label.
+- [x] **P6-T2** Unit mapping: determine each quadlet's systemd unit name and state via `systemctl --user` ⚠️ VERIFY naming rules by testing each file type; unit-test the mapping with real examples.
+- [x] **P6-T3** Detail tabs: **File** (raw quadlet content, syntax-colored sections), **Unit** (`systemctl --user cat/status`), **Journal** (`journalctl --user -u <unit> -f`, streamed, same coloring as Logs).
+- [x] **P6-T4** Actions: start/stop/restart unit; "reload systemd" (daemon-reload) with a clear label. Confirm for stop/restart of running units.
+- [x] **P6-T5** Link quadlet → container (if the container is running, offer to jump to it).
+- [x] **P6-T6** Graceful behavior when systemd user session or the quadlet dir does not exist (friendly empty state, explains where quadlets live).
 
 **Automated tests:** parser tests on sample quadlet files of each type; mapping tests; mock `Bun.spawn` for systemctl/journalctl; empty-state rendering.
 
