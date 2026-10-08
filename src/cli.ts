@@ -15,6 +15,8 @@ export interface CliArgs {
   socket?: string;
   help: boolean;
   version: boolean;
+  /** `--no-mouse`: never turn on terminal mouse reporting (P7-T9). */
+  noMouse: boolean;
 }
 
 export type ParseResult = { ok: true; args: CliArgs } | { ok: false; error: string };
@@ -22,7 +24,7 @@ export type ParseResult = { ok: true; args: CliArgs } | { ok: false; error: stri
 export const USAGE = `podtui - terminal UI for Podman
 
 Usage:
-  podtui [--socket <path>]
+  podtui [--socket <path>] [--no-mouse]
   podtui --version | --help
 
 Options:
@@ -33,12 +35,14 @@ Options:
                    ($XDG_RUNTIME_DIR/podman/podman.sock) and rootful
                    (/run/podman/podman.sock) sockets, and podman-docker's
                    docker.sock links. A Docker daemon is never used.
+  --no-mouse       Do not use the mouse (keyboard only; the terminal's own
+                   text selection keeps working).
   --version, -v    Print the version and exit.
   --help, -h       Print this message and exit.
 `;
 
 export function parseArgs(argv: string[]): ParseResult {
-  const args: CliArgs = { help: false, version: false };
+  const args: CliArgs = { help: false, version: false, noMouse: false };
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i]!;
@@ -53,6 +57,10 @@ export function parseArgs(argv: string[]): ParseResult {
       continue;
     }
 
+    if (token === "--no-mouse") {
+      args.noMouse = true;
+      continue;
+    }
     if (token === "--socket") {
       const value = argv[i + 1];
       if (value === undefined || value === "") {

@@ -4,6 +4,7 @@ import { USAGE, parseArgs } from "./cli.ts";
 import { VERSION } from "./version.ts";
 import { appRenderOptions } from "./ui/renderOptions.ts";
 import { describeUnreachable, resolveSocket } from "./api/socket.ts";
+import { enableMouse } from "./input/mouse.ts";
 
 /**
  * Render options (alternate screen, and interactive mode decided by the
@@ -53,5 +54,10 @@ if (!process.stdin.isTTY) {
   );
   process.exit(1);
 }
+
+// Mouse (P7-T6/T9): on unless --no-mouse; turned off again on every way
+// out (see enableMouse). A terminal without mouse support simply ignores
+// the request, and the keyboard works the same either way.
+if (!parsed.args.noMouse) enableMouse(process.stdout);
 
 render(<App socketPath={socket.path} />, appRenderOptions(process.stdout));

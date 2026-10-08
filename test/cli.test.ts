@@ -27,7 +27,7 @@ function err(argv: string[]): string {
 
 describe("parseArgs", () => {
   test("no flags is valid and selects nothing", () => {
-    expect(ok([])).toEqual({ help: false, version: false });
+    expect(ok([])).toEqual({ help: false, version: false, noMouse: false });
   });
 
   test("--socket takes the next token", () => {
@@ -35,7 +35,8 @@ describe("parseArgs", () => {
       socket: "/run/podman/podman.sock",
       help: false,
       version: false,
-    });
+    noMouse: false,
+  });
   });
 
   test("--socket= takes an inline value", () => {
@@ -43,17 +44,18 @@ describe("parseArgs", () => {
       socket: "/tmp/custom.sock",
       help: false,
       version: false,
-    });
+    noMouse: false,
+  });
   });
 
   test("--help sets the flag and ignores nothing else", () => {
-    expect(ok(["--help"])).toEqual({ help: true, version: false });
-    expect(ok(["-h"])).toEqual({ help: true, version: false });
+    expect(ok(["--help"])).toEqual({ help: true, version: false, noMouse: false });
+    expect(ok(["-h"])).toEqual({ help: true, version: false, noMouse: false });
   });
 
   test("--version and -v set the version flag", () => {
-    expect(ok(["--version"])).toEqual({ help: false, version: true });
-    expect(ok(["-v"])).toEqual({ help: false, version: true });
+    expect(ok(["--version"])).toEqual({ help: false, version: true, noMouse: false });
+    expect(ok(["-v"])).toEqual({ help: false, version: true, noMouse: false });
   });
 
   test("a missing --socket value is an error, not an empty string", () => {
@@ -81,5 +83,12 @@ describe("USAGE", () => {
     expect(USAGE).toContain("--help");
     expect(USAGE).toContain("--version");
     expect(USAGE).toContain("PODTUI_SOCKET");
+  });
+});
+describe("--no-mouse (P7-T9)", () => {
+  test("parses, and is documented in --help", () => {
+    const r = parseArgs(["--no-mouse"]);
+    expect(r.ok && r.args.noMouse).toBe(true);
+    expect(USAGE).toContain("--no-mouse");
   });
 });

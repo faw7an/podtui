@@ -28,6 +28,8 @@ import { useTopPoll } from "./hooks/useTopPoll.ts";
 import { FOLLOW, reduceLogView, type LogViewAction, type LogViewState } from "./view/logView.ts";
 import { NO_SEARCH, findMatch, type LogSearchState } from "./view/logSearch.ts";
 import { errorsOnly } from "./render/detailLines.ts";
+import { looksLikeMouse, parseMouse, type MouseEvent } from "../input/mouse.ts";
+import { hitTest } from "./layout/hitTest.ts";
 import { dialogKey, openConfirm, openMessage, type DialogState } from "./view/confirmDialog.ts";
 import { actionFor, failureContent, podJumpTarget, quadletJumpTarget } from "./actions/selectionAction.ts";
 import { busyText, doneText, runAction, type ActionVerb, type ResourceAction } from "./actions/resourceActions.ts";
@@ -473,9 +475,74 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
     };
   }, [engine, systemd, focusId, selectedItemId, lastRefresh, layout.detail !== null]);
 
+  const shownModel = notice ? { ...frameModel, notice } : frameModel;
+
+  // What a click or wheel notch does (P7-T8), resolved by hitTest against
+  // the very layout and model on screen.
+  const handleMouse = (ev: MouseEvent): void => {
+    const hit = hitTest(layout, shownModel, theme, ev.x, ev.y);
+    if (ev.kind === "wheel") {
+      const dir = ev.direction === "up" ? -1 : 1;
+      if (hit.kind === "panelRow" || hit.kind === "panelBody" || hit.kind === "panelTitle") {
+        const panel = shownModel.panels.find((p) => p.id === hit.id);
+        const ids = panel?.items.map((i) => i.id) ?? [];
+        if (state.focus !== hit.id) dispatch({ type: "focus", id: hit.id });
+        dispatch(selectionStep(hit.id, ids, state.selected[hit.id] ?? "", dir));
+      } else if (hit.kind === "detailBody" || hit.kind === "detailTab") {
+        if (frameModel.detail.log) {
+          const show = logOpts.errorsOnly ? errorsOnly : undefined;
+          const type = dir < 0 ? "lineUp" : "lineDown";
+          setLogView((v) => [0, 1, 2].reduce((acc) => reduceLogView(acc, { type }, logs.buffer, logRows, show), v));
+        } else {
+          dispatch({ type: "detailScroll", dir });
+        }
+      }
+      return;
+    }
+    if (ev.kind !== "press" || ev.button !== "left") return;
+    switch (hit.kind) {
+      case "headerTab":
+        dispatch({ type: "activate", id: hit.id });
+        return;
+      case "panelNumber":
+        dispatch({ type: "toggle", id: hit.id });
+        return;
+      case "panelTitle":
+      case "panelBody":
+        dispatch({ type: "focus", id: hit.id });
+        return;
+      case "panelRow":
+        dispatch({ type: "focus", id: hit.id });
+        dispatch({ type: "select", id: hit.id, itemId: hit.itemId });
+        return;
+      case "detailTab": {
+        const tab = TABS_BY_PANEL[detailPanel][hit.index];
+        if (tab) {
+          setActiveTabs((prev) => ({ ...prev, [detailPanel]: tab.id }));
+          dispatch({ type: "resetDetailScroll" });
+        }
+        return;
+      }
+      case "detailBody":
+        if (state.focus !== "detail") dispatch({ type: "focus", id: "detail" });
+        return;
+      case "none":
+        return;
+    }
+  };
+
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       process.exit(0);
+    }
+
+    // --- Mouse (P7-T8). A report is never typing, whatever mode is open. ---
+    if (looksLikeMouse(input)) {
+      const ev = parseMouse(input);
+      // Click outside a modal (or anywhere while typing) does nothing.
+      const modal = dialog !== null || bulk !== null || state.help || state.filterFor !== null || logSearch.typing;
+      if (ev && !modal) handleMouse(ev);
+      return;
     }
 
     // --- Bulk menu (P5): owns every key while open. ---
@@ -757,7 +824,6 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
     }
   });
 
-  const shownModel = notice ? { ...frameModel, notice } : frameModel;
 
   // The help overlay replaces the frame while open.
   if (state.help) {

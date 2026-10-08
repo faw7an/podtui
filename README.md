@@ -74,7 +74,8 @@ networks are never force-removed.
 | **Quadlets**: unit state from systemd, the file, the generated unit, live journal; start / stop / restart, reload systemd | |
 | Live refresh (every 5 s by default) that keeps your cursor on the same item | |
 | Follows your **Omarchy theme** live (`T` reloads); readable status colours on light and dark themes; 256-colour fallback | |
-| Container **Config** tab: formatted inspect output, foldable sections | Mouse support |
+| Container **Config** tab: formatted inspect output, foldable sections | |
+| **Mouse**: click rows, panel numbers, header and detail tabs; wheel scrolls (`--no-mouse` to turn off) | |
 | Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | |
 | Pod (members), image (history, users), volume (users) and network (subnets, members) detail views | |
 | **Stats** (live CPU with a 1-minute sparkline, memory, net, block, PIDs), **Env** (secrets masked until `v`) and **Top** (process list, every 2 s) tabs | |
@@ -231,6 +232,11 @@ podtui --version | --help
 
 podtui uses the terminal's alternate screen, so your scrollback is untouched. Quitting with `q`,
 Ctrl+C or a `SIGTERM` restores the terminal.
+
+The mouse works too: click a row to select it, a panel's `[N]` to hide it, a
+header tab to bring a panel back, a detail tab to switch; the wheel scrolls
+lists and logs. Run `podtui --no-mouse` to keep your terminal's own text
+selection instead.
 
 ### Keys
 

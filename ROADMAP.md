@@ -213,10 +213,10 @@ Phase overview
 - [x] **P7-T5** Truecolor vs 256-color degradation.
 
 ### Mouse
-- [ ] **P7-T6** `input/mouse.ts`: enable SGR mouse reporting, parse press/release/wheel/motion events into typed events, disable on all exit paths (normal quit, Ctrl+C, uncaught exception, SIGTERM). Unit tests with raw sequence samples. ⚠️ VERIFY sequences in xterm control docs and against your terminal's real output.
-- [ ] **P7-T7** Hit-testing: components register their screen rectangles; clicks resolve to `{panelId, rowIndex}` / tab / title-number. Handle terminal resize.
-- [ ] **P7-T8** Click actions: panel title number toggles; row click selects; tab click switches; wheel scrolls logs/lists; click outside a modal does nothing.
-- [ ] **P7-T9** `--no-mouse` flag and graceful behavior if stdin sequences are not supported.
+- [x] **P7-T6** `input/mouse.ts`: enable SGR mouse reporting, parse press/release/wheel/motion events into typed events, disable on all exit paths (normal quit, Ctrl+C, uncaught exception, SIGTERM). Unit tests with raw sequence samples. ⚠️ VERIFY sequences in xterm control docs and against your terminal's real output.
+- [x] **P7-T7** Hit-testing: components register their screen rectangles; clicks resolve to `{panelId, rowIndex}` / tab / title-number. Handle terminal resize.
+- [x] **P7-T8** Click actions: panel title number toggles; row click selects; tab click switches; wheel scrolls logs/lists; click outside a modal does nothing.
+- [x] **P7-T9** `--no-mouse` flag and graceful behavior if stdin sequences are not supported.
 
 **Automated tests:** theme parsing fixtures; semantic mapping tests; mouse parser table tests; hit-test geometry tests; cleanup-on-exit test (mock stdout records the disable sequence).
 
