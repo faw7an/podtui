@@ -329,12 +329,17 @@ never guess), [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) (architecture) and
 
 ### Releasing
 
-1. Set `"version"` in `package.json` (e.g. `0.1.0`), commit, merge to `main`.
-2. `git tag v0.1.0 && git push origin v0.1.0`
+Push to the **`stable`** branch with a new `"version"` in `package.json`:
 
-[The release workflow](.github/workflows/release.yml) checks that the tag matches
-`package.json`, runs all checks, builds and smoke-tests x64 and arm64 binaries on native runners,
-and publishes them with `SHA256SUMS`. Versions below 1.0.0 are published as pre-releases.
+1. Set `"version"` in `package.json` (e.g. `0.2.0`) and commit.
+2. Merge or push that commit to `stable`.
+
+[The release workflow](.github/workflows/release.yml) then runs all checks, builds and
+smoke-tests x64 and arm64 binaries on native runners, tags the pushed commit `v0.2.0`, and
+publishes the release with `SHA256SUMS`. Versions below 1.0.0 are published as pre-releases.
+A push to `stable` whose version is already released publishes nothing and says so (bump the
+version to release). Pushing a tag `vX.Y.Z` by hand still works too; it must equal the
+`package.json` version.
 
 ## License
 
