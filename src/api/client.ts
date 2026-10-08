@@ -234,6 +234,15 @@ export async function request<T>(
   return parseJsonText<T>(text, status, `${options.method ?? "GET"} ${path}`);
 }
 
+/** GET returning the raw body (e.g. a quadlet file, served as plain text). */
+export async function getText(
+  socketPath: string,
+  path: string,
+  options?: Omit<RequestOptions, "method" | "body">
+): Promise<string> {
+  return (await send(socketPath, path, { ...options, method: "GET" })).text;
+}
+
 export const get = <T>(socketPath: string, path: string, options?: Omit<RequestOptions, "method" | "body">) =>
   request<T>(socketPath, path, { ...options, method: "GET" });
 

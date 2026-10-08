@@ -15,6 +15,7 @@ import type {
   Info,
   ContainerStatsUI,
   ImageHistoryEntry,
+  QuadletListItem,
 } from "../api/types.ts";
 import type { LogFrame } from "../api/demux.ts";
 import type { SocketResult } from "../api/socket.ts";
@@ -119,6 +120,11 @@ export interface ContainerEngine {
 
   // Events
   streamEvents(socketPath: string, filters?: Record<string, string[]>): AsyncGenerator<unknown>;
+
+  // Quadlets (P6)
+  listQuadlets(socketPath: string): Promise<QuadletListItem[]>;
+  /** Raw quadlet file text. */
+  quadletFile(socketPath: string, name: string): Promise<string>;
 
   // Destructive guard
   isSandboxSocket(socketPath: string): boolean;

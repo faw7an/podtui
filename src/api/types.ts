@@ -656,3 +656,17 @@ export interface ImageHistoryEntry {
   Size: number;
   Comment: string;
 }
+
+/**
+ * One entry of `GET /libpod/quadlets/json` (fixture `quadlets-list.json`,
+ * Podman 5.8.4). `UnitName` is Podman's own mapping, honouring overrides
+ * such as `ServiceName=`; `Status` is "Not loaded" when systemd does not know
+ * the unit.
+ */
+export interface QuadletListItem {
+  Name: string;
+  UnitName: string;
+  Path: string;
+  Status: string;
+  App: string;
+}

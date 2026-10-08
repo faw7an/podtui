@@ -1,5 +1,6 @@
 import {
   get,
+  getText,
   post,
   postVoid,
   delReport,
@@ -12,6 +13,7 @@ import {
   MultiplexedLogDecoder,
 } from "../api/demux.ts";
 import type {
+  QuadletListItem,
   ImageHistoryEntry,
   ContainerListItem,
   ContainerInspect,
@@ -588,6 +590,16 @@ export function createPodmanEngine(): ContainerEngine {
       for await (const event of streamJson(socketPath, `/events?${queryParams.toString()}`)) {
         yield event;
       }
+    },
+
+    // Quadlets (P6). Podman lists them and computes unit names; verified on
+    // 5.8.4 against a throwaway service with a scratch XDG_CONFIG_HOME.
+    async listQuadlets(socketPath: string) {
+      return get<QuadletListItem[]>(socketPath, "/quadlets/json");
+    },
+
+    async quadletFile(socketPath: string, name: string) {
+      return getText(socketPath, `/quadlets/${encodeURIComponent(name)}/file`);
     },
 
     isSandboxSocket(socketPath: string) {

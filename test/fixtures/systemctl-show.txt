@@ -1,0 +1,11 @@
+Id=nope-xyz.service
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+UnitFileState=
+
+Id=pipewire.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=disabled

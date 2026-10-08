@@ -1,0 +1,37 @@
+[
+  {
+    "Name": "data.volume",
+    "UnitName": "data-volume.service",
+    "Path": "/home/user/.config/containers/systemd/data.volume",
+    "Status": "Not loaded",
+    "App": ""
+  },
+  {
+    "Name": "grp.pod",
+    "UnitName": "grp-pod.service",
+    "Path": "/home/user/.config/containers/systemd/grp.pod",
+    "Status": "Not loaded",
+    "App": ""
+  },
+  {
+    "Name": "hello.container",
+    "UnitName": "hello.service",
+    "Path": "/home/user/.config/containers/systemd/hello.container",
+    "Status": "Not loaded",
+    "App": ""
+  },
+  {
+    "Name": "named.container",
+    "UnitName": "custom-name.service",
+    "Path": "/home/user/.config/containers/systemd/named.container",
+    "Status": "Not loaded",
+    "App": ""
+  },
+  {
+    "Name": "svc.container",
+    "UnitName": "svc.service",
+    "Path": "/home/user/.config/containers/systemd/svc.container",
+    "Status": "Not loaded",
+    "App": ""
+  }
+]
