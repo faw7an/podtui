@@ -22,7 +22,7 @@ export interface DetailTabMeta {
 export const DETAIL_TABS: readonly DetailTabMeta[] = [
   { id: "logs", label: "Logs" },
   { id: "stats", label: "Stats", phase: "phase 3" },
-  { id: "env", label: "Env", phase: "phase 3" },
+  { id: "env", label: "Env" },
   { id: "config", label: "Config" },
   { id: "top", label: "Top", phase: "phase 3" },
 ] as const;
@@ -36,17 +36,33 @@ export interface DetailView {
   lines: string[];
   /** Logs tab stream; set by `buildFrameModel`, never by `buildDetail`. */
   log?: DetailLogModel;
+  /** Env tab layout: key column width, so values can be painted (P3-T6). */
+  env?: { keyWidth: number };
+  /** Extra bottom-border text, e.g. `v reveal secrets`. */
+  hint?: string;
 }
 
 /** Section keys that can be collapsed in the Config tab. */
 export const CONFIG_SECTIONS = ["state", "config", "network", "host"] as const;
 export type ConfigSection = (typeof CONFIG_SECTIONS)[number];
 
-/** Keys whose values are masked until explicitly revealed (P3-T6). */
-const SECRET_PATTERN = /(TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL)/i;
+/**
+ * Keys whose values are masked until `v` reveals them (P3-T6). Substring and
+ * case-insensitive on purpose: over-masking (`KEYBOARD_LAYOUT`) costs one
+ * keypress, under-masking leaks a secret on screen.
+ */
+export const SECRET_PATTERN = /(TOKEN|SECRET|PASSWORD|PASSWD|KEY|CREDENTIAL)/i;
+
+/** Fixed width, so the mask never tells the secret's length. */
+export const MASK = "********";
+
+export function isSecretKey(key: string): boolean {
+  return SECRET_PATTERN.test(key);
+}
 
 export function maskValue(key: string, value: string): string {
-  return SECRET_PATTERN.test(key) ? "*".repeat(Math.min(8, Math.max(3, value.length))) : value;
+  if (!isSecretKey(key) || value === "") return value;
+  return MASK;
 }
 
 export interface BuildDetailArgs {
@@ -132,15 +148,35 @@ function configLines(inspect: ContainerInspect, collapsed: ReadonlySet<string>):
   return out;
 }
 
-function envLines(inspect: ContainerInspect, reveal: boolean): string[] {
-  const env = inspect.Config?.Env ?? [];
-  if (env.length === 0) return [row("Env", "(empty)")];
-  return env.map((entry) => {
-    const eq = entry.indexOf("=");
-    const key = eq >= 0 ? entry.slice(0, eq) : entry;
-    const value = eq >= 0 ? entry.slice(eq + 1) : "";
-    return row(key, reveal ? value : maskValue(key, value));
-  });
+/** Widest key shown in full; longer keys are cut by the renderer's `fit`. */
+const ENV_KEY_MAX = 32;
+
+export interface EnvEntry {
+  key: string;
+  value: string;
+  secret: boolean;
+}
+
+/** `KEY=value` strings → entries sorted by key. A bare `KEY` has value "". */
+export function parseEnv(env: readonly string[]): EnvEntry[] {
+  return env
+    .map((entry) => {
+      const eq = entry.indexOf("=");
+      const key = eq >= 0 ? entry.slice(0, eq) : entry;
+      const value = eq >= 0 ? entry.slice(eq + 1) : "";
+      return { key, value, secret: isSecretKey(key) && value !== "" };
+    })
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+}
+
+function envView(inspect: ContainerInspect, reveal: boolean): { lines: string[]; keyWidth: number; hint?: string } {
+  const entries = parseEnv(inspect.Config?.Env ?? []);
+  if (entries.length === 0) return { lines: ["No environment variables."], keyWidth: 0 };
+  const keyWidth = Math.min(ENV_KEY_MAX, Math.max(...entries.map((e) => e.key.length))) + 2;
+  const lines = entries.map((e) => `${e.key.padEnd(keyWidth)}${reveal ? e.value : maskValue(e.key, e.value)}`);
+  const secrets = entries.filter((e) => e.secret).length;
+  const hint = secrets === 0 ? undefined : reveal ? "secrets shown · v hide" : `${secrets} masked · v reveal`;
+  return { lines, keyWidth, hint };
 }
 
 function placeholderLine(meta: DetailTabMeta): string {
@@ -166,13 +202,19 @@ export function buildDetail(args: BuildDetailArgs): DetailView {
   const title = `${inspect.Name || inspect.Id.slice(0, 12)} · ${inspect.State?.Status ?? "unknown"}`;
 
   let lines: string[];
+  let env: DetailView["env"];
+  let hint: string | undefined;
   switch (meta?.id) {
     case "config":
       lines = configLines(inspect, args.collapsed ?? new Set());
       break;
-    case "env":
-      lines = envLines(inspect, args.revealSecrets ?? false);
+    case "env": {
+      const view = envView(inspect, args.revealSecrets ?? false);
+      lines = view.lines;
+      env = view.keyWidth > 0 ? { keyWidth: view.keyWidth } : undefined;
+      hint = view.hint;
       break;
+    }
     default:
       // Logs/Stats/Top have no data source until Phase 3; say so rather than
       // rendering an empty pane that looks broken.
@@ -186,6 +228,8 @@ export function buildDetail(args: BuildDetailArgs): DetailView {
     activeTab: activeTab < 0 ? 0 : activeTab,
     activeTabId: meta?.id ?? "config",
     lines,
+    ...(env ? { env } : {}),
+    ...(hint ? { hint } : {}),
   };
 }
 

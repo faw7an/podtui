@@ -57,6 +57,8 @@ export const App = ({ socketPath }: { socketPath: string }) => {
   // without being torn down and re-created on every refresh.
   const dataRef = useRef<ResourceData>(EMPTY_DATA);
   const [logView, setLogView] = useState<LogViewState>(FOLLOW);
+  // Env secrets (P3-T6). Never carried to another container: see below.
+  const [revealSecrets, setRevealSecrets] = useState(false);
   const [logSearch, setLogSearch] = useState<LogSearchState>(NO_SEARCH);
   // Display preferences survive switching containers; they are the user's.
   const [logOpts, setLogOpts] = useState({ timestamps: false, wrap: false, errorsOnly: false });
@@ -119,6 +121,7 @@ export const App = ({ socketPath }: { socketPath: string }) => {
         inspect,
         filter: state.filterQuery,
         collapsedSections: state.collapsed,
+        revealSecrets,
       }),
     [
       data,
@@ -130,12 +133,17 @@ export const App = ({ socketPath }: { socketPath: string }) => {
       inspect,
       state.filterQuery,
       state.collapsed,
+      revealSecrets,
     ],
   );
 
   const focusId: PanelId = isPanelId(state.focus) ? state.focus : "containers";
   const focusModel = model.panels.find((p) => p.id === focusId);
   const selectedItemId = focusModel?.items[focusModel.selected]?.id ?? "";
+
+  // A revealed secret stays revealed only for the container it was revealed
+  // on: any change of selection hides secrets again.
+  useEffect(() => setRevealSecrets(false), [selectedItemId]);
 
   // The Logs tab follows the selected container while the detail pane is on
   // screen. Anything else (another tab, another panel, no pane) is null, and
@@ -325,6 +333,13 @@ export const App = ({ socketPath }: { socketPath: string }) => {
     // Space folds/unfolds every Config section; PgUp/PgDn scroll the detail.
     // Both are inert while filtering (the filter branch above returns first),
     // where Space types a space and PgUp/PgDn have no text to append.
+    // `v` reveals/hides masked Env values; only on the Env tab, so it can
+    // never flip secrets on while they are not even on screen.
+    if (input === "v" && activeTab === "env") {
+      setRevealSecrets((r) => !r);
+      return;
+    }
+
     if (input === " ") {
       dispatch({ type: "toggleAllSections" });
       return;

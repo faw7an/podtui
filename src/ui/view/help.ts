@@ -27,6 +27,7 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "e", desc: "logs: errors only", section: "detail" },
   { key: "t", desc: "logs: timestamps", section: "detail" },
   { key: "w", desc: "logs: wrap lines", section: "detail" },
+  { key: "v", desc: "env: reveal secrets", section: "detail" },
   { key: "Esc", desc: "back / close", section: "detail" },
   { key: "z", desc: "zoom panel", section: "panels" },
   { key: "?", desc: "help", section: "app" },

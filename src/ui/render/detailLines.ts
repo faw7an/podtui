@@ -7,7 +7,7 @@ import { logWindow } from "../view/logView.ts";
 import type { LogLine } from "../../util/logBuffer.ts";
 import { renderLogRows } from "./logRows.ts";
 import { matchCount } from "../view/logSearch.ts";
-import { LABEL_W } from "../view/detail.ts";
+import { LABEL_W, MASK } from "../view/detail.ts";
 import { bg, bold, dim, fg, paint, RESET } from "./palette.ts";
 
 const TL = "╭";
@@ -40,6 +40,17 @@ function paintContent(line: string, theme: Theme, on: boolean): string {
     return paint(line.slice(0, LABEL_W), [fg(theme.accent)]) + line.slice(LABEL_W);
   }
   return line;
+}
+
+/**
+ * One Env row (P3-T6): the name plain, the value in the accent colour, a
+ * masked value dim so it reads as "hidden", not as a value of asterisks.
+ */
+function paintEnvRow(line: string, keyWidth: number, theme: Theme, on: boolean): string {
+  if (!on || line.length <= keyWidth) return line;
+  const key = line.slice(0, keyWidth);
+  const value = line.slice(keyWidth);
+  return key + paint(value, [value === MASK ? dim() : fg(theme.accent)]);
 }
 
 interface ContentWindow {
@@ -161,9 +172,15 @@ export function renderDetail(
   } else {
     const lastTop = Math.max(0, detail.lines.length - contentBudget);
     const top = Math.min(Math.max(0, opts.scroll ?? 0), lastTop);
-    rows = detail.lines.slice(top, top + contentBudget).map((line) => paintContent(line, theme, on));
+    const env = detail.env;
+    rows = detail.lines
+      .slice(top, top + contentBudget)
+      .map((line) => (env ? paintEnvRow(line, env.keyWidth, theme, on) : paintContent(line, theme, on)));
     const hiddenBelow = detail.lines.length - top - rows.length;
-    hint = hiddenBelow > 0 ? ` ↓${hiddenBelow} more ` : "";
+    const parts = [detail.hint, hiddenBelow > 0 ? `↓${hiddenBelow} more` : undefined].filter(
+      (p): p is string => p !== undefined,
+    );
+    hint = parts.length > 0 ? ` ${parts.join(" · ")} ` : "";
   }
 
   for (let i = 0; i < innerRows; i++) {

@@ -49,6 +49,10 @@ export interface DetailModel {
    * lines are ever formatted.
    */
   log?: DetailLogModel;
+  /** Env tab: key column width, so the renderer paints values (P3-T6). */
+  env?: { keyWidth: number };
+  /** Extra bottom-border text, e.g. `v reveal`. */
+  hint?: string;
 }
 
 export interface DetailLogModel {

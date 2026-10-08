@@ -245,6 +245,7 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `e` | logs: errors only |
 | `t` | logs: timestamps |
 | `w` | logs: wrap lines |
+| `v` | env: reveal secrets |
 | `Esc` | back / close |
 | `?` | help |
 | `q` | quit |
