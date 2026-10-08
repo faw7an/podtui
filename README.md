@@ -73,7 +73,8 @@ networks are never force-removed.
 | Six numbered panels (pods, containers, images, volumes, networks, quadlets), each can be shown or hidden | |
 | **Quadlets**: unit state from systemd, the file, the generated unit, live journal; start / stop / restart, reload systemd | |
 | Live refresh (every 5 s by default) that keeps your cursor on the same item | |
-| Container **Config** tab: formatted inspect output, foldable sections | Omarchy theme colours, mouse support |
+| Follows your **Omarchy theme** live (`T` reloads); readable status colours on light and dark themes; 256-colour fallback | |
+| Container **Config** tab: formatted inspect output, foldable sections | Mouse support |
 | Container **Logs** tab: live follow, pause, search, errors red / warnings yellow, errors-only, timestamps, wrap | |
 | Pod (members), image (history, users), volume (users) and network (subnets, members) detail views | |
 | **Stats** (live CPU with a 1-minute sparkline, memory, net, block, PIDs), **Env** (secrets masked until `v`) and **Top** (process list, every 2 s) tabs | |
@@ -261,6 +262,7 @@ Ctrl+C or a `SIGTERM` restores the terminal.
 | `d` | remove (asks first) |
 | `x` | bulk: prune, stop, remove |
 | `R` | quadlets: reload systemd |
+| `T` | reload Omarchy theme |
 | `?` | help |
 | `q` | quit |
 

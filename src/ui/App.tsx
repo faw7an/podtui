@@ -7,7 +7,11 @@ import { createPodmanEngine } from "../engine/podman.ts";
 import { bunRunner, createSystemd, type CommandRunner, type SystemdScope } from "../engine/systemd.ts";
 import { initialState, reducer, resolveEscape, selectedIndex } from "./layout/layoutReducer.ts";
 import { PANEL_IDS, isPanelId, type PanelId } from "./layout/types.ts";
-import { defaultTheme } from "../theme/theme.ts";
+import { defaultTheme, type Theme } from "../theme/theme.ts";
+import { OMARCHY_THEME_DIRS, loadOmarchyTheme } from "../theme/omarchy.ts";
+import { watch } from "node:fs";
+import { homedir } from "node:os";
+import { dirname } from "node:path";
 import { EMPTY_DATA, buildFrameModel, type ResourceData } from "./view/build.ts";
 import { createVisibleFetcher, startPollLoop } from "./view/refresh.ts";
 import { nextTabIndex, type DetailTabId } from "./view/detail.ts";
@@ -56,6 +60,9 @@ function selectionStep(
 
 export { PANEL_COLUMNS };
 
+/** `$HOME` first (as shells and Omarchy use it), else the OS account home. */
+const homeDir = (): string => process.env["HOME"] || homedir();
+
 /**
  * `runner` exists for tests: they pass a fake so nothing ever reaches the real
  * user systemd. Production uses the Bun.spawn runner.
@@ -91,6 +98,42 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
   const [logOpts, setLogOpts] = useState({ timestamps: false, wrap: false, errorsOnly: false });
 
   const engine = useMemo(() => createPodmanEngine(), []);
+
+  // Omarchy theme (P7-T4): loaded at startup, reloaded on `T`, and followed
+  // when Omarchy switches theme. Switching REPLACES the theme directory, so
+  // the watch is on its parent; events are debounced.
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const reloadTheme = async (announce: boolean): Promise<void> => {
+    const r = await loadOmarchyTheme(homeDir());
+    setTheme(r.theme);
+    if (announce) {
+      setNotice(
+        r.kind === "omarchy"
+          ? { tone: "ok", text: `theme: ${r.theme.name.replace(/^omarchy:/, "")}` }
+          : { tone: "ok", text: `default theme (${r.reason})` },
+      );
+    }
+  };
+  useEffect(() => {
+    void reloadTheme(false);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const watchers = OMARCHY_THEME_DIRS(homeDir()).flatMap((dir) => {
+      try {
+        return [
+          watch(dirname(dir), () => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => void reloadTheme(false), 300);
+          }),
+        ];
+      } catch {
+        return []; // that location does not exist: nothing to follow
+      }
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      for (const w of watchers) w.close();
+    };
+  }, []);
   // Quadlet units live in the USER systemd for a rootless Podman and in the
   // system manager for a rootful one (P6); asked once, user until known.
   const [scope, setScope] = useState<SystemdScope>("user");
@@ -588,6 +631,12 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
     // Space folds/unfolds every Config section; PgUp/PgDn scroll the detail.
     // Both are inert while filtering (the filter branch above returns first),
     // where Space types a space and PgUp/PgDn have no text to append.
+    // --- `T`: reload the Omarchy theme (P7-T4). ---
+    if (input === "T") {
+      void reloadTheme(true);
+      return;
+    }
+
     // --- `x`: bulk commands, the focused panel's first (P5-T6). ---
     if (input === "x") {
       if (busyRef.current) {
@@ -712,13 +761,13 @@ export const App = ({ socketPath, runner = bunRunner }: { socketPath: string; ru
 
   // The help overlay replaces the frame while open.
   if (state.help) {
-    return <HelpOverlay size={{ cols: terminalCols, rows: terminalRows }} />;
+    return <HelpOverlay size={{ cols: terminalCols, rows: terminalRows }} theme={theme} />;
   }
 
   return (
     <Screen
       model={shownModel}
-      theme={defaultTheme}
+      theme={theme}
       visible={state.visible}
       zoom={state.zoom}
       detailFullscreen={state.detailFullscreen}

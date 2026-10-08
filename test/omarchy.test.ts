@@ -38,7 +38,7 @@ describe("parseOmarchyColors", () => {
 });
 
 describe("themeFromPalette", () => {
-  test.each(THEMES)("%s: every status colour and selected text readable (≥ 3:1)", (t) => {
+  test.each(THEMES.map((t) => [t] as [string]))("%s: every status colour and selected text readable (≥ 3:1)", (t) => {
     const th = themeFromPalette(parseOmarchyColors(file(t)), t);
     for (const role of ["error", "warn", "ok", "accent"] as const) {
       expect(contrast(th[role], th.background)).toBeGreaterThanOrEqual(MIN_CONTRAST);

@@ -31,16 +31,52 @@ const BOLD = "\u001B[1m";
 const DIM = "\u001B[2m";
 const INVERSE = "\u001B[7m";
 
+export type ColorDepth = "truecolor" | "256";
+
+/**
+ * Colour depth (P7-T5). `PODTUI_COLOR` forces it. Otherwise `COLORTERM`
+ * (truecolor/24bit) means 24-bit; a `TERM` that advertises 256 colours
+ * without `COLORTERM` (typical inside tmux/screen) gets 256; anything else
+ * stays 24-bit, as before, so nothing that worked changes.
+ */
+export function colorDepth(env: Record<string, string | undefined> = process.env): ColorDepth {
+  const forced = env["PODTUI_COLOR"];
+  if (forced === "256" || forced === "truecolor") return forced;
+  const ct = (env["COLORTERM"] ?? "").toLowerCase();
+  if (ct === "truecolor" || ct === "24bit") return "truecolor";
+  if (/256color/.test(env["TERM"] ?? "")) return "256";
+  return "truecolor";
+}
+
+/** xterm's 6x6x6 cube levels and 24-step grey ramp (xterm 256colres). */
+const CUBE = [0, 95, 135, 175, 215, 255];
+
+/** Nearest xterm-256 index for an RGB colour (cube 16-231, greys 232-255). */
+export function rgbTo256(r: number, g: number, b: number): number {
+  const level = (v: number): number => CUBE.reduce((best, c, i) => (Math.abs(c - v) < Math.abs((CUBE[best] ?? 0) - v) ? i : best), 0);
+  const [ri, gi, bi] = [level(r), level(g), level(b)];
+  const cube = 16 + 36 * ri + 6 * gi + bi;
+  const cubeRgb = [CUBE[ri] ?? 0, CUBE[gi] ?? 0, CUBE[bi] ?? 0];
+  const avg = (r + g + b) / 3;
+  const greyIndex = Math.min(23, Math.max(0, Math.round((avg - 8) / 10)));
+  const grey = 8 + greyIndex * 10;
+  const dist = (c: number[]): number => (c[0]! - r) ** 2 + (c[1]! - g) ** 2 + (c[2]! - b) ** 2;
+  return dist([grey, grey, grey]) < dist(cubeRgb) ? 232 + greyIndex : cube;
+}
+
+function sgrColor(layer: 38 | 48, color: string): string {
+  const [r, g, b] = hexToRgb(color);
+  return colorDepth() === "256" ? `\u001B[${layer};5;${rgbTo256(r, g, b)}m` : `\u001B[${layer};2;${r};${g};${b}m`;
+}
+
 export function fg(color: string): string {
   if (!colorEnabled()) return "";
-  const [r, g, b] = hexToRgb(color);
-  return `\u001B[38;2;${r};${g};${b}m`;
+  return sgrColor(38, color);
 }
 
 export function bg(color: string): string {
   if (!colorEnabled()) return "";
-  const [r, g, b] = hexToRgb(color);
-  return `\u001B[48;2;${r};${g};${b}m`;
+  return sgrColor(48, color);
 }
 
 export const bold = (): string => (colorEnabled() ? BOLD : "");

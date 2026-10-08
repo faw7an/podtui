@@ -38,6 +38,7 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: "d", desc: "remove (asks first)", section: "actions" },
   { key: "x", desc: "bulk: prune, stop, remove", section: "actions" },
   { key: "R", desc: "quadlets: reload systemd", section: "actions" },
+  { key: "T", desc: "reload Omarchy theme", section: "app" },
   { key: "?", desc: "help", section: "app" },
   { key: "q", desc: "quit", section: "app" },
 ] as const;

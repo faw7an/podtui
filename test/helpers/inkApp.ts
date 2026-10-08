@@ -43,6 +43,11 @@ export class FakeStdout extends EventEmitter {
     return frames.at(-1) ?? stripped;
   }
 
+  /** Everything written so far, escapes included (for colour assertions). */
+  raw(): string {
+    return this.buffer;
+  }
+
   drain(): void {
     this.buffer = "";
   }
