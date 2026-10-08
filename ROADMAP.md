@@ -111,8 +111,8 @@ Phase overview
 - [x] **P3-T6** Env tab: sorted key/value; names plain, values colored; masks values whose key matches secret-like patterns (`TOKEN`, `SECRET`, `PASSWORD`, `KEY`) until `v` reveals; unit-tested masker.
 - [x] **P3-T7** Stats tab: live CPU %, memory used/limit, network rx/tx, block I/O, PIDs; small sparkline history (last ~60 samples). ⚠️ VERIFY field names and how CPU % must be computed from the stats samples; unit-test the calculation with fixture samples.
 - [x] **P3-T8** Top tab: process table from `top`; column alignment; refresh interval.
-- [ ] **P3-T9** Stream lifecycle: switching tab, selection, hiding the panel, or quitting aborts the stream. Test with a mock engine that tracks open/close counts.
-- [ ] **P3-T10** Empty/error states: no logs yet, container not running (stats/top show a friendly message), stream disconnected.
+- [x] **P3-T9** Stream lifecycle: switching tab, selection, hiding the panel, or quitting aborts the stream. Test with a mock engine that tracks open/close counts.
+- [x] **P3-T10** Empty/error states: no logs yet, container not running (stats/top show a friendly message), stream disconnected.
 
 **Automated tests:** logLevel table tests; masker tests; stats math tests; log buffer ring tests (overflow drops oldest, memory bounded); stream open/close counter test; Logs tab snapshot with red line present.
 

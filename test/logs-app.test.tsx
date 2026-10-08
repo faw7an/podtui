@@ -35,6 +35,9 @@ interface FakePodman {
   opened: string[];
   closed: string[];
   open(): number;
+  /** Open `/containers/stats` streams. */
+  statsOpen(): number;
+  statsOpened: string[];
   stop(): void;
 }
 
@@ -49,6 +52,10 @@ function fakePodman(): FakePodman {
   const opened: string[] = [];
   const closed: string[] = [];
   const streams = new Map<Socket<undefined>, string>();
+  const statsStreams = new Set<Socket<undefined>>();
+  const statsOpened: string[] = [];
+  const statsLine = (name: string): string =>
+    `${JSON.stringify({ Error: null, Stats: [{ Name: name, CPU: 1.5, AvgCPU: 0.5, MemUsage: 1000, MemLimit: 2000, MemPerc: 50, Network: null, BlockInput: 0, BlockOutput: 0, PIDs: 3 }] })}\n`;
 
   const server = Bun.listen<undefined>({
     unix: path,
@@ -56,6 +63,16 @@ function fakePodman(): FakePodman {
       data(socket, data) {
         const target = data.toString().split(" ")[1] ?? "";
         const logs = /\/containers\/([0-9a-f]+)\/logs/.exec(target);
+        const stats = /\/containers\/stats\?containers=([^&]+)/.exec(target);
+        if (stats?.[1] && target.includes("stream=true")) {
+          const id = decodeURIComponent(stats[1]);
+          const name = NAMES.get(id) ?? id;
+          statsOpened.push(name);
+          statsStreams.add(socket);
+          socket.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n");
+          socket.write(statsLine(name));
+          return;
+        }
         if (logs?.[1]) {
           const name = NAMES.get(logs[1]) ?? "?";
           opened.push(name);
@@ -77,6 +94,7 @@ function fakePodman(): FakePodman {
         socket.end();
       },
       close(socket) {
+        statsStreams.delete(socket);
         const name = streams.get(socket);
         if (name !== undefined) {
           closed.push(name);
@@ -91,6 +109,8 @@ function fakePodman(): FakePodman {
     opened,
     closed,
     open: () => streams.size,
+    statsOpen: () => statsStreams.size,
+    statsOpened,
     stop: () => {
       server.stop(true);
       try {
@@ -193,6 +213,64 @@ describe("Logs tab in the App", () => {
       expect(h.stdout.frame()).toContain("/boom 1/1");
       h.stdin.type("\u001B");
       await waitFor(() => !h.stdout.frame().includes("/boom"), "search cleared");
+    } finally {
+      h.unmount();
+      h.api.stop();
+    }
+  }, 30000);
+
+  test("hiding the detail pane (zoom a list) closes the log stream; unzoom reopens it", async () => {
+    const h = await launch();
+    try {
+      h.stdin.type("j");
+      await new Promise((r) => setTimeout(r, 50));
+      h.stdin.type("]");
+      h.stdin.type("]");
+      await waitFor(() => h.api.open() === 1, "logs stream open");
+      h.stdin.type("z"); // zoom the Containers list: the detail pane is gone
+      await waitFor(() => h.api.open() === 0, "stream closed while the pane is hidden");
+      h.stdin.type("\u001B"); // unzoom
+      await waitFor(() => h.api.open() === 1, "stream reopened");
+    } finally {
+      h.unmount();
+      h.api.stop();
+    }
+  }, 30000);
+
+  test("Stats: one live stream for a running container, closed on tab change", async () => {
+    const h = await launch();
+    try {
+      h.stdin.type("j"); // web (running)
+      await new Promise((r) => setTimeout(r, 50));
+      h.stdin.type("["); // Config → Env
+      h.stdin.type("["); // Env → Stats
+      await waitFor(() => h.stdout.frame().includes("1.5% (avg 0.5%)"), "stats row");
+      expect(h.api.statsOpened).toEqual(["web"]);
+      expect(h.api.statsOpen()).toBe(1);
+      h.stdin.type("[");
+      await waitFor(() => h.api.statsOpen() === 0, "stats stream closed on tab change");
+    } finally {
+      h.unmount();
+      h.api.stop();
+    }
+  }, 30000);
+
+  test("Stats on a stopped container opens no stream and says why", async () => {
+    const h = await launch();
+    try {
+      h.stdin.type("j"); // web
+      await new Promise((r) => setTimeout(r, 50));
+      for (const k of ["j", "j"]) {
+        // One key per chunk: "jj" in one read is a single two-character input.
+        h.stdin.type(k);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      // (The fake serves `web`'s inspect for every id, so the title cannot
+      // confirm the selection; the Stats message below comes from the list.)
+      h.stdin.type("[");
+      h.stdin.type("[");
+      await waitFor(() => h.stdout.frame().includes("failing is not running (exited)."), "not-running message");
+      expect(h.api.statsOpened).toEqual([]);
     } finally {
       h.unmount();
       h.api.stop();

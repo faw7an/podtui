@@ -84,3 +84,24 @@ describe("Top tab model and render", () => {
     expect(stripAnsi(out.at(-1) ?? "")).toContain("↓2 more");
   });
 });
+
+describe("detail title follows the polled list, not the one-time inspect", () => {
+  test("a container stopped while selected stops saying running", () => {
+    const inspect = JSON.parse(readFileSync("test/fixtures/container-inspect.json", "utf8"));
+    expect(inspect.State.Status).toBe("running");
+    const exited = containers.map((c: { Id: string; State: string }, i: number) =>
+      i === 0 ? { ...c, State: "exited", Status: "" } : c,
+    );
+    const selected = Object.fromEntries(PANEL_IDS.map((p) => [p, ""])) as Record<PanelId, string>;
+    const d = buildFrameModel({
+      data: { ...EMPTY_DATA, containers: exited },
+      selected: { ...selected, containers: exited[0].Id },
+      focus: "containers",
+      now: Date.now(),
+      clock: "",
+      activeTab: "logs",
+      inspect,
+    }).detail;
+    expect(d.title).toBe("web · exited");
+  });
+});

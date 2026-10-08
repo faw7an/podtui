@@ -224,6 +224,14 @@ export function buildFrameModel(args: BuildFrameArgs): FrameModel {
       })
     : buildDetail({ inspect: null, activeTab: args.activeTab ?? "config", hasSelection: false });
 
+  // The list is re-polled; inspect is fetched once per selection. So the
+  // title takes the name from inspect but the state from the list: a
+  // container stopped while selected must not keep saying "running".
+  if (item && inspect && focusId === "containers") {
+    const state = (item.cells["state"] ?? "").slice(2);
+    if (state) detail.title = `${inspect.Name || inspect.Id.slice(0, 12)} · ${state}`;
+  }
+
   // Top: a polled process table for a running container (P3-T8).
   if ((args.activeTab ?? "config") === "top") {
     if (focusId === "containers" && item) {
